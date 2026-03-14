@@ -1,5 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Dimensions } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, opacity } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
@@ -14,13 +16,68 @@ const BUTTON_GOLD = colors.primary;
 interface ChordDetailModalProps {
   visible: boolean;
   chord: ChordData | null;
+  allChords?: ChordData[];
+  currentIndex?: number;
   onClose: () => void;
+  onNavigate?: (direction: 'prev' | 'next') => void;
   onPlay?: () => void;
   onEdit?: () => void;
 }
 
-export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: ChordDetailModalProps) {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = 50;
+
+export function ChordDetailModal({ 
+  visible, 
+  chord, 
+  allChords = [],
+  currentIndex = 0,
+  onClose, 
+  onNavigate,
+  onPlay, 
+  onEdit 
+}: ChordDetailModalProps) {
   const { isAdmin } = useAuth();
+  const translateX = useSharedValue(0);
+  
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < allChords.length - 1;
+  
+  const handleSwipe = (direction: 'prev' | 'next') => {
+    if (onNavigate) {
+      onNavigate(direction);
+      translateX.value = 0;
+    }
+  };
+  
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      // Only allow swipe if there's a chord in that direction
+      if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
+        translateX.value = e.translationX * 0.2; // Damped movement
+      } else {
+        translateX.value = e.translationX;
+      }
+    })
+    .onEnd((e) => {
+      if (Math.abs(e.translationX) > SWIPE_THRESHOLD && Math.abs(e.velocityX) > 500) {
+        if (e.translationX > 0 && hasPrev) {
+          runOnJS(handleSwipe)('prev');
+        } else if (e.translationX < 0 && hasNext) {
+          runOnJS(handleSwipe)('next');
+        } else {
+          translateX.value = withSpring(0);
+        }
+      } else {
+        translateX.value = withSpring(0);
+      }
+    });
+  
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
   
   if (!chord) return null;
 
@@ -236,7 +293,8 @@ export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: Ch
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.modal}>
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[styles.modal, animatedStyle]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -292,7 +350,38 @@ export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: Ch
             {/* Finger Positions */}
             {renderFingerPositions()}
           </ScrollView>
-        </View>
+          
+          {/* Swipe Indicators */}
+          {hasPrev && (
+            <View style={[styles.swipeIndicator, styles.swipeIndicatorLeft]}>
+              <MaterialIcons name="chevron-left" size={24} color={colors.textMuted} />
+            </View>
+          )}
+          {hasNext && (
+            <View style={[styles.swipeIndicator, styles.swipeIndicatorRight]}>
+              <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
+            </View>
+          )}
+          
+          {/* Progress indicator */}
+          {allChords.length > 0 && (
+            <View style={styles.progressDots}>
+              {allChords.slice(Math.max(0, currentIndex - 2), Math.min(allChords.length, currentIndex + 3)).map((_, idx) => {
+                const actualIdx = Math.max(0, currentIndex - 2) + idx;
+                return (
+                  <View 
+                    key={actualIdx}
+                    style={[
+                      styles.progressDot,
+                      actualIdx === currentIndex && styles.progressDotActive
+                    ]} 
+                  />
+                );
+              })}
+            </View>
+          )}
+        </Animated.View>
+        </GestureDetector>
       </View>
     </Modal>
   );
@@ -620,5 +709,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
     textAlign: 'right',
+  },
+  swipeIndicator: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bgOverlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.6,
+  },
+  swipeIndicatorLeft: {
+    left: -20,
+  },
+  swipeIndicatorRight: {
+    right: -20,
+  },
+  progressDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  progressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.borderSubtle,
+  },
+  progressDotActive: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
 });

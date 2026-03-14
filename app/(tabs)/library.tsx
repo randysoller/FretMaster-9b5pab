@@ -1,45 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
-import { CHORDS, ChordData, ChordShape, ChordType } from '@/constants/musicData';
+import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
+import { PresetDropdown } from '@/components/feature/PresetDropdown';
+import { CHORD_DATA, ChordData, ChordShape, BarreRoot } from '@/constants/musicData';
+import { useChordLibrary } from '@/contexts/ChordLibraryContext';
 import { audioService } from '@/services/audioService';
 import { colors, spacing, borderRadius, opacity } from '@/constants/theme';
 
-const FILTER_TYPES = [
+const CATEGORY_FILTERS: { label: string; value: ChordShape | 'all'; icon: any }[] = [
   { label: 'All', value: 'all', icon: null },
-  { label: 'Open', value: 'open', icon: 'check' as const },
-  { label: 'Barre', value: 'barre', icon: 'horizontal-rule' as const },
-  { label: 'Movable', value: 'movable', icon: 'open-with' as const },
+  { label: 'Open', value: 'open', icon: 'check' },
+  { label: 'Barre', value: 'barre', icon: 'horizontal-rule' },
+  { label: 'Movable', value: 'movable', icon: 'open-with' },
+];
+
+const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
+  { label: '6th', value: '6th' },
+  { label: '5th', value: '5th' },
+  { label: '4th', value: '4th' },
 ];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [selectedChords, setSelectedChords] = useState<Set<string>>(new Set());
   const [selectedChord, setSelectedChord] = useState<ChordData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  const {
+    filterCategories,
+    filterTypes,
+    filterBarreRoots,
+    searchQuery,
+    selectedChordIds,
+    toggleCategory,
+    toggleBarreRoot,
+    setSearchQuery,
+    toggleChordSelection,
+    clearSelectedChords,
+    clearAll,
+  } = useChordLibrary();
 
-  // Filter chords
-  const filteredChords = CHORDS.filter(chord => {
-    if (searchQuery && !chord.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    if (selectedFilter === 'all') return true;
-    return chord.shape === selectedFilter;
-  });
+  // Filter chords with three-tier logic
+  const filteredChords = useMemo(() => {
+    return CHORD_DATA.filter(chord => {
+      // Search query
+      if (searchQuery && !chord.fullName.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Category filter (shape)
+      if (filterCategories.length > 0 && !filterCategories.includes(chord.shape)) {
+        return false;
+      }
+      
+      // Type filter
+      if (filterTypes.length > 0 && !filterTypes.includes(chord.type)) {
+        return false;
+      }
+      
+      // Barre root filter (only applies if barre/movable selected)
+      const hasBM = filterCategories.includes('barre') || filterCategories.includes('movable');
+      if (hasBM && filterBarreRoots.length > 0) {
+        if (!chord.rootString || !filterBarreRoots.includes(chord.rootString)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [searchQuery, filterCategories, filterTypes, filterBarreRoots]);
+  
+  // Show barre root filter if barre/movable is selected
+  const showBarreRootFilter = filterCategories.includes('barre') || filterCategories.includes('movable');
+  
+  // Check if any filters are active
+  const hasActiveFilters = filterCategories.length > 0 || filterTypes.length > 0 || filterBarreRoots.length > 0 || searchQuery.length > 0;
 
-  const toggleChordSelection = (chordName: string) => {
-    const newSelection = new Set(selectedChords);
-    if (newSelection.has(chordName)) {
-      newSelection.delete(chordName);
+  const handleCategoryToggle = (value: ChordShape | 'all') => {
+    if (value === 'all') {
+      clearAll();
     } else {
-      newSelection.add(chordName);
+      toggleCategory(value);
     }
-    setSelectedChords(newSelection);
   };
 
   const handleChordPress = (chord: ChordData) => {
@@ -64,13 +109,11 @@ export default function LibraryScreen() {
       </View>
 
       {/* Preset Selector */}
-      <Pressable style={styles.presetSelector}>
-        <MaterialIcons name="folder-open" size={18} color="#888" />
-        <Text style={styles.presetText}>EASY START - Presets</Text>
-        <MaterialIcons name="keyboard-arrow-down" size={20} color="#888" />
-      </Pressable>
+      <View style={styles.presetRow}>
+        <PresetDropdown />
+      </View>
 
-      {/* Search Bar */}
+      {/* Search & Type Filter */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <MaterialIcons name="search" size={20} color="#666" />
@@ -87,47 +130,93 @@ export default function LibraryScreen() {
             </Pressable>
           )}
         </View>
-        <Pressable style={styles.filterButton}>
-          <MaterialIcons name="tune" size={20} color="#888" />
-        </Pressable>
+        <TypeFilterDropdown />
       </View>
 
-      {/* Filter Chips */}
+      {/* Category Filter Chips */}
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
         style={styles.filtersContainer}
         contentContainerStyle={styles.filtersContent}
       >
-        {FILTER_TYPES.map(filter => (
-          <Pressable
-            key={filter.value}
-            onPress={() => setSelectedFilter(filter.value)}
-            style={[
-              styles.filterChip,
-              selectedFilter === filter.value && styles.filterChipActive,
-            ]}
-          >
-            {filter.icon && (
-              <MaterialIcons 
-                name={filter.icon} 
-                size={14} 
-                color={selectedFilter === filter.value ? '#000' : '#888'} 
-              />
-            )}
-            <Text style={[
-              styles.filterChipText,
-              selectedFilter === filter.value && styles.filterChipTextActive,
-            ]}>
-              {filter.label}
-            </Text>
-          </Pressable>
-        ))}
+        {CATEGORY_FILTERS.map(filter => {
+          const isActive = filter.value === 'all' 
+            ? filterCategories.length === 0
+            : filterCategories.includes(filter.value as ChordShape);
+          
+          return (
+            <Pressable
+              key={filter.value}
+              onPress={() => handleCategoryToggle(filter.value)}
+              style={[
+                styles.filterChip,
+                isActive && styles.filterChipActive,
+              ]}
+            >
+              {filter.icon && (
+                <MaterialIcons 
+                  name={filter.icon} 
+                  size={14} 
+                  color={isActive ? colors.primary : '#888'} 
+                />
+              )}
+              <Text style={[
+                styles.filterChipText,
+                isActive && styles.filterChipTextActive,
+              ]}>
+                {filter.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
+      
+      {/* Barre Root Filter (only shown when barre/movable selected) */}
+      {showBarreRootFilter && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.barreRootContainer}
+          contentContainerStyle={styles.filtersContent}
+        >
+          <Text style={styles.barreRootLabel}>Root String:</Text>
+          {BARRE_ROOT_FILTERS.map(filter => {
+            const isActive = filterBarreRoots.includes(filter.value);
+            
+            return (
+              <Pressable
+                key={filter.value}
+                onPress={() => toggleBarreRoot(filter.value)}
+                style={[
+                  styles.filterChip,
+                  styles.barreRootChip,
+                  isActive && styles.filterChipActive,
+                ]}
+              >
+                <Text style={[
+                  styles.filterChipText,
+                  isActive && styles.filterChipTextActive,
+                ]}>
+                  {filter.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
-      {/* Results Count & Legend */}
+      {/* Results Count & Actions */}
       <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>{filteredChords.length} chords</Text>
+        <View style={styles.resultsLeft}>
+          <Text style={styles.resultsCount}>{filteredChords.length} chords</Text>
+          {hasActiveFilters && (
+            <Pressable onPress={clearAll} style={styles.clearButton}>
+              <MaterialIcons name="close" size={14} color={colors.textMuted} />
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={styles.legendDotOrange} />
@@ -140,6 +229,21 @@ export default function LibraryScreen() {
         </View>
       </View>
 
+      {/* Selected Actions Bar */}
+      {selectedChordIds.length > 0 && (
+        <View style={styles.selectionBar}>
+          <View style={styles.selectionLeft}>
+            <MaterialIcons name="check-circle" size={20} color={colors.primary} />
+            <Text style={styles.selectionCount}>{selectedChordIds.length} selected</Text>
+          </View>
+          <View style={styles.selectionActions}>
+            <Pressable onPress={clearSelectedChords} style={styles.selectionButton}>
+              <Text style={styles.selectionButtonText}>Clear</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {/* Chord List */}
       <ScrollView 
         showsVerticalScrollIndicator={false} 
@@ -148,12 +252,12 @@ export default function LibraryScreen() {
       >
         {filteredChords.map((chord, index) => (
           <ChordCard
-            key={chord.name}
+            key={chord.id}
             chord={chord}
             cardNumber={index + 1}
-            isSelected={selectedChords.has(chord.name)}
+            isSelected={selectedChordIds.includes(chord.id)}
             onPress={() => handleChordPress(chord)}
-            onCheckboxPress={() => toggleChordSelection(chord.name)}
+            onCheckboxPress={() => toggleChordSelection(chord.id)}
           />
         ))}
       </ScrollView>
@@ -191,24 +295,9 @@ const styles = StyleSheet.create({
     color: colors.textSubtle,
     lineHeight: 20,
   },
-  presetSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  presetRow: {
     marginHorizontal: spacing.base,
     marginTop: spacing.base,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.bgElevated,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  presetText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textSubtle,
-    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -234,15 +323,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 0,
   },
-  filterButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
+  barreRootContainer: {
+    marginTop: spacing.sm,
+    maxHeight: 50,
+  },
+  barreRootLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    alignSelf: 'center',
+    marginRight: spacing.sm,
+  },
+  barreRootChip: {
+    minWidth: 50,
     justifyContent: 'center',
-    backgroundColor: colors.bgElevated,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   filtersContainer: {
     marginTop: 12,
@@ -283,10 +377,29 @@ const styles = StyleSheet.create({
     paddingTop: spacing.base,
     paddingBottom: spacing.md,
   },
+  resultsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
   resultsCount: {
     color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.bgOverlay,
+    borderRadius: borderRadius.sm,
+  },
+  clearButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   legend: {
     flexDirection: 'row',
@@ -320,5 +433,45 @@ const styles = StyleSheet.create({
   chordListContent: {
     paddingHorizontal: spacing.base,
     paddingBottom: 20,
+  },
+  selectionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: spacing.base,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.bgOverlay,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary + '40',
+  },
+  selectionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  selectionCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  selectionActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  selectionButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.bgSurface,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSubtle,
   },
 });
