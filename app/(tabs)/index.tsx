@@ -106,28 +106,12 @@ export default function HomeScreen() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <MaterialIcons name="music-note" size={24} color={colors.primary} />
-          <View style={styles.headerBadge}>
-            <MaterialIcons name="auto-awesome" size={12} color={colors.primary} />
-            <Text style={styles.headerBadgeText}>
-              {profile ? `Welcome back, ${profile.username}` : 'Choose Your Practice Mode'}
-            </Text>
-          </View>
-        </View>
-
+        {/* Title */}
         <View style={styles.titleContainer}>
           <Text style={styles.title}>
             What Do You Want to{'\n'}
             <Text style={styles.titleAccent}>Play Today?</Text>
           </Text>
-          <Pressable 
-            style={styles.statsButton}
-            onPress={() => router.push('/stats' as any)}
-          >
-            <MaterialIcons name="bar-chart" size={24} color={colors.primary} />
-          </Pressable>
         </View>
 
         {/* Quick Stats Card */}
@@ -206,32 +190,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 16,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    paddingTop: spacing.xl,
-    gap: spacing.sm,
-  },
-  headerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    gap: 4,
-    flex: 1,
-  },
-  headerBadgeText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
-  },
   titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
@@ -240,16 +200,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: colors.text,
     lineHeight: 36,
-    flex: 1,
-  },
-  statsButton: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
   },
   titleAccent: {
     color: colors.primary,
