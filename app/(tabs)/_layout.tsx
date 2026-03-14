@@ -85,7 +85,7 @@ export default function TabLayout() {
           options={{
             title: 'Practice',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="music-note" size={size} color={color} />
+              <MaterialIcons name="home" size={size} color={color} />
             ),
           }}
         />
@@ -94,7 +94,7 @@ export default function TabLayout() {
           options={{
             title: 'Metronome',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="speed" size={size} color={color} />
+              <MaterialIcons name="av-timer" size={size} color={color} />
             ),
           }}
         />
@@ -103,7 +103,7 @@ export default function TabLayout() {
           options={{
             title: 'Tuner',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="tune" size={size} color={color} />
+              <MaterialIcons name="settings-input-antenna" size={size} color={color} />
             ),
           }}
         />
@@ -112,7 +112,7 @@ export default function TabLayout() {
           options={{
             title: 'Lessons',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="play-circle-outline" size={size} color={color} />
+              <MaterialIcons name="school" size={size} color={color} />
             ),
           }}
         />
@@ -121,7 +121,7 @@ export default function TabLayout() {
           options={{
             title: 'Library',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="library-music" size={size} color={color} />
+              <MaterialIcons name="library-books" size={size} color={color} />
             ),
           }}
         />
