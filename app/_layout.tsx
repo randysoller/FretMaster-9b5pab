@@ -6,6 +6,8 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ChordLibraryProvider } from '@/contexts/ChordLibraryContext';
+import { PresetProvider } from '@/contexts/PresetContext';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -20,7 +22,9 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <PresetProvider>
+        <ChordLibraryProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -29,8 +33,10 @@ export default function RootLayout() {
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </ChordLibraryProvider>
+      </PresetProvider>
     </AuthProvider>
   );
 }
