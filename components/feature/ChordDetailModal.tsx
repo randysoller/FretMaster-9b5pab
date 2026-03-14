@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, opacity } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
+import { useAuth } from '@/hooks/useAuth';
 
 const ROOT_NOTE_COLOR = colors.rootNoteBlue; // Root note blue for diamonds
 const OTHER_NOTE_COLOR = colors.primary; // Primary color for finger positions
@@ -19,6 +20,8 @@ interface ChordDetailModalProps {
 }
 
 export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: ChordDetailModalProps) {
+  const { isAdmin } = useAuth();
+  
   if (!chord) return null;
 
   // Get chord root note for comparison
@@ -260,7 +263,7 @@ export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: Ch
             {/* Action Buttons */}
             <View style={styles.actions}>
               <Pressable 
-                style={styles.playButton}
+                style={[styles.playButton, !isAdmin && styles.playButtonFull]}
                 onPress={() => {
                   audioService.playChordPreview(chord.name);
                   onPlay?.();
@@ -270,13 +273,15 @@ export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: Ch
                 <Text style={styles.playButtonText}>Play</Text>
               </Pressable>
 
-              <Pressable 
-                style={styles.editButton}
-                onPress={onEdit}
-              >
-                <MaterialIcons name="edit" size={18} color="#888" />
-                <Text style={styles.editButtonText}>Edit</Text>
-              </Pressable>
+              {isAdmin && (
+                <Pressable 
+                  style={styles.editButton}
+                  onPress={onEdit}
+                >
+                  <MaterialIcons name="edit" size={18} color="#888" />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </Pressable>
+              )}
             </View>
 
             {/* Progress indicator */}
@@ -523,6 +528,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: BUTTON_GOLD,
     borderRadius: borderRadius.md,
+  },
+  playButtonFull: {
+    flex: undefined,
+    width: '100%',
   },
   playButtonText: {
     color: colors.background,

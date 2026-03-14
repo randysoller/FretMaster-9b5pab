@@ -10,6 +10,7 @@ interface Profile {
   username: string;
   skill_level: string;
   favorite_genres: string[];
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +20,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -30,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Validate environment variables on startup
   useEffect(() => {
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
       setProfile(data);
+      setIsAdmin(data?.is_admin || false);
     } catch (error: any) {
       console.error('Error fetching profile:', error);
       
@@ -143,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setProfile(null);
+        setIsAdmin(false);
       }
     });
 
@@ -169,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         loading,
+        isAdmin,
         signOut,
         refreshProfile,
       }}
