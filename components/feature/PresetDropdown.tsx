@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, TextInput, Alert, FlatList } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { colors, spacing, borderRadius } from '@/constants/theme';
 import { usePresets, ChordPreset } from '@/contexts/PresetContext';
 import { useChordLibrary } from '@/contexts/ChordLibraryContext';
@@ -83,78 +81,107 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
     setEditingName('');
   };
 
-  const renderPresetItem = ({ item, drag, isActive }: RenderItemParams<ChordPreset>) => {
+  const handleMoveUp = (index: number) => {
+    if (index > 0) {
+      reorderPreset(index, index - 1);
+    }
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index < presets.length - 1) {
+      reorderPreset(index, index + 1);
+    }
+  };
+
+  const renderPresetItem = ({ item, index }: { item: ChordPreset; index: number }) => {
     const isEditing = editingId === item.id;
     const isActive_preset = activeLibraryPresetId === item.id;
 
     return (
-      <ScaleDecorator>
-        <Pressable
-          onLongPress={drag}
-          disabled={isActive}
-          style={[
-            styles.presetItem,
-            isActive && styles.presetItemDragging,
-            isActive_preset && styles.presetItemActive,
-          ]}
-        >
-          <View style={styles.dragHandle}>
-            <MaterialIcons name="drag-indicator" size={20} color={colors.textMuted} />
-          </View>
+      <View
+        style={[
+          styles.presetItem,
+          isActive_preset && styles.presetItemActive,
+        ]}
+      >
+        {/* Reorder Buttons */}
+        <View style={styles.reorderButtons}>
+          <Pressable
+            onPress={() => handleMoveUp(index)}
+            disabled={index === 0}
+            style={[styles.reorderButton, index === 0 && styles.reorderButtonDisabled]}
+          >
+            <MaterialIcons 
+              name="keyboard-arrow-up" 
+              size={18} 
+              color={index === 0 ? colors.borderSubtle : colors.textMuted} 
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => handleMoveDown(index)}
+            disabled={index === presets.length - 1}
+            style={[styles.reorderButton, index === presets.length - 1 && styles.reorderButtonDisabled]}
+          >
+            <MaterialIcons 
+              name="keyboard-arrow-down" 
+              size={18} 
+              color={index === presets.length - 1 ? colors.borderSubtle : colors.textMuted} 
+            />
+          </Pressable>
+        </View>
 
-          {isEditing ? (
-            <View style={styles.editContainer}>
-              <TextInput
-                style={styles.editInput}
-                value={editingName}
-                onChangeText={setEditingName}
-                autoFocus
-                onSubmitEditing={handleSaveEdit}
-              />
-              <Pressable onPress={handleSaveEdit} style={styles.editButton}>
-                <MaterialIcons name="check" size={18} color={colors.success} />
+        {isEditing ? (
+          <View style={styles.editContainer}>
+            <TextInput
+              style={styles.editInput}
+              value={editingName}
+              onChangeText={setEditingName}
+              autoFocus
+              onSubmitEditing={handleSaveEdit}
+            />
+            <Pressable onPress={handleSaveEdit} style={styles.editButton}>
+              <MaterialIcons name="check" size={18} color={colors.success} />
+            </Pressable>
+            <Pressable onPress={handleCancelEdit} style={styles.editButton}>
+              <MaterialIcons name="close" size={18} color={colors.error} />
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <Pressable
+              onPress={() => handleLoadPreset(item)}
+              style={styles.presetContent}
+            >
+              <View style={styles.presetInfo}>
+                <Text style={[styles.presetName, isActive_preset && styles.presetNameActive]}>
+                  {item.name}
+                </Text>
+                <Text style={styles.presetCount}>
+                  {item.chordIds.length} chord{item.chordIds.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
+              {isActive_preset && (
+                <MaterialIcons name="check-circle" size={20} color={colors.primary} />
+              )}
+            </Pressable>
+
+            <View style={styles.presetActions}>
+              <Pressable
+                onPress={() => handleStartEdit(item.id, item.name)}
+                style={styles.actionButton}
+              >
+                <MaterialIcons name="edit" size={18} color={colors.textMuted} />
               </Pressable>
-              <Pressable onPress={handleCancelEdit} style={styles.editButton}>
-                <MaterialIcons name="close" size={18} color={colors.error} />
+              <Pressable
+                onPress={() => handleDeletePreset(item.id, item.name)}
+                style={styles.actionButton}
+              >
+                <MaterialIcons name="delete" size={18} color={colors.error} />
               </Pressable>
             </View>
-          ) : (
-            <>
-              <Pressable
-                onPress={() => handleLoadPreset(item)}
-                style={styles.presetContent}
-              >
-                <View style={styles.presetInfo}>
-                  <Text style={[styles.presetName, isActive_preset && styles.presetNameActive]}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.presetCount}>
-                    {item.chordIds.length} chord{item.chordIds.length !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                {isActive_preset && (
-                  <MaterialIcons name="check-circle" size={20} color={colors.primary} />
-                )}
-              </Pressable>
-
-              <View style={styles.presetActions}>
-                <Pressable
-                  onPress={() => handleStartEdit(item.id, item.name)}
-                  style={styles.actionButton}
-                >
-                  <MaterialIcons name="edit" size={18} color={colors.textMuted} />
-                </Pressable>
-                <Pressable
-                  onPress={() => handleDeletePreset(item.id, item.name)}
-                  style={styles.actionButton}
-                >
-                  <MaterialIcons name="delete" size={18} color={colors.error} />
-                </Pressable>
-              </View>
-            </>
-          )}
-        </Pressable>
-      </ScaleDecorator>
+          </>
+        )}
+      </View>
     );
   };
 
@@ -237,7 +264,7 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
             )}
 
             {/* Presets List */}
-            <GestureHandlerRootView style={styles.listContainer}>
+            <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
               {presets.length === 0 ? (
                 <View style={styles.emptyState}>
                   <MaterialIcons name="collections-bookmark" size={48} color={colors.textMuted} />
@@ -247,17 +274,15 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
                   </Text>
                 </View>
               ) : (
-                <DraggableFlatList
+                <FlatList
                   data={presets}
                   renderItem={renderPresetItem}
                   keyExtractor={(item) => item.id}
-                  onDragEnd={({ data, from, to }) => {
-                    reorderPreset(from, to);
-                  }}
                   showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
                 />
               )}
-            </GestureHandlerRootView>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -372,19 +397,19 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSubtle,
     backgroundColor: colors.bgElevated,
   },
-  presetItemDragging: {
-    backgroundColor: colors.bgOverlay,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
+
   presetItemActive: {
     backgroundColor: colors.bgOverlay,
   },
-  dragHandle: {
+  reorderButtons: {
+    flexDirection: 'column',
     marginRight: spacing.sm,
+  },
+  reorderButton: {
+    padding: 2,
+  },
+  reorderButtonDisabled: {
+    opacity: 0.3,
   },
   presetContent: {
     flex: 1,
