@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import { Screen } from '@/components';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { pitchDetectionService, PitchDetectionResult } from '@/services/pitchDetectionService';
@@ -26,7 +25,6 @@ export default function TunerScreen() {
   const [detectedPitch, setDetectedPitch] = useState<PitchDetectionResult | MobilePitchResult | null>(null);
   const [inputLevel, setInputLevel] = useState(0);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [sensitivity, setSensitivity] = useState(60);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -68,7 +66,7 @@ export default function TunerScreen() {
         setIsListening(true);
         pitchDetectionService.startDetection((result, buffer, freqData) => {
           setDetectedPitch(result);
-        }, sensitivity / 100);
+        }, 0.5);
       } else {
         setPermissionDenied(true);
       }
@@ -122,7 +120,7 @@ export default function TunerScreen() {
         <View style={styles.header}>
           <MaterialIcons name="tune" size={20} color={colors.textSecondary} />
           <Text style={styles.headerTitle}>GUITAR TUNER</Text>
-          <Pressable onPress={() => router.push('/calibration')}>
+          <Pressable onPress={() => router.push('/calibration' as any)}>
             <MaterialIcons name="settings" size={20} color={colors.textSecondary} />
           </Pressable>
         </View>
@@ -216,32 +214,6 @@ export default function TunerScreen() {
                 <Text style={styles.stringNumber}>{6 - index}</Text>
               </View>
             ))}
-          </View>
-        </View>
-
-        {/* Mic Sensitivity */}
-        <View style={styles.sensitivitySection}>
-          <View style={styles.sensitivityHeader}>
-            <View style={styles.sensitivityLabel}>
-              <MaterialIcons name="mic" size={14} color={colors.textSecondary} />
-              <Text style={styles.sectionLabel}>MIC SENSITIVITY</Text>
-            </View>
-            <Text style={styles.sensitivityValue}>{sensitivity}%</Text>
-          </View>
-          
-          <View style={styles.sensitivityControls}>
-            <Text style={styles.sensitivityMin}>Low</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={100}
-              value={sensitivity}
-              onValueChange={setSensitivity}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.surface}
-              thumbTintColor={colors.primary}
-            />
-            <Text style={styles.sensitivityMax}>High</Text>
           </View>
         </View>
 
@@ -455,42 +427,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     marginTop: 2,
-  },
-  sensitivitySection: {
-    marginBottom: spacing.lg,
-  },
-  sensitivityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  sensitivityLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  sensitivityValue: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sensitivityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sensitivityMin: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-  sensitivityMax: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
   },
   inputLevelSection: {
     marginBottom: spacing.lg,
