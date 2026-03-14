@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, Easing, interpolate } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, opacity } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
@@ -25,7 +25,7 @@ interface ChordDetailModalProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 50;
+const SWIPE_THRESHOLD = SCREEN_WIDTH / 2; // Halfway point
 
 export function ChordDetailModal({ 
   visible, 
@@ -39,6 +39,17 @@ export function ChordDetailModal({
 }: ChordDetailModalProps) {
   const { isAdmin } = useAuth();
   const translateX = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+  
+  // Animate modal entrance
+  useEffect(() => {
+    if (visible) {
+      translateX.value = 0;
+      scale.value = withSpring(1, { damping: 20, stiffness: 90 });
+      opacity.value = withTiming(1, { duration: 200 });
+    }
+  }, [visible, currentIndex]);
   
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allChords.length - 1;
@@ -61,31 +72,51 @@ export function ChordDetailModal({
         translateX.value = e.translationX * 0.2; // Damped movement
       } else {
         translateX.value = e.translationX;
+        // Scale down slightly as user swipes
+        const progress = Math.abs(e.translationX) / SCREEN_WIDTH;
+        scale.value = 1 - (progress * 0.1); // Scale down to 0.9
+        opacity.value = 1 - (progress * 0.3); // Fade to 0.7
       }
     })
     .onEnd((e) => {
-      // More lenient swiping - just need distance OR velocity
+      // Auto-navigate if reached halfway point
       const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
-      const hasEnoughVelocity = Math.abs(e.velocityX) > 150; // Lowered from 200
+      const hasEnoughVelocity = Math.abs(e.velocityX) > 150;
       
       if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
+          // Animate out to the right
+          translateX.value = withTiming(SCREEN_WIDTH, { duration: 300, easing: Easing.out(Easing.cubic) });
+          scale.value = withTiming(0.8, { duration: 300 });
+          opacity.value = withTiming(0, { duration: 300 });
           runOnJS(handleSwipe)('prev');
-          translateX.value = withSpring(0);
         } else if (e.translationX < 0 && hasNext) {
+          // Animate out to the left
+          translateX.value = withTiming(-SCREEN_WIDTH, { duration: 300, easing: Easing.out(Easing.cubic) });
+          scale.value = withTiming(0.8, { duration: 300 });
+          opacity.value = withTiming(0, { duration: 300 });
           runOnJS(handleSwipe)('next');
-          translateX.value = withSpring(0);
         } else {
-          translateX.value = withSpring(0);
+          // Snap back if no navigation
+          translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
+          scale.value = withSpring(1, { damping: 20, stiffness: 90 });
+          opacity.value = withTiming(1, { duration: 200 });
         }
       } else {
-        translateX.value = withSpring(0);
+        // Snap back
+        translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
+        scale.value = withSpring(1, { damping: 20, stiffness: 90 });
+        opacity.value = withTiming(1, { duration: 200 });
       }
     });
   
   const animatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ translateX: translateX.value }],
+      transform: [
+        { translateX: translateX.value },
+        { scale: scale.value },
+      ],
+      opacity: opacity.value,
     };
   });
   
