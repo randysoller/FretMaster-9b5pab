@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   // String notation box
   stringNotationBox: {
     backgroundColor: '#FFF',
-    borderRadius: borderRadius.md,
+    borderRadius: 10,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,

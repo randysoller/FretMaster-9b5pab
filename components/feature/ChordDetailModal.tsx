@@ -42,6 +42,8 @@ export function ChordDetailModal({
   
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allChords.length - 1;
+  const prevChord = hasPrev ? allChords[currentIndex - 1] : null;
+  const nextChord = hasNext ? allChords[currentIndex + 1] : null;
   
   const handleSwipe = (direction: 'prev' | 'next') => {
     if (onNavigate) {
@@ -352,16 +354,26 @@ export function ChordDetailModal({
             {renderFingerPositions()}
           </ScrollView>
           
-          {/* Swipe Indicators */}
-          {hasPrev && (
-            <View style={[styles.swipeIndicator, styles.swipeIndicatorLeft]}>
-              <MaterialIcons name="chevron-left" size={24} color={colors.textMuted} />
-            </View>
+          {/* Bleeding Edge Preview Cards */}
+          {hasPrev && prevChord && (
+            <Pressable 
+              style={[styles.bleedingEdgeCard, styles.bleedingEdgeCardLeft]}
+              onPress={() => handleSwipe('prev')}
+            >
+              <View style={styles.bleedingEdgeContent}>
+                <Text style={styles.bleedingEdgeChordName} numberOfLines={1}>{prevChord.name}</Text>
+              </View>
+            </Pressable>
           )}
-          {hasNext && (
-            <View style={[styles.swipeIndicator, styles.swipeIndicatorRight]}>
-              <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
-            </View>
+          {hasNext && nextChord && (
+            <Pressable 
+              style={[styles.bleedingEdgeCard, styles.bleedingEdgeCardRight]}
+              onPress={() => handleSwipe('next')}
+            >
+              <View style={styles.bleedingEdgeContent}>
+                <Text style={styles.bleedingEdgeChordName} numberOfLines={1}>{nextChord.name}</Text>
+              </View>
+            </Pressable>
           )}
           
           {/* Progress indicator */}
@@ -577,12 +589,12 @@ const styles = StyleSheet.create({
   },
   stringNotationBox: {
     backgroundColor: '#FFF',
-    borderRadius: borderRadius.sm,
+    borderRadius: 10,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
     justifyContent: 'space-between',
     minWidth: 105,
-    marginLeft: 50,
+    marginLeft: 34,
   },
   notationRow: {
     flexDirection: 'row',
@@ -714,23 +726,41 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  swipeIndicator: {
+  bleedingEdgeCard: {
     position: 'absolute',
-    top: '50%',
-    marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.bgOverlay,
+    top: '12.5%',
+    width: 4,
+    height: '75%',
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  bleedingEdgeCardLeft: {
+    left: 0,
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    borderLeftWidth: 0,
+  },
+  bleedingEdgeCardRight: {
+    right: 0,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    borderRightWidth: 0,
+  },
+  bleedingEdgeContent: {
+    transform: [{ rotate: '-90deg' }],
+    width: 200,
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.6,
   },
-  swipeIndicatorLeft: {
-    left: -20,
-  },
-  swipeIndicatorRight: {
-    right: -20,
+  bleedingEdgeChordName: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   progressDots: {
     flexDirection: 'row',
