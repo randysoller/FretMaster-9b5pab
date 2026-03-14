@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
@@ -26,6 +27,7 @@ const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [selectedChord, setSelectedChord] = useState<ChordData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   
@@ -95,6 +97,13 @@ export default function LibraryScreen() {
   const handlePlayChord = () => {
     if (selectedChord) {
       audioService.playChordPreview(selectedChord.name);
+    }
+  };
+
+  const handleEditChord = () => {
+    if (selectedChord) {
+      setShowDetailModal(false);
+      router.push('/editor' as any);
     }
   };
 
@@ -266,9 +275,19 @@ export default function LibraryScreen() {
       <ChordDetailModal
         visible={showDetailModal}
         chord={selectedChord}
+        allChords={filteredChords}
+        currentIndex={selectedChord ? filteredChords.findIndex(c => c.id === selectedChord.id) : 0}
         onClose={() => setShowDetailModal(false)}
+        onNavigate={(direction) => {
+          const currentIdx = filteredChords.findIndex(c => c.id === selectedChord?.id);
+          if (direction === 'prev' && currentIdx > 0) {
+            setSelectedChord(filteredChords[currentIdx - 1]);
+          } else if (direction === 'next' && currentIdx < filteredChords.length - 1) {
+            setSelectedChord(filteredChords[currentIdx + 1]);
+          }
+        }}
         onPlay={handlePlayChord}
-        onEdit={() => {}}
+        onEdit={handleEditChord}
       />
     </View>
   );
