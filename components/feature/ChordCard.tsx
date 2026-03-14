@@ -133,9 +133,12 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
     );
   };
 
-  // Generate string notation
+  // Generate string notation - 6th string at bottom, 1st string at top
   const stringNotation = chord.positions.map((fret, index) => {
-    const stringName = STANDARD_TUNING[index];
+    let stringName = STANDARD_TUNING[index];
+    // Use lowercase 'e' for 1st string (high E)
+    if (index === 5) stringName = 'e';
+    
     let notation = '';
     if (fret === -1) {
       notation = '×';
@@ -145,7 +148,7 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
       notation = fret.toString();
     }
     return { string: stringName, fret: notation };
-  });
+  }).reverse(); // Reverse so 6th string is at bottom
 
   return (
     <View style={styles.card}>
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
-    minWidth: 70,
+    minWidth: 85,
   },
   stringNotationRow: {
     flexDirection: 'row',
@@ -376,18 +379,19 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   stringName: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#000',
-    width: 12,
+    width: 14,
   },
   stringDash: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#666',
   },
   fretNumber: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#000',
+    minWidth: 16,
   },
 });

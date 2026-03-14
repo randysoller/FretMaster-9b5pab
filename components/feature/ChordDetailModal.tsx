@@ -214,19 +214,20 @@ export function ChordDetailModal({
           )}
         </View>
 
-        {/* String notation box */}
+        {/* String notation box - 6th string at bottom */}
         <View style={styles.stringNotationBox}>
-          {['e', 'B', 'G', 'D', 'A', 'E'].map((note, index) => {
-            const fret = chord.positions[5 - index];
+          {['E', 'A', 'D', 'G', 'B', 'e'].map((note, index) => {
+            const fret = chord.positions[index];
             
             return (
               <View key={index} style={styles.notationRow}>
                 <Text style={styles.notationString}>{note}</Text>
                 <Text style={styles.notationSeparator}>—</Text>
                 <Text style={styles.notationFret}>{fret === -1 ? '×' : fret}</Text>
+                <Text style={styles.notationSeparator}>—</Text>
               </View>
             );
-          })}
+          }).reverse()}
         </View>
       </View>
     );
@@ -580,7 +581,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
     justifyContent: 'space-between',
-    minWidth: 85,
+    minWidth: 105,
   },
   notationRow: {
     flexDirection: 'row',
@@ -596,12 +597,14 @@ const styles = StyleSheet.create({
   notationSeparator: {
     color: '#666',
     fontSize: 13,
-    marginHorizontal: 6,
+    marginHorizontal: 4,
   },
   notationFret: {
     color: '#000',
     fontSize: 14,
     fontWeight: '600',
+    minWidth: 16,
+    textAlign: 'center',
   },
   actions: {
     flexDirection: 'row',
