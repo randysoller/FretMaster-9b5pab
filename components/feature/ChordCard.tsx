@@ -188,6 +188,7 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
               <Text style={styles.stringName}>{item.string}</Text>
               <Text style={styles.stringDash}>—</Text>
               <Text style={styles.fretNumber}>{item.fret}</Text>
+              <Text style={styles.stringDash}>—</Text>
             </View>
           ))}
         </View>
@@ -393,5 +394,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000',
     minWidth: 16,
+    textAlign: 'center',
   },
 });
