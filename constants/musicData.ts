@@ -3,8 +3,24 @@ export const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#'
 export const STANDARD_TUNING = ['E', 'A', 'D', 'G', 'B', 'E'];
 
 export type ChordShape = 'open' | 'barre' | 'movable';
-export type ChordType = 'major' | 'minor' | 'augmented' | 'diminished' | 'suspended' | 
-                        'major7' | 'dominant7' | 'minor7' | 'ninth' | 'eleventh' | 'thirteenth' | 'slash';
+export type ChordType = 
+  | 'major' 
+  | 'minor' 
+  | 'augmented' 
+  | 'diminished' 
+  | 'suspended' 
+  | 'major7' 
+  | 'dominant7' 
+  | 'minor7' 
+  | 'aug7'
+  | 'halfDim7'
+  | 'dim7'
+  | 'ninth' 
+  | 'eleventh' 
+  | 'thirteenth' 
+  | 'slash';
+
+export type BarreRoot = 6 | 5 | 4;
 
 export interface ChordData {
   name: string;
@@ -13,92 +29,130 @@ export interface ChordData {
   fingers: number[]; // 0 = not played, 1-4 = finger
   shape: ChordShape;
   type: ChordType;
+  baseFret?: number; // Base fret for movable chords
+  barres?: number[]; // Array of fret numbers where barres occur
+  rootString?: BarreRoot; // Root string for barre/movable chords (6, 5, or 4)
 }
+
+// Chord type labels for display
+export const CHORD_TYPE_LABELS: Record<ChordType | 'all', string> = {
+  all: 'All Types',
+  major: 'Major',
+  minor: 'Minor',
+  augmented: 'Augmented',
+  slash: 'Slash',
+  diminished: 'Diminished',
+  suspended: 'Suspended',
+  major7: 'Major 7th',
+  dominant7: 'Dominant 7th',
+  minor7: 'Minor 7th',
+  aug7: 'Augmented 7th',
+  halfDim7: 'Half Dim 7th',
+  dim7: 'Fully Dim 7th',
+  ninth: '9th',
+  eleventh: '11th',
+  thirteenth: '13th',
+};
+
+export const CATEGORY_LABELS: Record<ChordShape | 'all' | 'custom', string> = {
+  all: 'All Chords',
+  open: 'Open Chords',
+  barre: 'Barre Chords',
+  movable: 'Movable Chords',
+  custom: 'My Chords',
+};
+
+export const BARRE_ROOT_LABELS: Record<BarreRoot | 'all', string> = {
+  all: 'All Roots',
+  6: 'Root 6th String',
+  5: 'Root 5th String',
+  4: 'Root 4th String',
+};
 
 export const CHORDS: ChordData[] = [
   // ========== MAJOR CHORDS ==========
   // Open Major
-  { name: 'C', fullName: 'C Major', positions: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], shape: 'open', type: 'major' },
-  { name: 'D', fullName: 'D Major', positions: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], shape: 'open', type: 'major' },
-  { name: 'E', fullName: 'E Major', positions: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0], shape: 'open', type: 'major' },
-  { name: 'G', fullName: 'G Major', positions: [3, 2, 0, 0, 0, 3], fingers: [3, 2, 0, 0, 0, 4], shape: 'open', type: 'major' },
-  { name: 'A', fullName: 'A Major', positions: [-1, 0, 2, 2, 2, 0], fingers: [0, 0, 1, 2, 3, 0], shape: 'open', type: 'major' },
+  { name: 'C', fullName: 'C Major', positions: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], shape: 'open', type: 'major', baseFret: 1 },
+  { name: 'D', fullName: 'D Major', positions: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], shape: 'open', type: 'major', baseFret: 1 },
+  { name: 'E', fullName: 'E Major', positions: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0], shape: 'open', type: 'major', baseFret: 1 },
+  { name: 'G', fullName: 'G Major', positions: [3, 2, 0, 0, 0, 3], fingers: [3, 2, 0, 0, 0, 4], shape: 'open', type: 'major', baseFret: 1 },
+  { name: 'A', fullName: 'A Major', positions: [-1, 0, 2, 2, 2, 0], fingers: [0, 0, 1, 2, 3, 0], shape: 'open', type: 'major', baseFret: 1 },
   
   // Barre Major
-  { name: 'F', fullName: 'F Major', positions: [1, 3, 3, 2, 1, 1], fingers: [1, 3, 4, 2, 1, 1], shape: 'barre', type: 'major' },
-  { name: 'B', fullName: 'B Major', positions: [-1, 2, 4, 4, 4, 2], fingers: [0, 1, 3, 3, 3, 1], shape: 'barre', type: 'major' },
-  { name: 'Bb', fullName: 'Bb Major', positions: [-1, 1, 3, 3, 3, 1], fingers: [0, 1, 3, 3, 3, 1], shape: 'barre', type: 'major' },
+  { name: 'F', fullName: 'F Major', positions: [1, 3, 3, 2, 1, 1], fingers: [1, 3, 4, 2, 1, 1], shape: 'barre', type: 'major', baseFret: 1, barres: [1], rootString: 6 },
+  { name: 'B', fullName: 'B Major', positions: [-1, 2, 4, 4, 4, 2], fingers: [0, 1, 3, 3, 3, 1], shape: 'barre', type: 'major', baseFret: 2, barres: [2], rootString: 5 },
+  { name: 'Bb', fullName: 'Bb Major', positions: [-1, 1, 3, 3, 3, 1], fingers: [0, 1, 3, 3, 3, 1], shape: 'barre', type: 'major', baseFret: 1, barres: [1], rootString: 5 },
   
   // ========== MINOR CHORDS ==========
   // Open Minor
-  { name: 'Am', fullName: 'A Minor', positions: [-1, 0, 2, 2, 1, 0], fingers: [0, 0, 2, 3, 1, 0], shape: 'open', type: 'minor' },
-  { name: 'Dm', fullName: 'D Minor', positions: [-1, -1, 0, 2, 3, 1], fingers: [0, 0, 0, 2, 3, 1], shape: 'open', type: 'minor' },
-  { name: 'Em', fullName: 'E Minor', positions: [0, 2, 2, 0, 0, 0], fingers: [0, 2, 3, 0, 0, 0], shape: 'open', type: 'minor' },
+  { name: 'Am', fullName: 'A Minor', positions: [-1, 0, 2, 2, 1, 0], fingers: [0, 0, 2, 3, 1, 0], shape: 'open', type: 'minor', baseFret: 1 },
+  { name: 'Dm', fullName: 'D Minor', positions: [-1, -1, 0, 2, 3, 1], fingers: [0, 0, 0, 2, 3, 1], shape: 'open', type: 'minor', baseFret: 1 },
+  { name: 'Em', fullName: 'E Minor', positions: [0, 2, 2, 0, 0, 0], fingers: [0, 2, 3, 0, 0, 0], shape: 'open', type: 'minor', baseFret: 1 },
   
   // Barre Minor
-  { name: 'Fm', fullName: 'F Minor', positions: [1, 3, 3, 1, 1, 1], fingers: [1, 3, 4, 1, 1, 1], shape: 'barre', type: 'minor' },
-  { name: 'Bm', fullName: 'B Minor', positions: [-1, 2, 4, 4, 3, 2], fingers: [0, 1, 3, 4, 2, 1], shape: 'barre', type: 'minor' },
-  { name: 'Cm', fullName: 'C Minor', positions: [-1, 3, 5, 5, 4, 3], fingers: [0, 1, 3, 4, 2, 1], shape: 'barre', type: 'minor' },
+  { name: 'Fm', fullName: 'F Minor', positions: [1, 3, 3, 1, 1, 1], fingers: [1, 3, 4, 1, 1, 1], shape: 'barre', type: 'minor', baseFret: 1, barres: [1], rootString: 6 },
+  { name: 'Bm', fullName: 'B Minor', positions: [-1, 2, 4, 4, 3, 2], fingers: [0, 1, 3, 4, 2, 1], shape: 'barre', type: 'minor', baseFret: 2, barres: [2], rootString: 5 },
+  { name: 'Cm', fullName: 'C Minor', positions: [-1, 3, 5, 5, 4, 3], fingers: [0, 1, 3, 4, 2, 1], shape: 'barre', type: 'minor', baseFret: 3, barres: [3], rootString: 5 },
   
   // ========== AUGMENTED CHORDS ==========
-  { name: 'Caug', fullName: 'C Augmented', positions: [-1, 3, 2, 1, 1, 0], fingers: [0, 4, 3, 1, 2, 0], shape: 'open', type: 'augmented' },
-  { name: 'Gaug', fullName: 'G Augmented', positions: [3, 2, 1, 0, 0, 3], fingers: [3, 2, 1, 0, 0, 4], shape: 'open', type: 'augmented' },
-  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented' },
+  { name: 'Caug', fullName: 'C Augmented', positions: [-1, 3, 2, 1, 1, 0], fingers: [0, 4, 3, 1, 2, 0], shape: 'open', type: 'augmented', baseFret: 1 },
+  { name: 'Gaug', fullName: 'G Augmented', positions: [3, 2, 1, 0, 0, 3], fingers: [3, 2, 1, 0, 0, 4], shape: 'open', type: 'augmented', baseFret: 1 },
+  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented', baseFret: 1 },
   
   // ========== DIMINISHED CHORDS ==========
-  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished' },
-  { name: 'Ddim', fullName: 'D Diminished', positions: [-1, -1, 0, 1, 0, 1], fingers: [0, 0, 0, 1, 0, 2], shape: 'open', type: 'diminished' },
-  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished' },
+  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished', baseFret: 1 },
+  { name: 'Ddim', fullName: 'D Diminished', positions: [-1, -1, 0, 1, 0, 1], fingers: [0, 0, 0, 1, 0, 2], shape: 'open', type: 'diminished', baseFret: 1 },
+  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished', baseFret: 2 },
   
   // ========== SUSPENDED CHORDS ==========
-  { name: 'Csus2', fullName: 'C Suspended 2', positions: [-1, 3, 0, 0, 1, 3], fingers: [0, 2, 0, 0, 1, 3], shape: 'open', type: 'suspended' },
-  { name: 'Csus4', fullName: 'C Suspended 4', positions: [-1, 3, 3, 0, 1, 1], fingers: [0, 3, 4, 0, 1, 1], shape: 'open', type: 'suspended' },
-  { name: 'Dsus2', fullName: 'D Suspended 2', positions: [-1, -1, 0, 2, 3, 0], fingers: [0, 0, 0, 1, 2, 0], shape: 'open', type: 'suspended' },
-  { name: 'Dsus4', fullName: 'D Suspended 4', positions: [-1, -1, 0, 2, 3, 3], fingers: [0, 0, 0, 1, 3, 4], shape: 'open', type: 'suspended' },
-  { name: 'Esus4', fullName: 'E Suspended 4', positions: [0, 2, 2, 2, 0, 0], fingers: [0, 2, 3, 4, 0, 0], shape: 'open', type: 'suspended' },
-  { name: 'Asus4', fullName: 'A Suspended 4', positions: [-1, 0, 2, 2, 3, 0], fingers: [0, 0, 1, 2, 3, 0], shape: 'open', type: 'suspended' },
+  { name: 'Csus2', fullName: 'C Suspended 2', positions: [-1, 3, 0, 0, 1, 3], fingers: [0, 2, 0, 0, 1, 3], shape: 'open', type: 'suspended', baseFret: 1 },
+  { name: 'Csus4', fullName: 'C Suspended 4', positions: [-1, 3, 3, 0, 1, 1], fingers: [0, 3, 4, 0, 1, 1], shape: 'open', type: 'suspended', baseFret: 1 },
+  { name: 'Dsus2', fullName: 'D Suspended 2', positions: [-1, -1, 0, 2, 3, 0], fingers: [0, 0, 0, 1, 2, 0], shape: 'open', type: 'suspended', baseFret: 1 },
+  { name: 'Dsus4', fullName: 'D Suspended 4', positions: [-1, -1, 0, 2, 3, 3], fingers: [0, 0, 0, 1, 3, 4], shape: 'open', type: 'suspended', baseFret: 1 },
+  { name: 'Esus4', fullName: 'E Suspended 4', positions: [0, 2, 2, 2, 0, 0], fingers: [0, 2, 3, 4, 0, 0], shape: 'open', type: 'suspended', baseFret: 1 },
+  { name: 'Asus4', fullName: 'A Suspended 4', positions: [-1, 0, 2, 2, 3, 0], fingers: [0, 0, 1, 2, 3, 0], shape: 'open', type: 'suspended', baseFret: 1 },
   
   // ========== MAJOR 7TH CHORDS ==========
-  { name: 'Cmaj7', fullName: 'C Major 7', positions: [-1, 3, 2, 0, 0, 0], fingers: [0, 3, 2, 0, 0, 0], shape: 'open', type: 'major7' },
-  { name: 'Dmaj7', fullName: 'D Major 7', positions: [-1, -1, 0, 2, 2, 2], fingers: [0, 0, 0, 1, 1, 1], shape: 'open', type: 'major7' },
-  { name: 'Emaj7', fullName: 'E Major 7', positions: [0, 2, 1, 1, 0, 0], fingers: [0, 3, 1, 2, 0, 0], shape: 'open', type: 'major7' },
-  { name: 'Gmaj7', fullName: 'G Major 7', positions: [3, 2, 0, 0, 0, 2], fingers: [3, 2, 0, 0, 0, 1], shape: 'open', type: 'major7' },
-  { name: 'Amaj7', fullName: 'A Major 7', positions: [-1, 0, 2, 1, 2, 0], fingers: [0, 0, 2, 1, 3, 0], shape: 'open', type: 'major7' },
+  { name: 'Cmaj7', fullName: 'C Major 7', positions: [-1, 3, 2, 0, 0, 0], fingers: [0, 3, 2, 0, 0, 0], shape: 'open', type: 'major7', baseFret: 1 },
+  { name: 'Dmaj7', fullName: 'D Major 7', positions: [-1, -1, 0, 2, 2, 2], fingers: [0, 0, 0, 1, 1, 1], shape: 'open', type: 'major7', baseFret: 1, barres: [2] },
+  { name: 'Emaj7', fullName: 'E Major 7', positions: [0, 2, 1, 1, 0, 0], fingers: [0, 3, 1, 2, 0, 0], shape: 'open', type: 'major7', baseFret: 1 },
+  { name: 'Gmaj7', fullName: 'G Major 7', positions: [3, 2, 0, 0, 0, 2], fingers: [3, 2, 0, 0, 0, 1], shape: 'open', type: 'major7', baseFret: 1 },
+  { name: 'Amaj7', fullName: 'A Major 7', positions: [-1, 0, 2, 1, 2, 0], fingers: [0, 0, 2, 1, 3, 0], shape: 'open', type: 'major7', baseFret: 1 },
   
   // ========== DOMINANT 7TH CHORDS ==========
-  { name: 'C7', fullName: 'C Dominant 7', positions: [-1, 3, 2, 3, 1, 0], fingers: [0, 3, 2, 4, 1, 0], shape: 'open', type: 'dominant7' },
-  { name: 'D7', fullName: 'D Dominant 7', positions: [-1, -1, 0, 2, 1, 2], fingers: [0, 0, 0, 2, 1, 3], shape: 'open', type: 'dominant7' },
-  { name: 'E7', fullName: 'E Dominant 7', positions: [0, 2, 0, 1, 0, 0], fingers: [0, 2, 0, 1, 0, 0], shape: 'open', type: 'dominant7' },
-  { name: 'G7', fullName: 'G Dominant 7', positions: [3, 2, 0, 0, 0, 1], fingers: [3, 2, 0, 0, 0, 1], shape: 'open', type: 'dominant7' },
-  { name: 'A7', fullName: 'A Dominant 7', positions: [-1, 0, 2, 0, 2, 0], fingers: [0, 0, 2, 0, 3, 0], shape: 'open', type: 'dominant7' },
-  { name: 'B7', fullName: 'B Dominant 7', positions: [-1, 2, 1, 2, 0, 2], fingers: [0, 2, 1, 3, 0, 4], shape: 'open', type: 'dominant7' },
+  { name: 'C7', fullName: 'C Dominant 7', positions: [-1, 3, 2, 3, 1, 0], fingers: [0, 3, 2, 4, 1, 0], shape: 'open', type: 'dominant7', baseFret: 1 },
+  { name: 'D7', fullName: 'D Dominant 7', positions: [-1, -1, 0, 2, 1, 2], fingers: [0, 0, 0, 2, 1, 3], shape: 'open', type: 'dominant7', baseFret: 1 },
+  { name: 'E7', fullName: 'E Dominant 7', positions: [0, 2, 0, 1, 0, 0], fingers: [0, 2, 0, 1, 0, 0], shape: 'open', type: 'dominant7', baseFret: 1 },
+  { name: 'G7', fullName: 'G Dominant 7', positions: [3, 2, 0, 0, 0, 1], fingers: [3, 2, 0, 0, 0, 1], shape: 'open', type: 'dominant7', baseFret: 1 },
+  { name: 'A7', fullName: 'A Dominant 7', positions: [-1, 0, 2, 0, 2, 0], fingers: [0, 0, 2, 0, 3, 0], shape: 'open', type: 'dominant7', baseFret: 1 },
+  { name: 'B7', fullName: 'B Dominant 7', positions: [-1, 2, 1, 2, 0, 2], fingers: [0, 2, 1, 3, 0, 4], shape: 'open', type: 'dominant7', baseFret: 1 },
   
   // ========== MINOR 7TH CHORDS ==========
-  { name: 'Am7', fullName: 'A Minor 7', positions: [-1, 0, 2, 0, 1, 0], fingers: [0, 0, 2, 0, 1, 0], shape: 'open', type: 'minor7' },
-  { name: 'Dm7', fullName: 'D Minor 7', positions: [-1, -1, 0, 2, 1, 1], fingers: [0, 0, 0, 2, 1, 1], shape: 'open', type: 'minor7' },
-  { name: 'Em7', fullName: 'E Minor 7', positions: [0, 2, 0, 0, 0, 0], fingers: [0, 2, 0, 0, 0, 0], shape: 'open', type: 'minor7' },
-  { name: 'Bm7', fullName: 'B Minor 7', positions: [-1, 2, 0, 2, 0, 2], fingers: [0, 2, 0, 3, 0, 4], shape: 'open', type: 'minor7' },
+  { name: 'Am7', fullName: 'A Minor 7', positions: [-1, 0, 2, 0, 1, 0], fingers: [0, 0, 2, 0, 1, 0], shape: 'open', type: 'minor7', baseFret: 1 },
+  { name: 'Dm7', fullName: 'D Minor 7', positions: [-1, -1, 0, 2, 1, 1], fingers: [0, 0, 0, 2, 1, 1], shape: 'open', type: 'minor7', baseFret: 1 },
+  { name: 'Em7', fullName: 'E Minor 7', positions: [0, 2, 0, 0, 0, 0], fingers: [0, 2, 0, 0, 0, 0], shape: 'open', type: 'minor7', baseFret: 1 },
+  { name: 'Bm7', fullName: 'B Minor 7', positions: [-1, 2, 0, 2, 0, 2], fingers: [0, 2, 0, 3, 0, 4], shape: 'open', type: 'minor7', baseFret: 1 },
   
   // ========== 9TH CHORDS ==========
-  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth' },
-  { name: 'D9', fullName: 'D Dominant 9', positions: [-1, -1, 0, 2, 1, 0], fingers: [0, 0, 0, 2, 1, 0], shape: 'open', type: 'ninth' },
-  { name: 'E9', fullName: 'E Dominant 9', positions: [0, 2, 0, 1, 0, 2], fingers: [0, 2, 0, 1, 0, 3], shape: 'open', type: 'ninth' },
-  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth' },
+  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth', baseFret: 1 },
+  { name: 'D9', fullName: 'D Dominant 9', positions: [-1, -1, 0, 2, 1, 0], fingers: [0, 0, 0, 2, 1, 0], shape: 'open', type: 'ninth', baseFret: 1 },
+  { name: 'E9', fullName: 'E Dominant 9', positions: [0, 2, 0, 1, 0, 2], fingers: [0, 2, 0, 1, 0, 3], shape: 'open', type: 'ninth', baseFret: 1 },
+  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth', baseFret: 1 },
   
   // ========== 11TH CHORDS ==========
-  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh' },
-  { name: 'D11', fullName: 'D Dominant 11', positions: [-1, -1, 0, 0, 1, 0], fingers: [0, 0, 0, 0, 1, 0], shape: 'open', type: 'eleventh' },
-  { name: 'E11', fullName: 'E Dominant 11', positions: [0, 0, 0, 1, 0, 0], fingers: [0, 0, 0, 1, 0, 0], shape: 'open', type: 'eleventh' },
+  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh', baseFret: 1 },
+  { name: 'D11', fullName: 'D Dominant 11', positions: [-1, -1, 0, 0, 1, 0], fingers: [0, 0, 0, 0, 1, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
+  { name: 'E11', fullName: 'E Dominant 11', positions: [0, 0, 0, 1, 0, 0], fingers: [0, 0, 0, 1, 0, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
   
   // ========== 13TH CHORDS ==========
-  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth' },
-  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth' },
-  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth' },
+  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth', baseFret: 1 },
+  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth', baseFret: 1 },
+  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth', baseFret: 1 },
   
   // ========== SLASH CHORDS ==========
-  { name: 'C/G', fullName: 'C over G', positions: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], shape: 'open', type: 'slash' },
-  { name: 'D/F#', fullName: 'D over F#', positions: [2, -1, 0, 2, 3, 2], fingers: [1, 0, 0, 2, 4, 3], shape: 'open', type: 'slash' },
-  { name: 'G/B', fullName: 'G over B', positions: [-1, 2, 0, 0, 0, 3], fingers: [0, 2, 0, 0, 0, 4], shape: 'open', type: 'slash' },
+  { name: 'C/G', fullName: 'C over G', positions: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], shape: 'open', type: 'slash', baseFret: 1 },
+  { name: 'D/F#', fullName: 'D over F#', positions: [2, -1, 0, 2, 3, 2], fingers: [1, 0, 0, 2, 4, 3], shape: 'open', type: 'slash', baseFret: 1 },
+  { name: 'G/B', fullName: 'G over B', positions: [-1, 2, 0, 0, 0, 3], fingers: [0, 2, 0, 0, 0, 4], shape: 'open', type: 'slash', baseFret: 1 },
 ];
 
 export interface ScaleData {
