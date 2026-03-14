@@ -14,7 +14,7 @@ interface ChordCardProps {
 const ROOT_NOTE_COLOR = '#3B82F6'; // Blue
 const OTHER_NOTE_COLOR = '#FF8C42'; // Orange
 
-export function ChordCard({ chord, cardNumber, onPress }: ChordCardProps) {
+export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCheckboxPress }: ChordCardProps) {
   // Calculate fret range
   const activeFrets = chord.positions.filter(f => f > 0);
   const minFret = activeFrets.length > 0 ? Math.min(...activeFrets) : 1;
