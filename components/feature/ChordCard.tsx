@@ -12,7 +12,7 @@ interface ChordCardProps {
 }
 
 const ROOT_NOTE_COLOR = '#3B82F6'; // Blue
-const OTHER_NOTE_COLOR = '#FFA055'; // Orange
+const OTHER_NOTE_COLOR = '#FFB84D'; // Yellow-Orange
 
 export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCheckboxPress }: ChordCardProps) {
   // Calculate fret range

@@ -6,9 +6,9 @@ import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
 
 const ROOT_NOTE_COLOR = '#3B82F6'; // Blue for root notes (diamond)
-const OTHER_NOTE_COLOR = '#FFA055'; // Orange for other notes (circle)
+const OTHER_NOTE_COLOR = '#FFB84D'; // Yellow-Orange for other notes (circle)
 const FRETBOARD_BG = '#0A0A0A'; // Very dark background
-const BUTTON_ORANGE = '#FFA055'; // Orange buttons
+const BUTTON_ORANGE = '#FFB84D'; // Yellow-Orange buttons
 
 interface ChordDetailModalProps {
   visible: boolean;
