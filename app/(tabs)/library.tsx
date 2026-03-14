@@ -172,7 +172,7 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0A0A0A', // Deep stage black
   },
   header: {
     paddingHorizontal: 16,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 13,
-    color: '#888',
+    color: '#8B7355', // Warm muted gold
     lineHeight: 18,
   },
   presetSelector: {
@@ -198,15 +198,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1A1612', // Warm dark surface
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3229', // Warm border
   },
   presetText: {
     flex: 1,
     fontSize: 14,
-    color: '#CCC',
+    color: '#E5D5B7', // Warm light text
     fontWeight: '500',
   },
   searchContainer: {
@@ -219,13 +219,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1A1612',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3229',
   },
   searchInput: {
     flex: 1,
@@ -238,10 +238,10 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1A1612',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3229',
   },
   filtersContainer: {
     marginTop: 12,
@@ -257,17 +257,21 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#1A1612',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3229',
   },
   filterChipActive: {
-    backgroundColor: '#3B82F6',
-    borderColor: '#3B82F6',
+    backgroundColor: '#D4AF37', // Rich gold spotlight
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
   },
   filterChipText: {
-    color: '#CCC',
+    color: '#E5D5B7',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -283,7 +287,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultsCount: {
-    color: '#FFB84D',
+    color: '#FFB000', // Bright amber spotlight
     fontSize: 13,
     fontWeight: '700',
   },
@@ -300,17 +304,25 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FFB84D',
+    backgroundColor: '#D4AF37', // Rich gold
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
   },
   legendDotBlue: {
     width: 12,
     height: 12,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#FFD700', // Pure gold for root
     transform: [{ rotate: '45deg' }],
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 3,
   },
   legendText: {
     fontSize: 11,
-    color: '#888',
+    color: '#8B7355',
     fontWeight: '500',
   },
   chordList: {

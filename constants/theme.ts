@@ -1,37 +1,46 @@
+// Concert Stage Aesthetic - Warm blacks with amber/gold lighting
 export const colors = {
-  // Base colors
-  background: '#0D0D0D',
-  surface: '#1A1A1A',
-  surfaceElevated: '#252525',
-  card: '#1E1E1E',
+  // Stage blacks - warm undertones
+  background: '#0A0A0A', // Deep stage black
+  surface: '#1A1612', // Warm dark brown-black
+  surfaceElevated: '#2A2520', // Elevated surfaces
+  card: '#211E1A', // Warmer card background
   
-  // Brand colors
-  primary: '#FF8C00', // Dark Orange
-  secondary: '#8A2BE2', // Blue Violet (for chord progressions)
-  accent: '#00C853', // Green (for chords)
+  // Amber/Gold concert lighting accents
+  primary: '#D4AF37', // Rich gold
+  secondary: '#B8860B', // Dimmed gold
+  accent: '#FFB000', // Bright amber spotlight
   
-  // Text colors
+  // Text hierarchy
   text: '#FFFFFF',
-  textSecondary: '#999999',
-  textMuted: '#666666',
-  textDisabled: '#444444',
+  textSecondary: '#E5D5B7', // Warm light text
+  textMuted: '#8B7355', // Muted brown-gold
+  textDisabled: '#5C4E3A', // Very dim brown
   
-  // Fretboard colors
-  fretboard: '#1A1A1A',
-  string: '#666666',
-  fret: '#333333',
-  dot: '#FF8C00',
-  fingerPosition: '#FF8C00',
+  // Fretboard colors with gold theme
+  fretboard: '#0A0A0A',
+  string: '#4A423A', // Warm string color
+  fret: '#4A423A',
+  dot: '#D4AF37', // Rich gold dots
+  fingerPosition: '#D4AF37',
+  
+  // Root note highlighting
+  rootNote: '#FFD700', // Pure gold for root notes
   
   // Semantic colors
-  success: '#00C853',
-  error: '#FF3B30',
-  warning: '#FF9500',
-  info: '#0A84FF',
+  success: '#6BCF7F',
+  error: '#FF6B6B',
+  warning: '#FFB000',
+  info: '#D4AF37',
   
   // Additional UI colors
-  border: '#2A2A2A',
-  overlay: 'rgba(0, 0, 0, 0.8)',
+  border: '#3A3229', // Warm border
+  borderLight: '#4A423A',
+  overlay: 'rgba(10, 10, 10, 0.85)',
+  
+  // Stage lighting effects
+  spotlightGlow: 'rgba(212, 175, 55, 0.3)', // Gold glow
+  dimLight: 'rgba(184, 134, 11, 0.15)', // Subtle amber
 };
 
 export const spacing = {
@@ -43,7 +52,19 @@ export const spacing = {
   xxl: 48,
 };
 
+// Typography - Sora + DM Sans for modern musical feel
+// Note: To use custom fonts, install:
+// npx expo install @expo-google-fonts/sora @expo-google-fonts/dm-sans
+// Then load fonts in app/_layout.tsx with useFonts
 export const typography = {
+  // Font families (placeholder - requires font installation)
+  fontFamily: {
+    heading: 'Sora', // For chord names, titles
+    body: 'DM Sans', // For body text, labels
+    mono: 'Courier New', // For chord diagrams, fret numbers
+  },
+  
+  // Text styles
   h1: {
     fontSize: 32,
     fontWeight: '700' as const,

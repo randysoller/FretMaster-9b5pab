@@ -11,8 +11,8 @@ interface ChordCardProps {
   onCheckboxPress?: () => void;
 }
 
-const ROOT_NOTE_COLOR = '#3B82F6'; // Blue
-const OTHER_NOTE_COLOR = '#FFB84D'; // Yellow-Orange
+const ROOT_NOTE_COLOR = '#FFD700'; // Pure gold for root notes
+const OTHER_NOTE_COLOR = '#D4AF37'; // Rich gold for finger positions
 
 export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCheckboxPress }: ChordCardProps) {
   // Calculate fret range
@@ -195,19 +195,23 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
 const styles = StyleSheet.create({
   card: {
     position: 'relative',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#1A1612', // Warm dark stage background
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#3A3229', // Warm border
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   cardNumber: {
     position: 'absolute',
     top: 12,
     right: 12,
     fontSize: 11,
-    color: '#666',
+    color: '#5C4E3A',
     fontWeight: '600',
   },
   cardContent: {
@@ -223,14 +227,18 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#444',
+    borderColor: '#5C4E3A',
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
-    borderColor: '#FFA055',
-    backgroundColor: '#1A1A1A',
+    borderColor: '#D4AF37',
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
   },
 
   // Fretboard
@@ -240,13 +248,16 @@ const styles = StyleSheet.create({
   fretboardContainer: {
     position: 'relative',
     paddingLeft: 20,
+    backgroundColor: '#0A0A0A', // Deep stage black for contrast
+    borderRadius: 8,
+    padding: 8,
   },
   fretLabel: {
     position: 'absolute',
     left: 0,
     top: 35,
     fontSize: 11,
-    color: '#888',
+    color: '#8B7355',
     fontWeight: '700',
   },
   fretboard: {
@@ -267,12 +278,12 @@ const styles = StyleSheet.create({
   },
   mutedX: {
     fontSize: 15,
-    color: '#888',
+    color: '#8B7355',
     fontWeight: '700',
   },
   openO: {
     fontSize: 15,
-    color: '#CCC',
+    color: '#E5D5B7',
     fontWeight: '400',
   },
   gridArea: {
@@ -284,17 +295,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: '100%',
-    backgroundColor: '#555',
+    backgroundColor: '#4A423A',
   },
   fret: {
     position: 'absolute',
     height: 1.5,
     width: '100%',
-    backgroundColor: '#555',
+    backgroundColor: '#4A423A',
   },
   nutLine: {
     height: 4,
-    backgroundColor: '#777',
+    backgroundColor: '#8B7355',
   },
   dotContainer: {
     position: 'absolute',
@@ -344,14 +355,14 @@ const styles = StyleSheet.create({
   },
   chordCategory: {
     fontSize: 10,
-    color: '#666',
+    color: '#8B7355',
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   chordFullName: {
     fontSize: 14,
-    color: '#888',
+    color: '#E5D5B7',
     fontWeight: '500',
   },
   
