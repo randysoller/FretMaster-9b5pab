@@ -104,7 +104,7 @@ export default function LibraryScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Chord Library</Text>
         <Text style={styles.subtitle}>
-          Browse all {CHORDS.length} chord diagrams - tap the checkbox to select chords for a practice preset
+          Browse all {CHORD_DATA.length} chord diagrams - tap the checkbox to select chords for a practice preset
         </Text>
       </View>
 
