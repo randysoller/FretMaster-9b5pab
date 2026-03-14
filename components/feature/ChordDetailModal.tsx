@@ -42,12 +42,22 @@ export function ChordDetailModal({
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
   
-  // Animate modal entrance
+  // Animate modal entrance and reset on chord change
   useEffect(() => {
     if (visible) {
+      // Reset position immediately
       translateX.value = 0;
-      scale.value = withSpring(1, { damping: 20, stiffness: 90 });
-      opacity.value = withTiming(1, { duration: 200 });
+      // Animate in from the side for smooth transition
+      scale.value = 0.9;
+      opacity.value = 0;
+      
+      // Slight delay to ensure clean transition
+      const timer = setTimeout(() => {
+        scale.value = withSpring(1, { damping: 18, stiffness: 100 });
+        opacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) });
+      }, 50);
+      
+      return () => clearTimeout(timer);
     }
   }, [visible, currentIndex]);
   
@@ -59,13 +69,13 @@ export function ChordDetailModal({
   const handleSwipe = (direction: 'prev' | 'next') => {
     if (onNavigate) {
       onNavigate(direction);
-      translateX.value = 0;
+      // Don't reset here - let useEffect handle it
     }
   };
   
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15]) // Activate on 15px horizontal movement
-    .failOffsetY([-30, 30]) // Fail if vertical movement exceeds 30px
+    .activeOffsetX([-20, 20]) // Activate on 20px horizontal movement
+    .failOffsetY([-40, 40]) // Fail if vertical movement exceeds 40px
     .onUpdate((e) => {
       // Only allow swipe if there's a chord in that direction
       if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
@@ -81,21 +91,33 @@ export function ChordDetailModal({
     .onEnd((e) => {
       // Auto-navigate if reached halfway point
       const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
-      const hasEnoughVelocity = Math.abs(e.velocityX) > 150;
+      const hasEnoughVelocity = Math.abs(e.velocityX) > 200;
       
       if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
-          // Animate out to the right
-          translateX.value = withTiming(SCREEN_WIDTH, { duration: 300, easing: Easing.out(Easing.cubic) });
-          scale.value = withTiming(0.8, { duration: 300 });
-          opacity.value = withTiming(0, { duration: 300 });
-          runOnJS(handleSwipe)('prev');
+          // Animate out to the right, then navigate
+          translateX.value = withTiming(SCREEN_WIDTH, { 
+            duration: 250, 
+            easing: Easing.out(Easing.cubic) 
+          }, (finished) => {
+            if (finished) {
+              runOnJS(handleSwipe)('prev');
+            }
+          });
+          scale.value = withTiming(0.8, { duration: 250 });
+          opacity.value = withTiming(0, { duration: 250 });
         } else if (e.translationX < 0 && hasNext) {
-          // Animate out to the left
-          translateX.value = withTiming(-SCREEN_WIDTH, { duration: 300, easing: Easing.out(Easing.cubic) });
-          scale.value = withTiming(0.8, { duration: 300 });
-          opacity.value = withTiming(0, { duration: 300 });
-          runOnJS(handleSwipe)('next');
+          // Animate out to the left, then navigate
+          translateX.value = withTiming(-SCREEN_WIDTH, { 
+            duration: 250, 
+            easing: Easing.out(Easing.cubic) 
+          }, (finished) => {
+            if (finished) {
+              runOnJS(handleSwipe)('next');
+            }
+          });
+          scale.value = withTiming(0.8, { duration: 250 });
+          opacity.value = withTiming(0, { duration: 250 });
         } else {
           // Snap back if no navigation
           translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
