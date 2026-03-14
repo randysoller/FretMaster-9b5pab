@@ -1,30 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Animated } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { Screen, Button, AudioVisualizer } from '@/components';
+import { Screen } from '@/components';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import { STANDARD_TUNING } from '@/constants/musicData';
 import { pitchDetectionService, PitchDetectionResult } from '@/services/pitchDetectionService';
 import { mobileAudioDetectionService, MobilePitchResult } from '@/services/mobileAudioDetectionService';
 import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 
-const TUNINGS = ['Standard', 'EADGBE', 'Drop D', 'Open G', 'DADGAD'];
+const STANDARD_TUNING = ['E', 'A', 'D', 'G', 'B', 'E'];
+
+const TUNING_PRESETS = [
+  { name: 'Standard', strings: ['E', 'A', 'D', 'G', 'B', 'E'] },
+  { name: 'Drop D', strings: ['D', 'A', 'D', 'G', 'B', 'E'] },
+  { name: 'Half Step Down', strings: ['E♭', 'A♭', 'D♭', 'G♭', 'B♭', 'E♭'] },
+  { name: 'Open G', strings: ['D', 'G', 'D', 'G', 'B', 'D'] },
+];
 
 export default function TunerScreen() {
   const router = useRouter();
-  const [selectedTuning, setSelectedTuning] = useState('Standard');
-  const [micSensitivity, setMicSensitivity] = useState(60);
-  const [detectedPitch, setDetectedPitch] = useState<PitchDetectionResult | MobilePitchResult | null>(null);
-  const [detectionQuality, setDetectionQuality] = useState<any>(null);
   const [isListening, setIsListening] = useState(false);
+  const [selectedTuning, setSelectedTuning] = useState(TUNING_PRESETS[0]);
+  const [tuningDropdownOpen, setTuningDropdownOpen] = useState(false);
+  const [detectedPitch, setDetectedPitch] = useState<PitchDetectionResult | MobilePitchResult | null>(null);
   const [inputLevel, setInputLevel] = useState(0);
-  const [audioBuffer, setAudioBuffer] = useState<Float32Array | null>(null);
-  const [frequencyData, setFrequencyData] = useState<Uint8Array | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [sensitivity, setSensitivity] = useState(60);
+  
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Subscribe to input level updates
     const unsubscribe = pitchDetectionService.onInputLevel((level) => {
       setInputLevel(level);
     });
@@ -37,41 +43,50 @@ export default function TunerScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (detectedPitch) {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [detectedPitch]);
+
   const startListening = async () => {
     if (Platform.OS === 'web') {
-      // Web: Use Web Audio API
       const hasAccess = await pitchDetectionService.requestMicrophoneAccess();
       
       if (hasAccess) {
         setIsListening(true);
         pitchDetectionService.startDetection((result, buffer, freqData) => {
           setDetectedPitch(result);
-          if (result && result.quality) {
-            setDetectionQuality(result.quality);
-          }
-          if (buffer) setAudioBuffer(buffer);
-          if (freqData) setFrequencyData(freqData);
-        }, micSensitivity / 100);
+        }, sensitivity / 100);
       } else {
-        alert('Microphone access is required for tuning');
+        setPermissionDenied(true);
       }
     } else {
-      // Mobile: Use native audio + API detection
       const started = await mobileAudioDetectionService.startPitchDetection(
         (result) => {
           setDetectedPitch(result);
-          // Mobile doesn't have quality metrics in local mode
           if (result && result.confidence) {
             setInputLevel(result.confidence);
           }
         },
-        false // Use local detection for real-time feedback (faster)
+        false
       );
       
       if (started) {
         setIsListening(true);
       } else {
-        alert('Microphone access is required for tuning');
+        setPermissionDenied(true);
       }
     }
   };
@@ -96,88 +111,122 @@ export default function TunerScreen() {
     }
   };
 
+  const inTune = detectedPitch && Math.abs(detectedPitch.cents) < 5;
+  const flat = detectedPitch && detectedPitch.cents < -5;
+  const sharp = detectedPitch && detectedPitch.cents > 5;
+
   return (
     <Screen edges={['top']}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <MaterialIcons name="tune" size={24} color={colors.primary} />
-          <Text style={styles.headerTitle}>Guitar Tuner</Text>
+          <MaterialIcons name="tune" size={20} color={colors.textSecondary} />
+          <Text style={styles.headerTitle}>GUITAR TUNER</Text>
+          <Pressable onPress={() => router.push('/calibration')}>
+            <MaterialIcons name="settings" size={20} color={colors.textSecondary} />
+          </Pressable>
         </View>
-
-        {/* Title */}
-        <Text style={styles.title}>
-          Tune Your <Text style={styles.titleAccent}>Guitar</Text>
-        </Text>
 
         {/* Tuning Selector */}
-        <View style={styles.tuningSelector}>
-          <Text style={styles.tuningLabel}>{selectedTuning}</Text>
+        <Pressable 
+          style={styles.tuningSelector}
+          onPress={() => setTuningDropdownOpen(!tuningDropdownOpen)}
+        >
+          <Text style={styles.tuningLabel}>{selectedTuning.name}</Text>
           <MaterialIcons name="arrow-drop-down" size={24} color={colors.primary} />
-        </View>
-
-        <Text style={styles.instruction}>
-          Play a string and the tuner will detect the pitch.
-        </Text>
-
-        {/* Tuning Display */}
-        <Pressable onPress={toggleListening}>
-          <View style={styles.tuningDisplay}>
-            {!detectedPitch ? (
-              <View style={styles.waitingState}>
-                <MaterialIcons 
-                  name={isListening ? 'mic' : 'mic-off'} 
-                  size={48} 
-                  color={isListening ? colors.success : colors.textMuted} 
-                />
-                <Text style={styles.waitingText}>
-                  {isListening ? 'Listening...' : 'Tap to start tuning'}
-                </Text>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.noteLabel}>{detectedPitch.note}</Text>
-                <View style={styles.tuningMeter}>
-                  <Text style={styles.centLabel}>{detectedPitch.cents} cents</Text>
-                </View>
-              </>
-            )}
-          </View>
         </Pressable>
 
-        {/* Visual Tuner */}
-        <View style={styles.visualTuner}>
-          <Text style={styles.visualLabel}>Flat</Text>
-          <View style={styles.visualMeter}>
-            {Array.from({ length: 41 }).map((_, i) => {
-              const position = i - 20;
-              const cents = detectedPitch?.cents || 0;
-              const isActive = Math.abs(position - cents / 5) < 1;
-              let color = colors.surface;
-              if (isActive && detectedPitch) {
-                if (Math.abs(cents) < 5) color = colors.success;
-                else if (cents < 0) color = colors.error;
-                else color = colors.warning;
-              }
-              return (
-                <View 
-                  key={i} 
-                  style={[styles.meterBar, { backgroundColor: color }]} 
+        {/* Tuning Display */}
+        <Pressable onPress={toggleListening} style={styles.tuningDisplay}>
+          {!detectedPitch || !isListening ? (
+            <View style={styles.waitingState}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <MaterialIcons 
+                  name={isListening ? 'mic' : 'mic-off'} 
+                  size={56} 
+                  color={isListening ? colors.primary : colors.textMuted} 
                 />
-              );
-            })}
+              </Animated.View>
+              <Text style={styles.waitingText}>
+                {isListening ? 'Listening...' : 'Tap to Start'}
+              </Text>
+            </View>
+          ) : (
+            <Animated.View style={[styles.noteDisplay, { transform: [{ scale: pulseAnim }] }]}>
+              <Text style={styles.noteLabel}>{detectedPitch.note}</Text>
+              <Text style={[
+                styles.centsLabel,
+                inTune && styles.centsInTune,
+                flat && styles.centsFlat,
+                sharp && styles.centsSharp,
+              ]}>
+                {detectedPitch.cents > 0 ? '+' : ''}{detectedPitch.cents} cents
+              </Text>
+            </Animated.View>
+          )}
+        </Pressable>
+
+        {/* Visual Tuner Arc */}
+        <View style={styles.visualTuner}>
+          <View style={styles.arcContainer}>
+            <View style={styles.arc}>
+              {/* Flat region */}
+              <View style={[styles.arcSegment, styles.arcFlat]} />
+              {/* In-tune region */}
+              <View style={[styles.arcSegment, styles.arcInTune]} />
+              {/* Sharp region */}
+              <View style={[styles.arcSegment, styles.arcSharp]} />
+            </View>
+            
+            {/* Needle */}
+            {detectedPitch && (
+              <View 
+                style={[
+                  styles.needle,
+                  { 
+                    transform: [
+                      { translateX: (detectedPitch.cents / 50) * 100 },
+                    ] 
+                  }
+                ]}
+              >
+                <View style={[
+                  styles.needleDot,
+                  inTune && styles.needleDotInTune,
+                  flat && styles.needleDotFlat,
+                  sharp && styles.needleDotSharp,
+                ]} />
+              </View>
+            )}
           </View>
-          <Text style={styles.visualLabel}>Sharp</Text>
+          
+          <View style={styles.arcLabels}>
+            <Text style={styles.arcLabel}>Flat</Text>
+            <Text style={styles.arcLabel}>Sharp</Text>
+          </View>
+        </View>
+
+        {/* Strings */}
+        <View style={styles.stringsSection}>
+          <Text style={styles.sectionLabel}>STRINGS</Text>
+          <View style={styles.strings}>
+            {selectedTuning.strings.map((note, index) => (
+              <View key={index} style={styles.stringButton}>
+                <Text style={styles.stringNote}>{note}</Text>
+                <Text style={styles.stringNumber}>{6 - index}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Mic Sensitivity */}
         <View style={styles.sensitivitySection}>
           <View style={styles.sensitivityHeader}>
             <View style={styles.sensitivityLabel}>
-              <MaterialIcons name="mic" size={16} color={colors.textSecondary} />
+              <MaterialIcons name="mic" size={14} color={colors.textSecondary} />
               <Text style={styles.sectionLabel}>MIC SENSITIVITY</Text>
             </View>
-            <Text style={styles.sensitivityValue}>{micSensitivity}%</Text>
+            <Text style={styles.sensitivityValue}>{sensitivity}%</Text>
           </View>
           
           <View style={styles.sensitivityControls}>
@@ -186,8 +235,8 @@ export default function TunerScreen() {
               style={styles.slider}
               minimumValue={0}
               maximumValue={100}
-              value={micSensitivity}
-              onValueChange={setMicSensitivity}
+              value={sensitivity}
+              onValueChange={setSensitivity}
               minimumTrackTintColor={colors.primary}
               maximumTrackTintColor={colors.surface}
               thumbTintColor={colors.primary}
@@ -196,47 +245,11 @@ export default function TunerScreen() {
           </View>
         </View>
 
-        {/* Detection Quality */}
-        {detectionQuality && (
-          <View style={styles.qualitySection}>
-            <Text style={styles.sectionLabel}>DETECTION QUALITY</Text>
-            <View style={styles.qualityCard}>
-              <View style={styles.qualityScore}>
-                <Text style={styles.qualityValue}>{Math.round(detectionQuality.overallScore)}</Text>
-                <Text style={styles.qualityLabel}>Score</Text>
-              </View>
-              <View style={styles.qualityMetrics}>
-                <View style={styles.qualityMetric}>
-                  <Text style={styles.qualityMetricLabel}>S/N Ratio</Text>
-                  <Text style={styles.qualityMetricValue}>{detectionQuality.signalToNoise.toFixed(1)} dB</Text>
-                </View>
-                <View style={styles.qualityMetric}>
-                  <Text style={styles.qualityMetricLabel}>Clarity</Text>
-                  <Text style={styles.qualityMetricValue}>{Math.round(detectionQuality.harmonicClarity * 100)}%</Text>
-                </View>
-                <View style={styles.qualityMetric}>
-                  <Text style={styles.qualityMetricLabel}>Stability</Text>
-                  <Text style={styles.qualityMetricValue}>{Math.round(detectionQuality.temporalStability * 100)}%</Text>
-                </View>
-              </View>
-              {detectionQuality.warnings.length > 0 && (
-                <View style={styles.qualityWarnings}>
-                  {detectionQuality.warnings.map((warning: string, index: number) => (
-                    <Text key={index} style={styles.qualityWarning}>
-                      ⚠️ {warning}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Input Level Monitor */}
+        {/* Input Level */}
         {isListening && (
           <View style={styles.inputLevelSection}>
             <View style={styles.inputLevelHeader}>
-              <MaterialIcons name="graphic-eq" size={16} color={colors.textSecondary} />
+              <MaterialIcons name="graphic-eq" size={14} color={colors.textSecondary} />
               <Text style={styles.sectionLabel}>INPUT LEVEL</Text>
               <Text style={styles.inputLevelValue}>{Math.round(inputLevel * 100)}%</Text>
             </View>
@@ -250,77 +263,15 @@ export default function TunerScreen() {
                 ]} 
               />
             </View>
-            {inputLevel < 0.1 && (
-              <Text style={styles.inputLevelWarning}>⚠️ Too quiet - play louder</Text>
-            )}
-            {inputLevel > 0.9 && (
-              <Text style={styles.inputLevelWarning}>⚠️ Too loud - may clip</Text>
-            )}
           </View>
         )}
 
-        {/* Audio Visualization */}
-        {isListening && (audioBuffer || frequencyData) && (
-          <View style={styles.visualizationSection}>
-            <Text style={styles.sectionLabel}>AUDIO VISUALIZATION</Text>
-            <AudioVisualizer
-              audioData={audioBuffer}
-              frequencyData={frequencyData}
-              type="both"
-              height={120}
-              color={colors.primary}
-            />
+        {permissionDenied && (
+          <View style={styles.errorBanner}>
+            <MaterialIcons name="error-outline" size={20} color={colors.error} />
+            <Text style={styles.errorText}>Microphone access denied. Please enable in settings.</Text>
           </View>
         )}
-
-        {/* Calibration */}
-        <View style={styles.calibrationSection}>
-          <View style={styles.calibrationHeader}>
-            <View style={styles.calibrationLabel}>
-              <MaterialIcons name="settings" size={16} color={colors.textSecondary} />
-              <Text style={styles.sectionLabel}>CALIBRATION</Text>
-            </View>
-            <Pressable 
-              style={styles.calibrateButton}
-              onPress={() => router.push('/calibration')}
-            >
-              <MaterialIcons name="settings" size={16} color={colors.primary} />
-              <Text style={styles.calibrateText}>Calibrate</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Strings */}
-        <View style={styles.stringsSection}>
-          <View style={styles.stringsHeader}>
-            <Text style={styles.sectionLabel}>STRINGS</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Pressable
-                style={styles.testingButton}
-                onPress={() => router.push('/testing')}
-              >
-                <MaterialIcons name="science" size={16} color={colors.info} />
-                <Text style={styles.testingText}>Test</Text>
-              </Pressable>
-              <Pressable style={styles.autoDetectButton}>
-                <MaterialIcons name="auto-fix-high" size={16} color={colors.primary} />
-                <Text style={styles.autoDetectText}>Auto-Detect</Text>
-              </Pressable>
-            </View>
-          </View>
-          
-          <View style={styles.strings}>
-            {STANDARD_TUNING.map((note, index) => (
-              <Pressable 
-                key={index}
-                style={styles.stringButton}
-              >
-                <Text style={styles.stringNote}>{note}</Text>
-                <Text style={styles.stringNumber}>{index + 1}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
       </View>
     </Screen>
   );
@@ -334,24 +285,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
   headerTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  title: {
-    ...typography.h1,
-    fontSize: 28,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  titleAccent: {
-    color: colors.primary,
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    fontWeight: '700',
   },
   tuningSelector: {
     flexDirection: 'row',
@@ -360,28 +303,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.xl,
     gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tuningLabel: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
-  instruction: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
   tuningDisplay: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.xl,
     padding: spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
-    marginBottom: spacing.lg,
+    minHeight: 180,
+    marginBottom: spacing.xl,
+    borderWidth: 2,
+    borderColor: colors.border,
   },
   waitingState: {
     alignItems: 'center',
@@ -391,133 +332,105 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 16,
   },
-  noteLabel: {
-    fontSize: 64,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  tuningMeter: {
-    marginTop: spacing.md,
-  },
-  centLabel: {
-    fontSize: 18,
-    color: colors.textSecondary,
-  },
-  visualTuner: {
-    flexDirection: 'row',
+  noteDisplay: {
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  noteLabel: {
+    fontSize: 72,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  centsLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  centsInTune: {
+    color: colors.success,
+  },
+  centsFlat: {
+    color: colors.error,
+  },
+  centsSharp: {
+    color: colors.warning,
+  },
+  visualTuner: {
     marginBottom: spacing.xl,
   },
-  visualLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  visualMeter: {
-    flex: 1,
-    flexDirection: 'row',
-    height: 40,
-    gap: 2,
-  },
-  meterBar: {
-    flex: 1,
-    borderRadius: 2,
-  },
-  sensitivitySection: {
-    marginBottom: spacing.lg,
-  },
-  sensitivityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  arcContainer: {
+    position: 'relative',
+    height: 60,
     marginBottom: spacing.sm,
   },
-  sensitivityLabel: {
+  arc: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+    height: 40,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  arcSegment: {
+    flex: 1,
+    height: '100%',
+  },
+  arcFlat: {
+    backgroundColor: colors.error + '40',
+  },
+  arcInTune: {
+    backgroundColor: colors.success + '40',
+  },
+  arcSharp: {
+    backgroundColor: colors.warning + '40',
+  },
+  needle: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: 2,
+    height: 60,
+    marginLeft: -1,
+    marginTop: -30,
+  },
+  needleDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.textMuted,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  needleDotInTune: {
+    backgroundColor: colors.success,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+  },
+  needleDotFlat: {
+    backgroundColor: colors.error,
+  },
+  needleDotSharp: {
+    backgroundColor: colors.warning,
+  },
+  arcLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+  },
+  arcLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  stringsSection: {
+    marginBottom: spacing.xl,
   },
   sectionLabel: {
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 11,
     letterSpacing: 1,
-  },
-  sensitivityValue: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sensitivityControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sensitivityMin: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  sensitivityMax: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  slider: {
-    flex: 1,
-    height: 40,
-  },
-  calibrationSection: {
-    marginBottom: spacing.xl,
-  },
-  calibrationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  calibrationLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  calibrateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  calibrateText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stringsSection: {
-    marginBottom: spacing.lg,
-  },
-  stringsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: spacing.md,
-  },
-  autoDetectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  autoDetectText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   strings: {
     flexDirection: 'row',
@@ -535,69 +448,49 @@ const styles = StyleSheet.create({
   },
   stringNote: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   stringNumber: {
     color: colors.textMuted,
-    fontSize: 12,
-    marginTop: spacing.xs,
+    fontSize: 11,
+    marginTop: 2,
   },
-  qualitySection: {
+  sensitivitySection: {
     marginBottom: spacing.lg,
   },
-  qualityCard: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  qualityScore: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  qualityValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  qualityLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  qualityMetrics: {
+  sensitivityHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: spacing.md,
-  },
-  qualityMetric: {
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: spacing.sm,
   },
-  qualityMetricLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginBottom: 4,
+  sensitivityLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  qualityMetricValue: {
-    fontSize: 14,
-    fontWeight: '600',
+  sensitivityValue: {
     color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
-  qualityWarnings: {
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  sensitivityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  qualityWarning: {
-    fontSize: 12,
-    color: colors.warning,
-    marginBottom: spacing.xs,
-    lineHeight: 16,
+  sensitivityMin: {
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  sensitivityMax: {
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  slider: {
+    flex: 1,
+    height: 40,
   },
   inputLevelSection: {
     marginBottom: spacing.lg,
@@ -611,11 +504,11 @@ const styles = StyleSheet.create({
   inputLevelValue: {
     marginLeft: 'auto',
     color: colors.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
   inputLevelMeter: {
-    height: 8,
+    height: 6,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.full,
     overflow: 'hidden',
@@ -631,28 +524,19 @@ const styles = StyleSheet.create({
   inputLevelFillHigh: {
     backgroundColor: colors.error,
   },
-  inputLevelWarning: {
-    fontSize: 11,
-    color: colors.warning,
-    marginTop: spacing.xs,
-  },
-  visualizationSection: {
-    marginBottom: spacing.lg,
-  },
-  testingButton: {
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
+    gap: spacing.sm,
+    backgroundColor: colors.error + '20',
+    padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: colors.info,
+    borderColor: colors.error + '40',
   },
-  testingText: {
-    color: colors.info,
-    fontSize: 14,
-    fontWeight: '600',
+  errorText: {
+    flex: 1,
+    color: colors.error,
+    fontSize: 13,
   },
 });

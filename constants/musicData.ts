@@ -107,12 +107,12 @@ export const CHORDS: ChordData[] = [
   // ========== AUGMENTED CHORDS ==========
   { name: 'Caug', fullName: 'C Augmented', positions: [-1, 3, 2, 1, 1, 0], fingers: [0, 4, 3, 1, 2, 0], shape: 'open', type: 'augmented', baseFret: 1 },
   { name: 'Gaug', fullName: 'G Augmented', positions: [3, 2, 1, 0, 0, 3], fingers: [3, 2, 1, 0, 0, 4], shape: 'open', type: 'augmented', baseFret: 1 },
-  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented', baseFret: 1 },
+  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented', baseFret: 1, rootString: 4 },
   
   // ========== DIMINISHED CHORDS ==========
-  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished', baseFret: 1 },
+  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished', baseFret: 1, rootString: 5 },
   { name: 'Ddim', fullName: 'D Diminished', positions: [-1, -1, 0, 1, 0, 1], fingers: [0, 0, 0, 1, 0, 2], shape: 'open', type: 'diminished', baseFret: 1 },
-  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished', baseFret: 2 },
+  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished', baseFret: 2, rootString: 5 },
   
   // ========== SUSPENDED CHORDS ==========
   { name: 'Csus2', fullName: 'C Suspended 2', positions: [-1, 3, 0, 0, 1, 3], fingers: [0, 2, 0, 0, 1, 3], shape: 'open', type: 'suspended', baseFret: 1 },
@@ -144,20 +144,20 @@ export const CHORDS: ChordData[] = [
   { name: 'Bm7', fullName: 'B Minor 7', positions: [-1, 2, 0, 2, 0, 2], fingers: [0, 2, 0, 3, 0, 4], shape: 'open', type: 'minor7', baseFret: 1 },
   
   // ========== 9TH CHORDS ==========
-  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth', baseFret: 1 },
+  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth', baseFret: 1, rootString: 5 },
   { name: 'D9', fullName: 'D Dominant 9', positions: [-1, -1, 0, 2, 1, 0], fingers: [0, 0, 0, 2, 1, 0], shape: 'open', type: 'ninth', baseFret: 1 },
   { name: 'E9', fullName: 'E Dominant 9', positions: [0, 2, 0, 1, 0, 2], fingers: [0, 2, 0, 1, 0, 3], shape: 'open', type: 'ninth', baseFret: 1 },
-  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth', baseFret: 1 },
+  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth', baseFret: 1, rootString: 6 },
   
   // ========== 11TH CHORDS ==========
-  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh', baseFret: 1 },
+  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh', baseFret: 1, rootString: 5 },
   { name: 'D11', fullName: 'D Dominant 11', positions: [-1, -1, 0, 0, 1, 0], fingers: [0, 0, 0, 0, 1, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
   { name: 'E11', fullName: 'E Dominant 11', positions: [0, 0, 0, 1, 0, 0], fingers: [0, 0, 0, 1, 0, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
   
   // ========== 13TH CHORDS ==========
-  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth', baseFret: 1 },
-  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth', baseFret: 1 },
-  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth', baseFret: 1 },
+  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 5 },
+  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 6 },
+  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 5 },
   
   // ========== SLASH CHORDS ==========
   { name: 'C/G', fullName: 'C over G', positions: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], shape: 'open', type: 'slash', baseFret: 1 },
@@ -198,12 +198,12 @@ export const CHORD_DATA: ChordData[] = [ // Added '[' here
   // ========== AUGMENTED CHORDS ==========
   { name: 'Caug', fullName: 'C Augmented', positions: [-1, 3, 2, 1, 1, 0], fingers: [0, 4, 3, 1, 2, 0], shape: 'open', type: 'augmented', baseFret: 1 },
   { name: 'Gaug', fullName: 'G Augmented', positions: [3, 2, 1, 0, 0, 3], fingers: [3, 2, 1, 0, 0, 4], shape: 'open', type: 'augmented', baseFret: 1 },
-  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented', baseFret: 1 },
+  { name: 'Daug', fullName: 'D Augmented', positions: [-1, -1, 0, 3, 3, 2], fingers: [0, 0, 0, 2, 3, 1], shape: 'movable', type: 'augmented', baseFret: 1, rootString: 4 },
   
   // ========== DIMINISHED CHORDS ==========
-  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished', baseFret: 1 },
+  { name: 'Cdim', fullName: 'C Diminished', positions: [-1, 3, 1, 2, 1, 2], fingers: [0, 4, 1, 2, 1, 3], shape: 'movable', type: 'diminished', baseFret: 1, rootString: 5 },
   { name: 'Ddim', fullName: 'D Diminished', positions: [-1, -1, 0, 1, 0, 1], fingers: [0, 0, 0, 1, 0, 2], shape: 'open', type: 'diminished', baseFret: 1 },
-  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished', baseFret: 2 },
+  { name: 'Bdim', fullName: 'B Diminished', positions: [-1, 2, 3, 4, 3, -1], fingers: [0, 1, 2, 4, 3, 0], shape: 'movable', type: 'diminished', baseFret: 2, rootString: 5 },
   
   // ========== SUSPENDED CHORDS ==========
   { name: 'Csus2', fullName: 'C Suspended 2', positions: [-1, 3, 0, 0, 1, 3], fingers: [0, 2, 0, 0, 1, 3], shape: 'open', type: 'suspended', baseFret: 1 },
@@ -235,20 +235,20 @@ export const CHORD_DATA: ChordData[] = [ // Added '[' here
   { name: 'Bm7', fullName: 'B Minor 7', positions: [-1, 2, 0, 2, 0, 2], fingers: [0, 2, 0, 3, 0, 4], shape: 'open', type: 'minor7', baseFret: 1 },
   
   // ========== 9TH CHORDS ==========
-  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth', baseFret: 1 },
+  { name: 'C9', fullName: 'C Dominant 9', positions: [-1, 3, 2, 3, 3, 3], fingers: [0, 2, 1, 3, 3, 3], shape: 'movable', type: 'ninth', baseFret: 1, rootString: 5 },
   { name: 'D9', fullName: 'D Dominant 9', positions: [-1, -1, 0, 2, 1, 0], fingers: [0, 0, 0, 2, 1, 0], shape: 'open', type: 'ninth', baseFret: 1 },
   { name: 'E9', fullName: 'E Dominant 9', positions: [0, 2, 0, 1, 0, 2], fingers: [0, 2, 0, 1, 0, 3], shape: 'open', type: 'ninth', baseFret: 1 },
-  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth', baseFret: 1 },
+  { name: 'G9', fullName: 'G Dominant 9', positions: [3, 2, 3, 2, 3, 3], fingers: [2, 1, 3, 1, 4, 4], shape: 'movable', type: 'ninth', baseFret: 1, rootString: 6 },
   
   // ========== 11TH CHORDS ==========
-  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh', baseFret: 1 },
+  { name: 'C11', fullName: 'C Dominant 11', positions: [-1, 3, 3, 3, 1, 1], fingers: [0, 2, 3, 4, 1, 1], shape: 'movable', type: 'eleventh', baseFret: 1, rootString: 5 },
   { name: 'D11', fullName: 'D Dominant 11', positions: [-1, -1, 0, 0, 1, 0], fingers: [0, 0, 0, 0, 1, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
   { name: 'E11', fullName: 'E Dominant 11', positions: [0, 0, 0, 1, 0, 0], fingers: [0, 0, 0, 1, 0, 0], shape: 'open', type: 'eleventh', baseFret: 1 },
   
   // ========== 13TH CHORDS ==========
-  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth', baseFret: 1 },
-  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth', baseFret: 1 },
-  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth', baseFret: 1 },
+  { name: 'C13', fullName: 'C Dominant 13', positions: [-1, 3, 2, 3, 5, 5], fingers: [0, 1, 1, 2, 3, 4], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 5 },
+  { name: 'G13', fullName: 'G Dominant 13', positions: [3, 2, 3, 2, 0, 0], fingers: [3, 1, 4, 2, 0, 0], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 6 },
+  { name: 'A13', fullName: 'A Dominant 13', positions: [-1, 0, 2, 0, 2, 2], fingers: [0, 0, 1, 0, 2, 3], shape: 'movable', type: 'thirteenth', baseFret: 1, rootString: 5 },
   
   // ========== SLASH CHORDS ==========
   { name: 'C/G', fullName: 'C over G', positions: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], shape: 'open', type: 'slash', baseFret: 1 },
