@@ -53,8 +53,8 @@ export function ChordDetailModal({
   };
   
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-10, 10]) // Activate on 10px horizontal movement
-    .failOffsetY([-20, 20]) // Fail if vertical movement exceeds 20px
+    .activeOffsetX([-15, 15]) // Activate on 15px horizontal movement
+    .failOffsetY([-30, 30]) // Fail if vertical movement exceeds 30px
     .onUpdate((e) => {
       // Only allow swipe if there's a chord in that direction
       if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
@@ -64,15 +64,17 @@ export function ChordDetailModal({
       }
     })
     .onEnd((e) => {
-      // Lower velocity threshold for easier swiping (or no velocity check at all)
+      // More lenient swiping - just need distance OR velocity
       const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
-      const hasEnoughVelocity = Math.abs(e.velocityX) > 200; // Lowered from 500
+      const hasEnoughVelocity = Math.abs(e.velocityX) > 150; // Lowered from 200
       
       if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
           runOnJS(handleSwipe)('prev');
+          translateX.value = withSpring(0);
         } else if (e.translationX < 0 && hasNext) {
           runOnJS(handleSwipe)('next');
+          translateX.value = withSpring(0);
         } else {
           translateX.value = withSpring(0);
         }
@@ -323,7 +325,10 @@ export function ChordDetailModal({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={true}
+          >
             {/* Fretboard Diagram */}
             {renderFretboardDiagram()}
 
@@ -414,7 +419,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modal: {
-    width: '90%',
+    width: SCREEN_WIDTH - 16, // 8pts margin on each side to show bleeding edges
     maxWidth: 400,
     maxHeight: '85%',
     backgroundColor: colors.bgElevated,
