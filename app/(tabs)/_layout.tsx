@@ -54,7 +54,7 @@ export default function TabLayout() {
           style={styles.statsButton}
           onPress={() => router.push('/stats' as any)}
         >
-          <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
+          <MaterialIcons name="bar-chart" size={24} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -67,7 +67,7 @@ export default function TabLayout() {
           tabBarShowLabel: true,
           tabBarHideOnKeyboard: false,
           tabBarLabelStyle: {
-            fontSize: 11,
+            fontSize: 15,
             fontWeight: '600',
             marginTop: 0,
             marginBottom: 4,
@@ -94,7 +94,7 @@ export default function TabLayout() {
           options={{
             title: 'Metronome',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="av-timer" size={size} color={color} />
+              <MaterialIcons name="speed" size={size} color={color} />
             ),
           }}
         />
@@ -103,7 +103,7 @@ export default function TabLayout() {
           options={{
             title: 'Tuner',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="settings-input-antenna" size={size} color={color} />
+              <MaterialIcons name="tune" size={size} color={color} />
             ),
           }}
         />
@@ -119,7 +119,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="library"
           options={{
-            title: 'Library',
+            title: 'Libraries',
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="library-books" size={size} color={color} />
             ),
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '500',
   },
   statsButton: {
