@@ -26,7 +26,6 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
   const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
 
   // Note calculation helpers
-  const STANDARD_TUNING = ['E', 'A', 'D', 'G', 'B', 'E'];
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   
   const normalizeNote = (note: string) => {
@@ -44,12 +43,12 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
   
   const normalizedRootNote = normalizeNote(rootNote);
 
-  // Render fretboard diagram
+  // Render fretboard diagram (smaller for card view)
   const renderFretboard = () => {
     const STRINGS = 6;
     const FRETS = 4;
-    const DIAGRAM_WIDTH = 80;
-    const DIAGRAM_HEIGHT = 100;
+    const DIAGRAM_WIDTH = 60;
+    const DIAGRAM_HEIGHT = 75;
     const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1);
     const FRET_SPACING = DIAGRAM_HEIGHT / FRETS;
 
@@ -151,35 +150,38 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
   }).reverse(); // Reverse so 6th string is at bottom
 
   return (
-    <View style={styles.card}>
+    <Pressable onPress={onPress} style={styles.card}>
       {/* Card number */}
       <Text style={styles.cardNumber}>{cardNumber < 10 ? `0${cardNumber}` : cardNumber}</Text>
       
       <View style={styles.cardContent}>
         {/* Checkbox */}
         <Pressable 
-          onPress={onCheckboxPress}
+          onPress={(e) => {
+            e.stopPropagation();
+            onCheckboxPress?.();
+          }}
           style={styles.checkboxContainer}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
             {isSelected && (
-              <MaterialIcons name="check" size={16} color="#FF8C42" />
+              <MaterialIcons name="check" size={14} color={colors.primary} />
             )}
           </View>
         </Pressable>
 
         {/* Fretboard diagram */}
-        <Pressable onPress={onPress} style={styles.diagramSection}>
+        <View style={styles.diagramSection}>
           {renderFretboard()}
-        </Pressable>
+        </View>
 
         {/* Chord info */}
-        <Pressable onPress={onPress} style={styles.infoSection}>
-          <Text style={styles.chordName}>{chord.name}</Text>
+        <View style={styles.infoSection}>
+          <Text style={styles.chordLetter}>{rootNote}</Text>
           <Text style={styles.chordCategory}>{chord.shape.toUpperCase()} CHORDS</Text>
           <Text style={styles.chordFullName}>{chord.fullName}</Text>
-        </Pressable>
+        </View>
 
         {/* String notation box */}
         <View style={styles.stringNotationBox}>
@@ -193,68 +195,68 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
           ))}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     position: 'relative',
-    backgroundColor: `rgba(24, 19, 16, ${opacity.surfaceElevated})`,
-    borderRadius: borderRadius.xl,
-    padding: spacing.base,
+    backgroundColor: '#1A1A1A',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: '#2A2A2A',
   },
   cardNumber: {
     position: 'absolute',
-    top: 12,
+    top: 8,
     right: 12,
-    fontSize: 11,
-    color: colors.textMuted,
+    fontSize: 10,
+    color: '#666',
     fontWeight: '600',
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: spacing.md,
   },
   checkboxContainer: {
-    padding: 4,
+    padding: 2,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 3,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: '#444',
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
     borderColor: colors.primary,
-    backgroundColor: `rgba(212, 149, 42, ${opacity.activeBackgroundLight})`,
+    backgroundColor: 'rgba(212, 149, 42, 0.2)',
   },
 
   // Fretboard
   diagramSection: {
-    width: 90,
+    width: 70,
   },
   fretboardContainer: {
     position: 'relative',
-    paddingLeft: 20,
-    backgroundColor: colors.fretboard,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
+    paddingLeft: 16,
+    backgroundColor: '#0F0F0F',
+    borderRadius: borderRadius.sm,
+    padding: spacing.xs,
   },
   fretLabel: {
     position: 'absolute',
-    left: 0,
-    top: 35,
-    fontSize: 9,
-    color: colors.textSubtle,
+    left: -2,
+    top: 28,
+    fontSize: 8,
+    color: '#888',
     fontWeight: '600',
   },
   fretboard: {
@@ -262,25 +264,25 @@ const styles = StyleSheet.create({
   },
   topMarkersRow: {
     position: 'absolute',
-    top: -20,
+    top: -16,
     left: 0,
-    height: 18,
+    height: 14,
   },
   topMarker: {
     position: 'absolute',
-    width: 16,
-    height: 18,
+    width: 12,
+    height: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   mutedX: {
-    fontSize: 15,
-    color: colors.textMuted,
+    fontSize: 12,
+    color: '#666',
     fontWeight: '700',
   },
   openO: {
-    fontSize: 15,
-    color: colors.textSubtle,
+    fontSize: 12,
+    color: '#999',
     fontWeight: '400',
   },
   gridArea: {
@@ -307,35 +309,35 @@ const styles = StyleSheet.create({
   },
   dotContainer: {
     position: 'absolute',
-    width: 22,
-    height: 22,
-    marginLeft: -11,
-    marginTop: -11,
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    marginTop: -9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   diamondDot: {
-    width: 20,
-    height: 20,
+    width: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
   },
   circleNumber: {
-    color: colors.background,
-    fontSize: 14,
+    color: '#000',
+    fontSize: 11,
     fontWeight: '700',
   },
   diamondNumber: {
-    color: '#1A1D24', // Darker for root notes as per spec
-    fontSize: 14,
+    color: '#000',
+    fontSize: 11,
     fontWeight: '700',
     transform: [{ rotate: '-45deg' }],
   },
@@ -344,56 +346,64 @@ const styles = StyleSheet.create({
   infoSection: {
     flex: 1,
     justifyContent: 'center',
+    gap: 2,
   },
-  chordName: {
-    fontSize: 30,
+  chordLetter: {
+    fontSize: 36,
     fontWeight: '800',
-    color: colors.text,
-    marginBottom: 2,
+    color: '#FFFFFF',
+    lineHeight: 40,
+    marginBottom: -4,
   },
   chordCategory: {
-    fontSize: 10,
-    color: colors.textMuted,
-    fontWeight: '700',
+    fontSize: 9,
+    color: '#888',
+    fontWeight: '600',
     letterSpacing: 0.5,
-    marginBottom: 4,
     textTransform: 'uppercase',
   },
   chordFullName: {
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: 13,
+    color: '#AAA',
     fontWeight: '400',
   },
   
   // String notation box
   stringNotationBox: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.xs,
-    minWidth: 85,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 2,
+    minWidth: 75,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   stringNotationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'flex-start',
+    paddingVertical: 2,
   },
   stringName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#000',
-    width: 14,
-  },
-  stringDash: {
     fontSize: 11,
-    color: '#666',
-  },
-  fretNumber: {
-    fontSize: 12,
     fontWeight: '700',
     color: '#000',
-    minWidth: 16,
+    width: 12,
+  },
+  stringDash: {
+    fontSize: 10,
+    color: '#888',
+    marginHorizontal: 2,
+  },
+  fretNumber: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#000',
+    minWidth: 14,
     textAlign: 'center',
   },
 });
