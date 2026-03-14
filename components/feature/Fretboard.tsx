@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Line, Circle, Rect, Polygon, Text as SvgText } from 'react-native-svg';
@@ -241,28 +242,30 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
               return (
                 <React.Fragment key={`barre-dot-${si}`}>
                   {isRoot ? (
-                    <RootDiamond x={getStringX(si)} y={y} r={config.dotRadius} />
+                    <RootDiamond x={getStringX(si)} y={y} r={config.dotRadius} fingerNum={barreFingerNum} fontSize={config.fontSize} />
                   ) : (
-                    <Circle cx={getStringX(si)} cy={y} r={config.dotRadius} fill={OTHER_NOTE_COLOR} />
-                  )}
-                  {barreFingerNum > 0 && (
-                    <SvgText
-                      x={getStringX(si)}
-                      y={y + config.fontSize * 0.35}
-                      fontSize={config.fontSize}
-                      fontWeight="700"
-                      fill={isRoot ? '#1A1D24' : colors.background}
-                      textAnchor="middle"
-                    >
-                      {barreFingerNum}
-                    </SvgText>
+                    <>
+                      <Circle cx={getStringX(si)} cy={y} r={config.dotRadius} fill={OTHER_NOTE_COLOR} />
+                      {barreFingerNum > 0 && (
+                        <SvgText
+                          x={getStringX(si)}
+                          y={y + config.fontSize * 0.35}
+                          fontSize={config.fontSize}
+                          fontWeight="700"
+                          fill={colors.background}
+                          textAnchor="middle"
+                        >
+                          {barreFingerNum}
+                        </SvgText>
+                      )}
+                    </>
                   )}
                 </React.Fragment>
               );
             })}
           </React.Fragment>
         );
-      })}
+      })} {/* Removed extra '}' here */}
 
       {/* Open and muted string indicators */}
       {chord.positions.map((fret, i) => {
@@ -275,7 +278,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
           const isRoot = normalizeNote(noteAtPosition) === normalizedRootNote;
           
           if (isRoot) {
-            return <RootDiamond key={`open-${i}`} x={x} y={y} r={r} />;
+            return <RootDiamond key={`open-${i}`} x={x} y={y} r={r} fingerNum={0} fontSize={config.fontSize * 0.65} />;
           }
           return <Circle key={`open-${i}`} cx={x} cy={y} r={r} stroke={OPEN_COLOR} strokeWidth={1.5} fill="none" />;
         }
@@ -290,7 +293,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         }
         
         return null;
-      })}
+      })} {/* Removed extra '}' here */}
 
       {/* Finger dots (non-barre) */}
       {chord.positions.map((fret, i) => {
@@ -310,21 +313,23 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         return (
           <React.Fragment key={`dot-${i}`}>
             {isRoot ? (
-              <RootDiamond x={x} y={y} r={config.dotRadius} />
+              <RootDiamond x={x} y={y} r={config.dotRadius} fingerNum={chord.fingers[i]} fontSize={config.fontSize} />
             ) : (
-              <Circle cx={x} cy={y} r={config.dotRadius} fill={OTHER_NOTE_COLOR} />
-            )}
-            {chord.fingers[i] > 0 && (
-              <SvgText
-                x={x}
-                y={y + config.fontSize * 0.35}
-                fontSize={config.fontSize}
-                fontWeight="700"
-                fill={isRoot ? '#1A1D24' : colors.background}
-                textAnchor="middle"
-              >
-                {chord.fingers[i]}
-              </SvgText>
+              <>
+                <Circle cx={x} cy={y} r={config.dotRadius} fill={OTHER_NOTE_COLOR} />
+                {chord.fingers[i] > 0 && (
+                  <SvgText
+                    x={x}
+                    y={y + config.fontSize * 0.35}
+                    fontSize={config.fontSize}
+                    fontWeight="700"
+                    fill={colors.background}
+                    textAnchor="middle"
+                  >
+                    {chord.fingers[i]}
+                  </SvgText>
+                )}
+              </>
             )}
           </React.Fragment>
         );
@@ -333,11 +338,27 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   );
 }
 
-/** Light blue diamond shape for root notes */
-function RootDiamond({ x, y, r }: { x: number; y: number; r: number }) {
+/** Light blue diamond shape for root notes with upright finger number */
+function RootDiamond({ x, y, r, fingerNum, fontSize }: { x: number; y: number; r: number; fingerNum?: number; fontSize?: number }) {
   const d = r * 1.15;
   const points = `${x},${y - d} ${x + d},${y} ${x},${y + d} ${x - d},${y}`;
-  return <Polygon points={points} fill={ROOT_NOTE_COLOR} />;
+  return (
+    <>
+      <Polygon points={points} fill={ROOT_NOTE_COLOR} />
+      {fingerNum != null && fingerNum > 0 && fontSize && (
+        <SvgText
+          x={x}
+          y={y + fontSize * 0.35}
+          fontSize={fontSize}
+          fontWeight="700"
+          fill="#1A1D24"
+          textAnchor="middle"
+        >
+          {fingerNum}
+        </SvgText>
+      )}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
