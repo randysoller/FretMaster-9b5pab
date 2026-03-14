@@ -69,7 +69,7 @@ export default function TabLayout() {
           tabBarLabelStyle: {
             fontSize: 15,
             fontWeight: '600',
-            marginTop: 0,
+            marginTop: 4,
             marginBottom: 4,
           },
           tabBarItemStyle: {
@@ -87,6 +87,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="home" size={size} color={color} />
             ),
+            tabBarLabel: 'Practice',
           }}
         />
         <Tabs.Screen
@@ -94,8 +95,9 @@ export default function TabLayout() {
           options={{
             title: 'Metronome',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="speed" size={size} color={color} />
+              <MaterialIcons name="av-timer" size={size} color={color} />
             ),
+            tabBarLabel: 'Metronome',
           }}
         />
         <Tabs.Screen
@@ -103,8 +105,9 @@ export default function TabLayout() {
           options={{
             title: 'Tuner',
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="tune" size={size} color={color} />
+              <MaterialIcons name="vibration" size={size} color={color} />
             ),
+            tabBarLabel: 'Tuner',
           }}
         />
         <Tabs.Screen
@@ -114,6 +117,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="school" size={size} color={color} />
             ),
+            tabBarLabel: 'Lessons',
           }}
         />
         <Tabs.Screen
@@ -123,6 +127,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="library-books" size={size} color={color} />
             ),
+            tabBarLabel: 'Libraries',
           }}
         />
       </Tabs>
