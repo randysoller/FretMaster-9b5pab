@@ -54,13 +54,16 @@ export const colors = {
   borderLight: '#2E2A25',
 };
 
+// Spacing System - 8px grid with 4px fine-tuning
 export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
+  xs: 4,      // Fine spacing, icon-to-text gaps
+  sm: 8,      // Tight gaps between related items
+  md: 12,     // Standard gap between components
+  base: 16,   // Standard padding, section gaps
+  lg: 24,     // Card padding (desktop), section padding
+  xl: 32,     // Large vertical spacing between sections
+  xxl: 48,    // Hero section vertical padding (mobile)
+  xxxl: 64,   // Hero section vertical padding (desktop)
 };
 
 // Typography - Sora + DM Sans exact specifications
@@ -150,10 +153,47 @@ export const typography = {
   },
 };
 
+// Border Radius System
 export const borderRadius = {
-  sm: 4,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  full: 9999,
+  sm: 4,      // Small inline badges, tags
+  md: 8,      // Filter chips, buttons, list items, smaller cards
+  lg: 10,     // Default radius, standard cards
+  xl: 12,     // Buttons, cards, panels
+  xxl: 16,    // Modals, practice mode cards, bottom sheets
+  full: 9999, // Pills, tags, avatar badges, toggle track, tab indicators
+};
+
+// Key Dimensions
+export const dimensions = {
+  headerHeight: 58,
+  tabBarHeight: 56,
+  toolbarHeight: 66,
+  minTouchTarget: 44,
+};
+
+// Animation Timing
+export const animations = {
+  badge: { duration: 300, easing: [0.16, 1, 0.3, 1] }, // Spring-like entrance
+  transition: { duration: 300 },
+  dropdown: { duration: 150 },
+  quick: { duration: 200 },
+  audioWave: { duration: 800 },
+  sweep: { duration: 700 },
+};
+
+// Opacity Patterns
+export const opacity = {
+  activeBackground: 0.1,      // 10% for active/selected backgrounds
+  activeBorder: 0.5,          // 50% for active borders
+  activeBackgroundLight: 0.15, // 15% for emphasized active states
+  hoverBackground: 0.15,      // 15% for hover states
+  disabled: 0.4,              // 40% overall opacity for disabled elements
+  backdropLight: 0.85,        // 85% for light backdrop blur
+  backdropDark: 0.95,         // 95% for dark backdrop blur
+  backdrop: 0.92,             // 92% for tab bar backdrop
+  subtle: 0.08,               // 8% for subtle decorative elements
+  glowInner: 0.25,            // 25% for inner glow shadows
+  glowOuter: 0.1,             // 10% for outer glow shadows
+  surfaceElevated: 0.6,       // 60% for elevated card surfaces
+  overlay: 0.7,               // 70% for modal overlays
 };

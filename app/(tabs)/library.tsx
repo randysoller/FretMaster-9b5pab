@@ -6,6 +6,7 @@ import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
 import { CHORDS, ChordData, ChordShape, ChordType } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
+import { colors, spacing, borderRadius, opacity } from '@/constants/theme';
 
 const FILTER_TYPES = [
   { label: 'All', value: 'all', icon: null },
@@ -175,9 +176,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   title: {
     fontSize: 30,
@@ -193,13 +194,13 @@ const styles = StyleSheet.create({
   presetSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    gap: spacing.md,
+    marginHorizontal: spacing.base,
+    marginTop: spacing.base,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     backgroundColor: colors.bgElevated,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -211,19 +212,19 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 8,
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.base,
+    gap: spacing.sm,
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgElevated,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    gap: 8,
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgElevated,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -248,23 +249,23 @@ const styles = StyleSheet.create({
     maxHeight: 50,
   },
   filtersContent: {
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: spacing.base,
+    gap: spacing.sm,
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
     backgroundColor: colors.bgElevated,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
   filterChipActive: {
-    backgroundColor: `rgba(212, 149, 42, 0.1)`, // Primary at 10%
-    borderColor: `rgba(212, 149, 42, 0.5)`, // Primary at 50%
+    backgroundColor: `rgba(212, 149, 42, ${opacity.activeBackground})`,
+    borderColor: `rgba(212, 149, 42, ${opacity.activeBorder})`,
   },
   filterChipText: {
     color: colors.textSubtle,
@@ -278,9 +279,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.base,
+    paddingBottom: spacing.md,
   },
   resultsCount: {
     color: colors.primary,
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chordListContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.base,
     paddingBottom: 20,
   },
 });

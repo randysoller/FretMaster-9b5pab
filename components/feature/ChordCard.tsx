@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordData } from '@/constants/musicData';
-import { colors } from '@/constants/theme';
+import { colors, spacing, borderRadius, opacity } from '@/constants/theme';
 
 interface ChordCardProps {
   chord: ChordData;
@@ -196,10 +196,10 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
 const styles = StyleSheet.create({
   card: {
     position: 'relative',
-    backgroundColor: `rgba(24, 19, 16, 0.6)`, // BG Elevated at 60% opacity
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: `rgba(24, 19, 16, ${opacity.surfaceElevated})`,
+    borderRadius: borderRadius.xl,
+    padding: spacing.base,
+    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
   },
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   },
   checkboxSelected: {
     borderColor: colors.primary,
-    backgroundColor: `rgba(212, 149, 42, 0.15)`,
+    backgroundColor: `rgba(212, 149, 42, ${opacity.activeBackgroundLight})`,
   },
 
   // Fretboard
@@ -242,8 +242,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     paddingLeft: 20,
     backgroundColor: colors.fretboard,
-    borderRadius: 8,
-    padding: 8,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
   },
   fretLabel: {
     position: 'absolute',
@@ -364,10 +364,10 @@ const styles = StyleSheet.create({
   // String notation box
   stringNotationBox: {
     backgroundColor: '#FFF',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    gap: 4,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
     minWidth: 70,
   },
   stringNotationRow: {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { colors, spacing, typography, borderRadius, opacity } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
 
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     maxHeight: '85%',
     backgroundColor: colors.bgElevated,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.xxl,
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   chordLetter: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     backgroundColor: colors.bgOverlay,
     alignItems: 'center',
     justifyContent: 'center',
