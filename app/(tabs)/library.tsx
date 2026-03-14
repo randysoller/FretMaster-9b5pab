@@ -19,9 +19,9 @@ const CATEGORY_FILTERS: { label: string; value: ChordShape | 'all'; icon: any }[
 ];
 
 const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
-  { label: '6th', value: '6th' },
-  { label: '5th', value: '5th' },
-  { label: '4th', value: '4th' },
+  { label: '6th', value: 6 },
+  { label: '5th', value: 5 },
+  { label: '4th', value: 4 },
 ];
 
 export default function LibraryScreen() {
