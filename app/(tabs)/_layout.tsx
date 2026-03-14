@@ -13,21 +13,30 @@ export default function TabLayout() {
   const { profile } = useAuth();
 
   const tabBarStyle = {
+    position: 'absolute' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
     height: Platform.select({
-      ios: insets.bottom + 56,
-      android: insets.bottom + 56,
-      default: 56,
+      ios: insets.bottom + 60,
+      android: insets.bottom + 60,
+      default: 60,
     }),
-    paddingTop: 0,
+    paddingTop: 8,
     paddingBottom: Platform.select({
-      ios: insets.bottom,
-      android: insets.bottom,
-      default: 0,
+      ios: insets.bottom + 8,
+      android: insets.bottom + 8,
+      default: 8,
     }),
-    paddingHorizontal: 0,
-    backgroundColor: `rgba(13, 11, 8, 0.92)`, // BG Base at 92% opacity
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
+    borderTopColor: colors.border,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   };
 
   return (
@@ -55,14 +64,19 @@ export default function TabLayout() {
           tabBarStyle,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textMuted,
+          tabBarShowLabel: true,
+          tabBarHideOnKeyboard: false,
           tabBarLabelStyle: {
-            fontSize: 14,
+            fontSize: 11,
             fontWeight: '600',
-            fontFamily: 'Sora',
+            marginTop: 0,
+            marginBottom: 4,
+          },
+          tabBarItemStyle: {
+            paddingVertical: 4,
           },
           tabBarIconStyle: {
-            width: 30,
-            height: 30,
+            marginBottom: 0,
           },
         }}
       >
