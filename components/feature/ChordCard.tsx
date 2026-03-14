@@ -133,7 +133,6 @@ export function ChordCard({ chord, cardNumber, onPress }: ChordCardProps) {
   };
 
   // Generate string notation
-  const STANDARD_TUNING = ['E', 'B', 'G', 'D', 'A', 'E'];
   const stringNotation = chord.positions.map((fret, index) => {
     const stringName = STANDARD_TUNING[index];
     let notation = '';
