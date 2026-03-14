@@ -53,6 +53,8 @@ export function ChordDetailModal({
   };
   
   const panGesture = Gesture.Pan()
+    .activeOffsetX([-10, 10]) // Activate on 10px horizontal movement
+    .failOffsetY([-20, 20]) // Fail if vertical movement exceeds 20px
     .onUpdate((e) => {
       // Only allow swipe if there's a chord in that direction
       if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
@@ -62,7 +64,11 @@ export function ChordDetailModal({
       }
     })
     .onEnd((e) => {
-      if (Math.abs(e.translationX) > SWIPE_THRESHOLD && Math.abs(e.velocityX) > 500) {
+      // Lower velocity threshold for easier swiping (or no velocity check at all)
+      const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
+      const hasEnoughVelocity = Math.abs(e.velocityX) > 200; // Lowered from 500
+      
+      if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
           runOnJS(handleSwipe)('prev');
         } else if (e.translationX < 0 && hasNext) {
