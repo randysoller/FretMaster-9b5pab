@@ -108,7 +108,7 @@ export default function LibraryScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Chord Library</Text>
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   },
   chordListContent: {
     paddingHorizontal: spacing.base,
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   selectionBar: {
     flexDirection: 'row',

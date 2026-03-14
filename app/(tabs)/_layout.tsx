@@ -13,14 +13,10 @@ export default function TabLayout() {
   const { profile } = useAuth();
 
   const tabBarStyle = {
-    position: 'absolute' as const,
-    bottom: 0,
-    left: 0,
-    right: 0,
     height: Platform.select({
-      ios: insets.bottom + 60,
-      android: insets.bottom + 60,
-      default: 60,
+      ios: insets.bottom + 64,
+      android: insets.bottom + 64,
+      default: 64,
     }),
     paddingTop: 8,
     paddingBottom: Platform.select({
