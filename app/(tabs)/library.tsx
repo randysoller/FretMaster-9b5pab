@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     borderColor: '#2A2A2A',
   },
   filterChipActive: {
-    backgroundColor: '#FFB84D',
-    borderColor: '#FFB84D',
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
   },
   filterChipText: {
     color: '#CCC',
