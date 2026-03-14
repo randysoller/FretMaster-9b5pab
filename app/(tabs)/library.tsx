@@ -172,7 +172,7 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A', // Deep stage black
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 16,
@@ -180,15 +180,15 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFF',
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.text,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#8B7355', // Warm muted gold
-    lineHeight: 18,
+    fontSize: 14,
+    color: colors.textSubtle,
+    lineHeight: 20,
   },
   presetSelector: {
     flexDirection: 'row',
@@ -198,15 +198,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#1A1612', // Warm dark surface
+    backgroundColor: colors.bgElevated,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3A3229', // Warm border
+    borderColor: colors.border,
   },
   presetText: {
     flex: 1,
     fontSize: 14,
-    color: '#E5D5B7', // Warm light text
+    color: colors.textSubtle,
     fontWeight: '500',
   },
   searchContainer: {
@@ -219,17 +219,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1612',
+    backgroundColor: colors.bgElevated,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#3A3229',
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
-    color: '#FFF',
+    color: colors.text,
     fontSize: 14,
     paddingVertical: 0,
   },
@@ -238,10 +238,10 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1A1612',
+    backgroundColor: colors.bgElevated,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3A3229',
+    borderColor: colors.border,
   },
   filtersContainer: {
     marginTop: 12,
@@ -255,28 +255,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#1A1612',
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.bgElevated,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3A3229',
+    borderColor: colors.border,
   },
   filterChipActive: {
-    backgroundColor: '#D4AF37', // Rich gold spotlight
-    borderColor: '#D4AF37',
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+    backgroundColor: `rgba(212, 149, 42, 0.1)`, // Primary at 10%
+    borderColor: `rgba(212, 149, 42, 0.5)`, // Primary at 50%
   },
   filterChipText: {
-    color: '#E5D5B7',
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.textSubtle,
+    fontSize: 14,
+    fontWeight: '500',
   },
   filterChipTextActive: {
-    color: '#000',
+    color: colors.primary,
   },
   resultsHeader: {
     flexDirection: 'row',
@@ -287,8 +283,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultsCount: {
-    color: '#FFB000', // Bright amber spotlight
-    fontSize: 13,
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: '700',
   },
   legend: {
@@ -304,25 +300,17 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#D4AF37', // Rich gold
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3,
+    backgroundColor: colors.primary,
   },
   legendDotBlue: {
     width: 12,
     height: 12,
-    backgroundColor: '#FFD700', // Pure gold for root
+    backgroundColor: colors.rootNoteBlue,
     transform: [{ rotate: '45deg' }],
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 3,
   },
   legendText: {
     fontSize: 11,
-    color: '#8B7355',
+    color: colors.textMuted,
     fontWeight: '500',
   },
   chordList: {

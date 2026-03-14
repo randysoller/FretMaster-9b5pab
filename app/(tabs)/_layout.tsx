@@ -9,20 +9,20 @@ export default function TabLayout() {
 
   const tabBarStyle = {
     height: Platform.select({
-      ios: insets.bottom + 60,
-      android: insets.bottom + 60,
-      default: 70,
+      ios: insets.bottom + 56,
+      android: insets.bottom + 56,
+      default: 56,
     }),
-    paddingTop: 8,
+    paddingTop: 0,
     paddingBottom: Platform.select({
-      ios: insets.bottom + 8,
-      android: insets.bottom + 8,
-      default: 8,
+      ios: insets.bottom,
+      android: insets.bottom,
+      default: 0,
     }),
-    paddingHorizontal: 16,
-    backgroundColor: colors.background,
+    paddingHorizontal: 0,
+    backgroundColor: `rgba(13, 11, 8, 0.92)`, // BG Base at 92% opacity
     borderTopWidth: 1,
-    borderTopColor: colors.surface,
+    borderTopColor: colors.borderSubtle,
   };
 
   return (
@@ -33,8 +33,13 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
+          fontSize: 14,
+          fontWeight: '600',
+          fontFamily: 'Sora',
+        },
+        tabBarIconStyle: {
+          width: 30,
+          height: 30,
         },
       }}
     >

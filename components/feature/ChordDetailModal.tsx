@@ -5,10 +5,10 @@ import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
 
-const ROOT_NOTE_COLOR = '#FFD700'; // Pure gold for root notes (diamond)
-const OTHER_NOTE_COLOR = '#D4AF37'; // Rich gold for other notes (circle)
-const FRETBOARD_BG = '#0A0A0A'; // Deep stage black
-const BUTTON_GOLD = '#D4AF37'; // Rich gold buttons
+const ROOT_NOTE_COLOR = colors.rootNoteBlue; // Root note blue for diamonds
+const OTHER_NOTE_COLOR = colors.primary; // Primary color for finger positions
+const FRETBOARD_BG = colors.fretboard;
+const BUTTON_GOLD = colors.primary;
 
 interface ChordDetailModalProps {
   visible: boolean;
@@ -304,15 +304,11 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     maxHeight: '85%',
-    backgroundColor: '#1A1612', // Warm dark stage surface
+    backgroundColor: colors.bgElevated,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: '#3A3229',
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    borderColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -330,11 +326,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#211E1A',
+    backgroundColor: colors.bgOverlay,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#3A3229',
+    borderColor: colors.border,
   },
   chordLetterText: {
     fontSize: 24,
@@ -353,14 +349,16 @@ const styles = StyleSheet.create({
   badge: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#8B7355',
+    color: colors.textMuted,
     letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   category: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#8B7355',
+    color: colors.textMuted,
     letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   closeButton: {
     padding: spacing.xs,
@@ -368,7 +366,7 @@ const styles = StyleSheet.create({
   chordName: {
     fontSize: 16,
     fontWeight: '400',
-    color: '#E5D5B7',
+    color: colors.textSubtle,
   },
   fretboardContainer: {
     flexDirection: 'row',
@@ -396,12 +394,12 @@ const styles = StyleSheet.create({
   },
   mutedX: {
     fontSize: 16,
-    color: '#8B7355',
-    fontWeight: '600',
+    color: colors.textMuted,
+    fontWeight: '700',
   },
   openO: {
     fontSize: 16,
-    color: '#E5D5B7',
+    color: colors.textSubtle,
     fontWeight: '400',
   },
   gridContainer: {
@@ -412,17 +410,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: '100%',
-    backgroundColor: '#E5D5B7',
+    backgroundColor: colors.string,
   },
   fret: {
     position: 'absolute',
-    height: 1,
+    height: 2,
     width: '100%',
-    backgroundColor: '#4A423A',
+    backgroundColor: colors.fret,
   },
   nutLine: {
-    height: 3,
-    backgroundColor: '#8B7355',
+    height: 6,
+    backgroundColor: colors.text,
+    borderRadius: 1,
   },
   fingerDotContainer: {
     position: 'absolute',
@@ -448,13 +447,13 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   fingerNumber: {
-    color: '#000',
-    fontSize: 14,
+    color: colors.background,
+    fontSize: 18,
     fontWeight: '700',
   },
   fingerNumberInDiamond: {
-    color: '#000',
-    fontSize: 14,
+    color: '#1A1D24',
+    fontSize: 18,
     fontWeight: '700',
     transform: [{ rotate: '-45deg' }],
   },
@@ -478,7 +477,7 @@ const styles = StyleSheet.create({
     left: -8,
     top: 36,
     fontSize: 11,
-    color: '#8B7355',
+    color: colors.textSubtle,
     fontWeight: '600',
   },
   stringNotationBox: {
@@ -524,13 +523,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     backgroundColor: BUTTON_GOLD,
     borderRadius: borderRadius.md,
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
   },
   playButtonText: {
-    color: '#000',
+    color: colors.background,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -541,13 +536,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.md,
-    backgroundColor: '#211E1A',
+    backgroundColor: colors.bgSurface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: '#3A3229',
+    borderColor: colors.border,
   },
   editButtonText: {
-    color: '#8B7355',
+    color: colors.textMuted,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -556,7 +551,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   progressText: {
-    color: '#8B7355',
+    color: colors.textMuted,
     fontSize: 12,
   },
   fingerPositions: {
@@ -571,8 +566,9 @@ const styles = StyleSheet.create({
   fingerTitle: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#B8860B',
+    color: colors.textMuted,
     letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   fingerRow: {
     flexDirection: 'row',
@@ -594,24 +590,24 @@ const styles = StyleSheet.create({
     backgroundColor: ROOT_NOTE_COLOR,
   },
   fingerString: {
-    color: '#E5D5B7',
+    color: colors.textSubtle,
     fontSize: 14,
     fontWeight: '400',
   },
   fingerStringMuted: {
-    color: '#5C4E3A',
+    color: colors.textMuted,
   },
   fingerFret: {
-    color: '#E5D5B7',
+    color: colors.textSubtle,
     fontSize: 14,
     fontWeight: '400',
     flex: 1,
   },
   fingerFretOpen: {
-    color: '#6BCF7F',
+    color: colors.success,
   },
   fingerName: {
-    color: '#8B7355',
+    color: colors.textMuted,
     fontSize: 14,
     flex: 1,
     textAlign: 'right',

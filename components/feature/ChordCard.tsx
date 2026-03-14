@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordData } from '@/constants/musicData';
+import { colors } from '@/constants/theme';
 
 interface ChordCardProps {
   chord: ChordData;
@@ -11,8 +12,8 @@ interface ChordCardProps {
   onCheckboxPress?: () => void;
 }
 
-const ROOT_NOTE_COLOR = '#FFD700'; // Pure gold for root notes
-const OTHER_NOTE_COLOR = '#D4AF37'; // Rich gold for finger positions
+const ROOT_NOTE_COLOR = colors.rootNoteBlue; // Root note blue for diamonds
+const OTHER_NOTE_COLOR = colors.primary; // Primary color for finger positions
 
 export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCheckboxPress }: ChordCardProps) {
   // Calculate fret range
@@ -195,23 +196,19 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
 const styles = StyleSheet.create({
   card: {
     position: 'relative',
-    backgroundColor: '#1A1612', // Warm dark stage background
+    backgroundColor: `rgba(24, 19, 16, 0.6)`, // BG Elevated at 60% opacity
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#3A3229', // Warm border
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderColor: colors.borderSubtle,
   },
   cardNumber: {
     position: 'absolute',
     top: 12,
     right: 12,
     fontSize: 11,
-    color: '#5C4E3A',
+    color: colors.textMuted,
     fontWeight: '600',
   },
   cardContent: {
@@ -227,18 +224,14 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#5C4E3A',
+    borderColor: colors.border,
     backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
-    borderColor: '#D4AF37',
-    backgroundColor: 'rgba(212, 175, 55, 0.15)',
-    shadowColor: '#D4AF37',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
+    borderColor: colors.primary,
+    backgroundColor: `rgba(212, 149, 42, 0.15)`,
   },
 
   // Fretboard
@@ -248,7 +241,7 @@ const styles = StyleSheet.create({
   fretboardContainer: {
     position: 'relative',
     paddingLeft: 20,
-    backgroundColor: '#0A0A0A', // Deep stage black for contrast
+    backgroundColor: colors.fretboard,
     borderRadius: 8,
     padding: 8,
   },
@@ -256,9 +249,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 35,
-    fontSize: 11,
-    color: '#8B7355',
-    fontWeight: '700',
+    fontSize: 9,
+    color: colors.textSubtle,
+    fontWeight: '600',
   },
   fretboard: {
     position: 'relative',
@@ -278,12 +271,12 @@ const styles = StyleSheet.create({
   },
   mutedX: {
     fontSize: 15,
-    color: '#8B7355',
+    color: colors.textMuted,
     fontWeight: '700',
   },
   openO: {
     fontSize: 15,
-    color: '#E5D5B7',
+    color: colors.textSubtle,
     fontWeight: '400',
   },
   gridArea: {
@@ -295,17 +288,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 2,
     height: '100%',
-    backgroundColor: '#4A423A',
+    backgroundColor: colors.string,
   },
   fret: {
     position: 'absolute',
-    height: 1.5,
+    height: 2,
     width: '100%',
-    backgroundColor: '#4A423A',
+    backgroundColor: colors.fret,
   },
   nutLine: {
-    height: 4,
-    backgroundColor: '#8B7355',
+    height: 6,
+    backgroundColor: colors.text,
+    borderRadius: 1,
   },
   dotContainer: {
     position: 'absolute',
@@ -331,13 +325,13 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   circleNumber: {
-    color: '#000',
-    fontSize: 13,
+    color: colors.background,
+    fontSize: 14,
     fontWeight: '700',
   },
   diamondNumber: {
-    color: '#000',
-    fontSize: 13,
+    color: '#1A1D24', // Darker for root notes as per spec
+    fontSize: 14,
     fontWeight: '700',
     transform: [{ rotate: '-45deg' }],
   },
@@ -348,22 +342,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chordName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FFF',
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.text,
     marginBottom: 2,
   },
   chordCategory: {
     fontSize: 10,
-    color: '#8B7355',
+    color: colors.textMuted,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
   chordFullName: {
-    fontSize: 14,
-    color: '#E5D5B7',
-    fontWeight: '500',
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: '400',
   },
   
   // String notation box
