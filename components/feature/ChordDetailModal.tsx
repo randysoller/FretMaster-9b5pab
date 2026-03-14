@@ -582,6 +582,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     justifyContent: 'space-between',
     minWidth: 105,
+    marginLeft: 50,
   },
   notationRow: {
     flexDirection: 'row',
