@@ -45,6 +45,7 @@ export function ChordDetailModal({
   // Reset animated values when chord changes
   useEffect(() => {
     if (visible && chord) {
+      console.log('🔄 Chord changed, resetting animations:', chord.name);
       // Always reset to fully visible state when chord changes
       translateX.value = 0;
       scale.value = 1;
@@ -52,20 +53,33 @@ export function ChordDetailModal({
     }
   }, [visible, chord?.id]);
   
+  // Debug info
+  useEffect(() => {
+    console.log('📍 Modal state:', { 
+      visible, 
+      chordId: chord?.id, 
+      chordName: chord?.name,
+      currentIndex, 
+      totalChords: allChords.length,
+      hasPrev, 
+      hasNext 
+    });
+  }, [visible, chord?.id, currentIndex, hasPrev, hasNext]);
+  
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allChords.length - 1;
   const prevChord = hasPrev ? allChords[currentIndex - 1] : null;
   const nextChord = hasNext ? allChords[currentIndex + 1] : null;
   
   const handleSwipe = React.useCallback((direction: 'prev' | 'next') => {
+    console.log('🔄 handleSwipe called with direction:', direction);
     if (onNavigate) {
       onNavigate(direction);
     }
   }, [onNavigate]);
   
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-20, 20]) // Activate on 20px horizontal movement
-    .failOffsetY([-40, 40]) // Fail if vertical movement exceeds 40px
+    .activeOffsetX([-15, 15]) // Reduced threshold for easier activation
     .onUpdate((e) => {
       // Only allow swipe if there's a chord in that direction
       if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
@@ -79,13 +93,24 @@ export function ChordDetailModal({
       }
     })
     .onEnd((e) => {
+      console.log('👆 Pan gesture ended:', { 
+        translationX: e.translationX, 
+        velocityX: e.velocityX,
+        hasPrev,
+        hasNext,
+        currentIndex
+      });
+      
       // Auto-navigate if reached halfway point
       const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
       const hasEnoughVelocity = Math.abs(e.velocityX) > 200;
       
+      console.log('📊 Swipe check:', { hasEnoughDistance, hasEnoughVelocity });
+      
       if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
-          // Animate out to the right, then navigate
+          // Swipe RIGHT - go to previous chord
+          console.log('⬅️ Swiping RIGHT to PREVIOUS chord');
           const direction = 'prev';
           translateX.value = withTiming(SCREEN_WIDTH, { 
             duration: 200, 
@@ -93,13 +118,15 @@ export function ChordDetailModal({
           }, (finished) => {
             'worklet';
             if (finished) {
+              console.log('✅ Animation finished, navigating to prev');
               runOnJS(handleSwipe)(direction);
             }
           });
           scale.value = withTiming(0.85, { duration: 200 });
           opacity.value = withTiming(0, { duration: 200 });
         } else if (e.translationX < 0 && hasNext) {
-          // Animate out to the left, then navigate
+          // Swipe LEFT - go to next chord
+          console.log('➡️ Swiping LEFT to NEXT chord');
           const direction = 'next';
           translateX.value = withTiming(-SCREEN_WIDTH, { 
             duration: 200, 
@@ -107,18 +134,21 @@ export function ChordDetailModal({
           }, (finished) => {
             'worklet';
             if (finished) {
+              console.log('✅ Animation finished, navigating to next');
               runOnJS(handleSwipe)(direction);
             }
           });
           scale.value = withTiming(0.85, { duration: 200 });
           opacity.value = withTiming(0, { duration: 200 });
         } else {
+          console.log('⚠️ No navigation: no prev/next available');
           // Snap back if no navigation
           translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
           scale.value = withSpring(1, { damping: 20, stiffness: 90 });
           opacity.value = withTiming(1, { duration: 200 });
         }
       } else {
+        console.log('⚠️ Swipe too short, snapping back');
         // Snap back
         translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
         scale.value = withSpring(1, { damping: 20, stiffness: 90 });
@@ -414,24 +444,24 @@ export function ChordDetailModal({
           
           {/* Bleeding Edge Preview Cards */}
           {hasPrev && prevChord && (
-            <Pressable 
+            <View 
               style={[styles.bleedingEdgeCard, styles.bleedingEdgeCardLeft]}
-              onPress={() => handleSwipe('prev')}
+              pointerEvents="none"
             >
               <View style={styles.bleedingEdgeContent}>
                 <Text style={styles.bleedingEdgeChordName} numberOfLines={1}>{prevChord.name}</Text>
               </View>
-            </Pressable>
+            </View>
           )}
           {hasNext && nextChord && (
-            <Pressable 
+            <View 
               style={[styles.bleedingEdgeCard, styles.bleedingEdgeCardRight]}
-              onPress={() => handleSwipe('next')}
+              pointerEvents="none"
             >
               <View style={styles.bleedingEdgeContent}>
                 <Text style={styles.bleedingEdgeChordName} numberOfLines={1}>{nextChord.name}</Text>
               </View>
-            </Pressable>
+            </View>
           )}
           
           {/* Progress indicator */}
