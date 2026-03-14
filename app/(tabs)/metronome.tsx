@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
-import { Screen, Button } from '@/components';
+import { Screen } from '@/components';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { audioService } from '@/services/audioService';
 
@@ -54,7 +53,7 @@ export default function MetronomeScreen() {
           // Pulse animation
           Animated.sequence([
             Animated.timing(beatPulse, {
-              toValue: beatInfo.isStrong ? 1.3 : 1.15,
+              toValue: beatInfo.isStrong ? 1.2 : 1.1,
               duration: 50,
               useNativeDriver: true,
             }),
@@ -114,10 +113,14 @@ export default function MetronomeScreen() {
 
   return (
     <Screen edges={['top']}>
-      <View style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Header */}
         <View style={styles.header}>
-          <MaterialIcons name="speed" size={24} color={colors.primary} />
+          <MaterialIcons name="speed" size={20} color={colors.textSecondary} />
           <Text style={styles.headerTitle}>METRONOME</Text>
         </View>
 
@@ -133,25 +136,18 @@ export default function MetronomeScreen() {
               onPress={() => setTempo(Math.max(40, tempo - 1))}
               style={styles.tempoButton}
             >
-              <MaterialIcons name="remove" size={20} color={colors.textSecondary} />
+              <MaterialIcons name="remove" size={18} color={colors.textSecondary} />
             </Pressable>
             
-            <Slider
-              style={styles.slider}
-              minimumValue={40}
-              maximumValue={220}
-              value={tempo}
-              onValueChange={setTempo}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.surface}
-              thumbTintColor={colors.primary}
-            />
+            <View style={styles.tempoDisplay}>
+              <Text style={styles.tempoNumber}>{tempo}</Text>
+            </View>
             
             <Pressable 
               onPress={() => setTempo(Math.min(220, tempo + 1))}
               style={styles.tempoButton}
             >
-              <MaterialIcons name="add" size={20} color={colors.textSecondary} />
+              <MaterialIcons name="add" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
 
@@ -281,39 +277,26 @@ export default function MetronomeScreen() {
         {/* Volume */}
         <View style={styles.section}>
           <View style={styles.volumeHeader}>
+            <MaterialIcons name="volume-up" size={16} color={colors.textSecondary} />
             <Text style={styles.sectionLabel}>VOLUME</Text>
             <Text style={styles.volumeValue}>{volume}%</Text>
           </View>
           
-          <View style={styles.volumeControls}>
-            <Pressable 
-              onPress={() => setVolume(Math.max(0, volume - 5))}
-              style={styles.volumeButton}
-            >
-              <MaterialIcons name="volume-down" size={20} color={colors.textSecondary} />
-            </Pressable>
-            
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={100}
-              value={volume}
-              onValueChange={setVolume}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.surface}
-              thumbTintColor={colors.primary}
+          <View style={styles.volumeBar}>
+            <View 
+              style={[
+                styles.volumeFill,
+                { width: `${volume}%` }
+              ]}
             />
-            
             <Pressable 
-              onPress={() => setVolume(Math.min(100, volume + 5))}
-              style={styles.volumeButton}
-            >
-              <MaterialIcons name="volume-up" size={20} color={colors.textSecondary} />
-            </Pressable>
+              style={styles.volumeThumb}
+              onPress={() => {}} // Touch interaction placeholder
+            />
           </View>
         </View>
 
-        {/* Play Button */}
+        {/* Play Button - Compact Size */}
         <View style={styles.playSection}>
           <Animated.View style={{ transform: [{ scale: beatPulse }] }}>
             <Pressable 
@@ -322,14 +305,13 @@ export default function MetronomeScreen() {
             >
               <MaterialIcons 
                 name={isPlaying ? 'pause' : 'play-arrow'} 
-                size={32} 
-                color={colors.background} 
+                size={20} 
+                color="#000" 
               />
-              <Text style={styles.playButtonText}>{isPlaying ? 'Pause' : 'Play'}</Text>
             </Pressable>
           </Animated.View>
         </View>
-      </View>
+      </ScrollView>
     </Screen>
   );
 }
@@ -337,21 +319,24 @@ export default function MetronomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
     padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
-    ...typography.button,
+    ...typography.caption,
     color: colors.textSecondary,
-    fontSize: 12,
-    letterSpacing: 1,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    fontWeight: '700',
   },
   section: {
     marginBottom: spacing.xl,
@@ -379,20 +364,28 @@ const styles = StyleSheet.create({
   tempoControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
   },
   tempoButton: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  slider: {
-    flex: 1,
-    height: 40,
+  tempoDisplay: {
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  tempoNumber: {
+    fontSize: 48,
+    fontWeight: '800',
+    color: colors.text,
   },
   quickTempos: {
     flexDirection: 'row',
@@ -486,49 +479,59 @@ const styles = StyleSheet.create({
   },
   volumeHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
   volumeValue: {
+    marginLeft: 'auto',
     color: colors.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
-  volumeControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  volumeButton: {
-    width: 32,
-    height: 32,
+  volumeBar: {
+    height: 6,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: borderRadius.full,
+    marginTop: spacing.sm,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  volumeFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+  },
+  volumeThumb: {
+    position: 'absolute',
+    right: 0,
+    top: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.background,
   },
   playSection: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: spacing.xl,
+    alignItems: 'center',
+    marginTop: spacing.xl,
   },
   playButton: {
-    flexDirection: 'row',
+    width: 56,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.lg,
-    backgroundColor: colors.success,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   playButtonActive: {
     backgroundColor: colors.error,
-  },
-  playButtonText: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '700',
+    shadowColor: colors.error,
   },
   subdivisions: {
     flexDirection: 'row',
