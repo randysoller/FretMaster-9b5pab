@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ChordData } from '@/constants/musicData';
 
 interface ChordCardProps {
   chord: ChordData;
   cardNumber: number;
+  isSelected?: boolean;
   onPress?: () => void;
+  onCheckboxPress?: () => void;
 }
 
 const ROOT_NOTE_COLOR = '#3B82F6'; // Blue
@@ -129,42 +132,111 @@ export function ChordCard({ chord, cardNumber, onPress }: ChordCardProps) {
     );
   };
 
+  // Generate string notation
+  const STANDARD_TUNING = ['E', 'B', 'G', 'D', 'A', 'E'];
+  const stringNotation = chord.positions.map((fret, index) => {
+    const stringName = STANDARD_TUNING[index];
+    let notation = '';
+    if (fret === -1) {
+      notation = '×';
+    } else if (fret === 0) {
+      notation = '0';
+    } else {
+      notation = fret.toString();
+    }
+    return { string: stringName, fret: notation };
+  });
+
   return (
-    <Pressable onPress={onPress} style={styles.card}>
+    <View style={styles.card}>
+      {/* Card number */}
+      <Text style={styles.cardNumber}>{cardNumber < 10 ? `0${cardNumber}` : cardNumber}</Text>
+      
       <View style={styles.cardContent}>
+        {/* Checkbox */}
+        <Pressable 
+          onPress={onCheckboxPress}
+          style={styles.checkboxContainer}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+            {isSelected && (
+              <MaterialIcons name="check" size={16} color="#FF8C42" />
+            )}
+          </View>
+        </Pressable>
+
         {/* Fretboard diagram */}
-        <View style={styles.diagramSection}>
+        <Pressable onPress={onPress} style={styles.diagramSection}>
           {renderFretboard()}
-        </View>
+        </Pressable>
 
         {/* Chord info */}
-        <View style={styles.infoSection}>
+        <Pressable onPress={onPress} style={styles.infoSection}>
           <Text style={styles.chordName}>{chord.name}</Text>
+          <Text style={styles.chordCategory}>OPEN CHORDS</Text>
           <Text style={styles.chordFullName}>{chord.fullName}</Text>
+        </Pressable>
+
+        {/* String notation box */}
+        <View style={styles.stringNotationBox}>
+          {stringNotation.map((item, index) => (
+            <View key={index} style={styles.stringNotationRow}>
+              <Text style={styles.stringName}>{item.string}</Text>
+              <Text style={styles.stringDash}>—</Text>
+              <Text style={styles.fretNumber}>{item.fret}</Text>
+            </View>
+          ))}
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
+    position: 'relative',
     backgroundColor: '#0A0A0A',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 14,
-    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
     borderColor: '#2A2A2A',
+  },
+  cardNumber: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    gap: 14,
+  },
+  checkboxContainer: {
+    padding: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#444',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    borderColor: '#FF8C42',
+    backgroundColor: '#1A1A1A',
   },
 
   // Fretboard
   diagramSection: {
-    width: 110,
+    width: 90,
   },
   fretboardContainer: {
     position: 'relative',
@@ -266,14 +338,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chordName: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '700',
     color: '#FFF',
+    marginBottom: 2,
+  },
+  chordCategory: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '700',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   chordFullName: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#888',
     fontWeight: '500',
+  },
+  
+  // String notation box
+  stringNotationBox: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 4,
+    minWidth: 70,
+  },
+  stringNotationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stringName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#000',
+    width: 12,
+  },
+  stringDash: {
+    fontSize: 10,
+    color: '#666',
+  },
+  fretNumber: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
   },
 });

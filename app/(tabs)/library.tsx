@@ -1,50 +1,45 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
 import { CHORDS, ChordData, ChordShape, ChordType } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
 
-type ShapeFilter = 'all' | ChordShape;
-type TypeFilter = 'all' | ChordType;
-
-const SHAPE_FILTERS: { label: string; value: ShapeFilter }[] = [
-  { label: 'All Chords', value: 'all' },
-  { label: 'Open Chords', value: 'open' },
-  { label: 'Barre Chords', value: 'barre' },
-  { label: 'Movable Chords', value: 'movable' },
-];
-
-const TYPE_FILTERS: { label: string; value: TypeFilter }[] = [
-  { label: 'All Types', value: 'all' },
-  { label: 'Major', value: 'major' },
-  { label: 'Minor', value: 'minor' },
-  { label: 'Augmented', value: 'augmented' },
-  { label: 'Diminished', value: 'diminished' },
-  { label: 'Suspended', value: 'suspended' },
-  { label: 'Major 7th', value: 'major7' },
-  { label: 'Dominant 7th', value: 'dominant7' },
-  { label: 'Minor 7th', value: 'minor7' },
-  { label: '9th Chords', value: 'ninth' },
-  { label: '11th Chords', value: 'eleventh' },
-  { label: '13th Chords', value: 'thirteenth' },
-  { label: 'Slash Chords', value: 'slash' },
+const FILTER_TYPES = [
+  { label: 'All', value: 'all', icon: null },
+  { label: 'Open', value: 'open', icon: 'check' as const },
+  { label: 'Barre', value: 'barre', icon: 'horizontal-rule' as const },
+  { label: 'Movable', value: 'movable', icon: 'open-with' as const },
 ];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedShape, setSelectedShape] = useState<ShapeFilter>('all');
-  const [selectedType, setSelectedType] = useState<TypeFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedChords, setSelectedChords] = useState<Set<string>>(new Set());
   const [selectedChord, setSelectedChord] = useState<ChordData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Filter chords based on selected categories
+  // Filter chords
   const filteredChords = CHORDS.filter(chord => {
-    const shapeMatch = selectedShape === 'all' || chord.shape === selectedShape;
-    const typeMatch = selectedType === 'all' || chord.type === selectedType;
-    return shapeMatch && typeMatch;
+    if (searchQuery && !chord.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    if (selectedFilter === 'all') return true;
+    return chord.shape === selectedFilter;
   });
+
+  const toggleChordSelection = (chordName: string) => {
+    const newSelection = new Set(selectedChords);
+    if (newSelection.has(chordName)) {
+      newSelection.delete(chordName);
+    } else {
+      newSelection.add(chordName);
+    }
+    setSelectedChords(newSelection);
+  };
 
   const handleChordPress = (chord: ChordData) => {
     setSelectedChord(chord);
@@ -61,73 +56,87 @@ export default function LibraryScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Chord Study</Text>
+        <Text style={styles.title}>Chord Library</Text>
         <Text style={styles.subtitle}>
-          Select chord categories to study
+          Browse all {CHORDS.length} chord diagrams - tap the checkbox to select chords for a practice preset
         </Text>
       </View>
 
-      {/* Shape Filter (Level 1) */}
-      <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>CHORD SHAPE</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterChips}
-        >
-          {SHAPE_FILTERS.map(filter => (
-            <Pressable
-              key={filter.value}
-              onPress={() => setSelectedShape(filter.value)}
-              style={[
-                styles.filterChip,
-                selectedShape === filter.value && styles.filterChipActive,
-              ]}
-            >
-              <Text style={[
-                styles.filterChipText,
-                selectedShape === filter.value && styles.filterChipTextActive,
-              ]}>
-                {filter.label}
-              </Text>
+      {/* Preset Selector */}
+      <Pressable style={styles.presetSelector}>
+        <MaterialIcons name="folder-open" size={18} color="#888" />
+        <Text style={styles.presetText}>EASY START - Presets</Text>
+        <MaterialIcons name="keyboard-arrow-down" size={20} color="#888" />
+      </Pressable>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <MaterialIcons name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search chords..."
+            placeholderTextColor="#666"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={18} color="#666" />
             </Pressable>
-          ))}
-        </ScrollView>
+          )}
+        </View>
+        <Pressable style={styles.filterButton}>
+          <MaterialIcons name="tune" size={20} color="#888" />
+        </Pressable>
       </View>
 
-      {/* Type Filter (Level 2) */}
-      <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>CHORD TYPE</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterChips}
-        >
-          {TYPE_FILTERS.map(filter => (
-            <Pressable
-              key={filter.value}
-              onPress={() => setSelectedType(filter.value)}
-              style={[
-                styles.filterChip,
-                selectedType === filter.value && styles.filterChipActive,
-              ]}
-            >
-              <Text style={[
-                styles.filterChipText,
-                selectedType === filter.value && styles.filterChipTextActive,
-              ]}>
-                {filter.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Filter Chips */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.filtersContainer}
+        contentContainerStyle={styles.filtersContent}
+      >
+        {FILTER_TYPES.map(filter => (
+          <Pressable
+            key={filter.value}
+            onPress={() => setSelectedFilter(filter.value)}
+            style={[
+              styles.filterChip,
+              selectedFilter === filter.value && styles.filterChipActive,
+            ]}
+          >
+            {filter.icon && (
+              <MaterialIcons 
+                name={filter.icon} 
+                size={14} 
+                color={selectedFilter === filter.value ? '#000' : '#888'} 
+              />
+            )}
+            <Text style={[
+              styles.filterChipText,
+              selectedFilter === filter.value && styles.filterChipTextActive,
+            ]}>
+              {filter.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
-      {/* Results Count */}
+      {/* Results Count & Legend */}
       <View style={styles.resultsHeader}>
-        <Text style={styles.resultsCount}>
-          {filteredChords.length} chord{filteredChords.length !== 1 ? 's' : ''}
-        </Text>
+        <Text style={styles.resultsCount}>{filteredChords.length} chords</Text>
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={styles.legendDotOrange} />
+            <Text style={styles.legendText}>Finger Position</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={styles.legendDotBlue} />
+            <Text style={styles.legendText}>Root Note</Text>
+          </View>
+        </View>
       </View>
 
       {/* Chord List */}
@@ -136,25 +145,16 @@ export default function LibraryScreen() {
         style={styles.chordList}
         contentContainerStyle={styles.chordListContent}
       >
-        {filteredChords.length > 0 ? (
-          filteredChords.map((chord, index) => (
-            <ChordCard
-              key={chord.name + index}
-              chord={chord}
-              cardNumber={index + 1}
-              onPress={() => handleChordPress(chord)}
-            />
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              No chords match the selected filters
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              Try selecting different categories
-            </Text>
-          </View>
-        )}
+        {filteredChords.map((chord, index) => (
+          <ChordCard
+            key={chord.name}
+            chord={chord}
+            cardNumber={index + 1}
+            isSelected={selectedChords.has(chord.name)}
+            onPress={() => handleChordPress(chord)}
+            onCheckboxPress={() => toggleChordSelection(chord.name)}
+          />
+        ))}
       </ScrollView>
 
       {/* Chord Detail Modal */}
@@ -175,42 +175,91 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     color: '#FFF',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#888',
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  filterSection: {
-    marginTop: 20,
-  },
-  filterLabel: {
-    paddingHorizontal: 20,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#666',
-    letterSpacing: 1.2,
-    marginBottom: 10,
-  },
-  filterChips: {
-    paddingHorizontal: 20,
+  presetSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  presetText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#CCC',
+    fontWeight: '500',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 8,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  filtersContainer: {
+    marginTop: 12,
+    maxHeight: 50,
+  },
+  filtersContent: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     backgroundColor: '#1A1A1A',
-    borderRadius: 24,
-    borderWidth: 1.5,
+    borderRadius: 20,
+    borderWidth: 1,
     borderColor: '#2A2A2A',
   },
   filterChipActive: {
@@ -219,42 +268,56 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     color: '#CCC',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   filterChipTextActive: {
     color: '#000',
   },
   resultsHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 12,
   },
   resultsCount: {
     color: '#FF8C42',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  legend: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDotOrange: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF8C42',
+  },
+  legendDotBlue: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#3B82F6',
+    transform: [{ rotate: '45deg' }],
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#888',
+    fontWeight: '500',
   },
   chordList: {
     flex: 1,
   },
   chordListContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateText: {
-    color: '#888',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    color: '#666',
-    fontSize: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
 });
