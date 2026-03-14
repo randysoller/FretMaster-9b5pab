@@ -42,36 +42,26 @@ export function ChordDetailModal({
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
   
-  // Animate modal entrance and reset on chord change
+  // Reset animated values when chord changes
   useEffect(() => {
-    if (visible) {
-      // Reset position immediately
+    if (visible && chord) {
+      // Always reset to fully visible state when chord changes
       translateX.value = 0;
-      // Animate in from the side for smooth transition
-      scale.value = 0.9;
-      opacity.value = 0;
-      
-      // Slight delay to ensure clean transition
-      const timer = setTimeout(() => {
-        scale.value = withSpring(1, { damping: 18, stiffness: 100 });
-        opacity.value = withTiming(1, { duration: 250, easing: Easing.out(Easing.ease) });
-      }, 50);
-      
-      return () => clearTimeout(timer);
+      scale.value = 1;
+      opacity.value = 1;
     }
-  }, [visible, currentIndex]);
+  }, [visible, chord?.id]);
   
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allChords.length - 1;
   const prevChord = hasPrev ? allChords[currentIndex - 1] : null;
   const nextChord = hasNext ? allChords[currentIndex + 1] : null;
   
-  const handleSwipe = (direction: 'prev' | 'next') => {
+  const handleSwipe = React.useCallback((direction: 'prev' | 'next') => {
     if (onNavigate) {
       onNavigate(direction);
-      // Don't reset here - let useEffect handle it
     }
-  };
+  }, [onNavigate]);
   
   const panGesture = Gesture.Pan()
     .activeOffsetX([-20, 20]) // Activate on 20px horizontal movement
@@ -96,28 +86,32 @@ export function ChordDetailModal({
       if (hasEnoughDistance || hasEnoughVelocity) {
         if (e.translationX > 0 && hasPrev) {
           // Animate out to the right, then navigate
+          const direction = 'prev';
           translateX.value = withTiming(SCREEN_WIDTH, { 
-            duration: 250, 
+            duration: 200, 
             easing: Easing.out(Easing.cubic) 
           }, (finished) => {
+            'worklet';
             if (finished) {
-              runOnJS(handleSwipe)('prev');
+              runOnJS(handleSwipe)(direction);
             }
           });
-          scale.value = withTiming(0.8, { duration: 250 });
-          opacity.value = withTiming(0, { duration: 250 });
+          scale.value = withTiming(0.85, { duration: 200 });
+          opacity.value = withTiming(0, { duration: 200 });
         } else if (e.translationX < 0 && hasNext) {
           // Animate out to the left, then navigate
+          const direction = 'next';
           translateX.value = withTiming(-SCREEN_WIDTH, { 
-            duration: 250, 
+            duration: 200, 
             easing: Easing.out(Easing.cubic) 
           }, (finished) => {
+            'worklet';
             if (finished) {
-              runOnJS(handleSwipe)('next');
+              runOnJS(handleSwipe)(direction);
             }
           });
-          scale.value = withTiming(0.8, { duration: 250 });
-          opacity.value = withTiming(0, { duration: 250 });
+          scale.value = withTiming(0.85, { duration: 200 });
+          opacity.value = withTiming(0, { duration: 200 });
         } else {
           // Snap back if no navigation
           translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
