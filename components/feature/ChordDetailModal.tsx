@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Dimensions } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, Easing, interpolate } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, Easing } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius, opacity } from '@/constants/theme';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { audioService } from '@/services/audioService';
 import { useAuth } from '@/hooks/useAuth';
 
-const ROOT_NOTE_COLOR = colors.rootNoteBlue; // Root note blue for diamonds
-const OTHER_NOTE_COLOR = colors.primary; // Primary color for finger positions
+const ROOT_NOTE_COLOR = colors.rootNoteBlue;
+const OTHER_NOTE_COLOR = colors.primary;
 const FRETBOARD_BG = colors.fretboard;
 const BUTTON_GOLD = colors.primary;
 
@@ -25,7 +25,7 @@ interface ChordDetailModalProps {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH / 2; // Halfway point
+const SWIPE_THRESHOLD = SCREEN_WIDTH / 3; // Lowered threshold for easier swipes
 
 export function ChordDetailModal({ 
   visible, 
@@ -41,117 +41,123 @@ export function ChordDetailModal({
   const translateX = useSharedValue(0);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
-  
-  // Reset animated values when chord changes
-  useEffect(() => {
-    if (visible && chord) {
-      console.log('🔄 Chord changed, resetting animations:', chord.name);
-      // Always reset to fully visible state when chord changes
-      translateX.value = 0;
-      scale.value = 1;
-      opacity.value = 1;
-    }
-  }, [visible, chord?.id]);
-  
-  // Debug info
-  useEffect(() => {
-    console.log('📍 Modal state:', { 
-      visible, 
-      chordId: chord?.id, 
-      chordName: chord?.name,
-      currentIndex, 
-      totalChords: allChords.length,
-      hasPrev, 
-      hasNext 
-    });
-  }, [visible, chord?.id, currentIndex, hasPrev, hasNext]);
+  const isNavigatingRef = useRef(false);
   
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allChords.length - 1;
   const prevChord = hasPrev ? allChords[currentIndex - 1] : null;
   const nextChord = hasNext ? allChords[currentIndex + 1] : null;
   
-  const handleSwipe = React.useCallback((direction: 'prev' | 'next') => {
-    console.log('🔄 handleSwipe called with direction:', direction);
+  // Reset animation values when chord changes
+  useEffect(() => {
+    if (visible && chord) {
+      console.log('🔄 New chord loaded:', chord.name, 'Index:', currentIndex);
+      
+      // Reset navigation flag
+      isNavigatingRef.current = false;
+      
+      // Reset all animated values to default visible state
+      translateX.value = 0;
+      scale.value = 1;
+      opacity.value = 1;
+    }
+  }, [chord?.id, visible]);
+  
+  // Navigation handler
+  const navigate = useCallback((direction: 'prev' | 'next') => {
+    console.log('🚀 Navigate called:', direction, 'from index:', currentIndex);
+    
+    if (isNavigatingRef.current) {
+      console.log('⚠️ Already navigating, ignoring');
+      return;
+    }
+    
+    isNavigatingRef.current = true;
+    
     if (onNavigate) {
       onNavigate(direction);
     }
-  }, [onNavigate]);
+  }, [onNavigate, currentIndex]);
   
+  // Pan gesture handler
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15]) // Reduced threshold for easier activation
+    .activeOffsetX([-10, 10])
     .onUpdate((e) => {
-      // Only allow swipe if there's a chord in that direction
+      'worklet';
+      
+      // Prevent swipe if no chord in that direction
       if ((e.translationX > 0 && !hasPrev) || (e.translationX < 0 && !hasNext)) {
-        translateX.value = e.translationX * 0.2; // Damped movement
-      } else {
-        translateX.value = e.translationX;
-        // Scale down slightly as user swipes
-        const progress = Math.abs(e.translationX) / SCREEN_WIDTH;
-        scale.value = 1 - (progress * 0.1); // Scale down to 0.9
-        opacity.value = 1 - (progress * 0.3); // Fade to 0.7
+        translateX.value = e.translationX * 0.1; // Heavy damping
+        return;
       }
+      
+      // Apply translation
+      translateX.value = e.translationX;
+      
+      // Calculate progress for scaling and opacity
+      const progress = Math.abs(e.translationX) / SCREEN_WIDTH;
+      scale.value = Math.max(0.85, 1 - progress * 0.15);
+      opacity.value = Math.max(0.5, 1 - progress * 0.5);
     })
     .onEnd((e) => {
-      console.log('👆 Pan gesture ended:', { 
-        translationX: e.translationX, 
-        velocityX: e.velocityX,
+      'worklet';
+      
+      const swipeDistance = Math.abs(e.translationX);
+      const swipeVelocity = Math.abs(e.velocityX);
+      const shouldNavigate = swipeDistance > SWIPE_THRESHOLD || swipeVelocity > 300;
+      
+      console.log('👆 Gesture ended:', {
+        distance: swipeDistance,
+        velocity: swipeVelocity,
+        threshold: SWIPE_THRESHOLD,
+        shouldNavigate,
+        direction: e.translationX > 0 ? 'RIGHT (prev)' : 'LEFT (next)',
         hasPrev,
-        hasNext,
-        currentIndex
+        hasNext
       });
       
-      // Auto-navigate if reached halfway point
-      const hasEnoughDistance = Math.abs(e.translationX) > SWIPE_THRESHOLD;
-      const hasEnoughVelocity = Math.abs(e.velocityX) > 200;
-      
-      console.log('📊 Swipe check:', { hasEnoughDistance, hasEnoughVelocity });
-      
-      if (hasEnoughDistance || hasEnoughVelocity) {
+      if (shouldNavigate) {
+        // Determine direction
         if (e.translationX > 0 && hasPrev) {
-          // Swipe RIGHT - go to previous chord
-          console.log('⬅️ Swiping RIGHT to PREVIOUS chord');
-          const direction = 'prev';
-          translateX.value = withTiming(SCREEN_WIDTH, { 
-            duration: 200, 
-            easing: Easing.out(Easing.cubic) 
-          }, (finished) => {
-            'worklet';
-            if (finished) {
-              console.log('✅ Animation finished, navigating to prev');
-              runOnJS(handleSwipe)(direction);
+          console.log('➡️ Navigating to PREVIOUS');
+          // Animate out to the right
+          translateX.value = withTiming(
+            SCREEN_WIDTH,
+            { duration: 250, easing: Easing.out(Easing.cubic) },
+            (finished) => {
+              if (finished) {
+                runOnJS(navigate)('prev');
+              }
             }
-          });
-          scale.value = withTiming(0.85, { duration: 200 });
-          opacity.value = withTiming(0, { duration: 200 });
+          );
+          scale.value = withTiming(0.8, { duration: 250 });
+          opacity.value = withTiming(0, { duration: 250 });
         } else if (e.translationX < 0 && hasNext) {
-          // Swipe LEFT - go to next chord
-          console.log('➡️ Swiping LEFT to NEXT chord');
-          const direction = 'next';
-          translateX.value = withTiming(-SCREEN_WIDTH, { 
-            duration: 200, 
-            easing: Easing.out(Easing.cubic) 
-          }, (finished) => {
-            'worklet';
-            if (finished) {
-              console.log('✅ Animation finished, navigating to next');
-              runOnJS(handleSwipe)(direction);
+          console.log('⬅️ Navigating to NEXT');
+          // Animate out to the left
+          translateX.value = withTiming(
+            -SCREEN_WIDTH,
+            { duration: 250, easing: Easing.out(Easing.cubic) },
+            (finished) => {
+              if (finished) {
+                runOnJS(navigate)('next');
+              }
             }
-          });
-          scale.value = withTiming(0.85, { duration: 200 });
-          opacity.value = withTiming(0, { duration: 200 });
+          );
+          scale.value = withTiming(0.8, { duration: 250 });
+          opacity.value = withTiming(0, { duration: 250 });
         } else {
-          console.log('⚠️ No navigation: no prev/next available');
-          // Snap back if no navigation
-          translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
-          scale.value = withSpring(1, { damping: 20, stiffness: 90 });
+          // Snap back - no chord available
+          console.log('⚠️ No chord available, snapping back');
+          translateX.value = withSpring(0, { damping: 20, stiffness: 100 });
+          scale.value = withSpring(1, { damping: 20, stiffness: 100 });
           opacity.value = withTiming(1, { duration: 200 });
         }
       } else {
-        console.log('⚠️ Swipe too short, snapping back');
-        // Snap back
-        translateX.value = withSpring(0, { damping: 20, stiffness: 90 });
-        scale.value = withSpring(1, { damping: 20, stiffness: 90 });
+        // Snap back - threshold not met
+        console.log('↩️ Threshold not met, snapping back');
+        translateX.value = withSpring(0, { damping: 20, stiffness: 100 });
+        scale.value = withSpring(1, { damping: 20, stiffness: 100 });
         opacity.value = withTiming(1, { duration: 200 });
       }
     });
