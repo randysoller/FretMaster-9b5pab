@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
     borderColor: '#2A2A2A',
   },
   filterChipActive: {
-    backgroundColor: '#FF8C42',
-    borderColor: '#FF8C42',
+    backgroundColor: '#FFA055',
+    borderColor: '#FFA055',
   },
   filterChipText: {
     color: '#CCC',
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultsCount: {
-    color: '#FF8C42',
+    color: '#FFA055',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FF8C42',
+    backgroundColor: '#FFA055',
   },
   legendDotBlue: {
     width: 12,
