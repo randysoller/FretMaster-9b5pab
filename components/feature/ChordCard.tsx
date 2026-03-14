@@ -173,7 +173,7 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
         {/* Chord info */}
         <Pressable onPress={onPress} style={styles.infoSection}>
           <Text style={styles.chordName}>{chord.name}</Text>
-          <Text style={styles.chordCategory}>OPEN CHORDS</Text>
+          <Text style={styles.chordCategory}>{chord.shape.toUpperCase()} CHORDS</Text>
           <Text style={styles.chordFullName}>{chord.fullName}</Text>
         </Pressable>
 

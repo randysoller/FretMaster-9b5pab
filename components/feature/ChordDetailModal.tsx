@@ -242,10 +242,10 @@ export function ChordDetailModal({ visible, chord, onClose, onPlay, onEdit }: Ch
               </View>
               <View style={styles.titleContainer}>
                 <View style={styles.badges}>
-                  <Text style={styles.badge}>OPEN CHORDS</Text>
-                  <Text style={styles.category}>{chord.category.toUpperCase()}</Text>
+                  <Text style={styles.badge}>{chord.shape.toUpperCase()} CHORDS</Text>
+                  <Text style={styles.category}>{chord.type.toUpperCase()}</Text>
                 </View>
-                <Text style={styles.chordName}>{chord.name}</Text>
+                <Text style={styles.chordName}>{chord.fullName}</Text>
               </View>
             </View>
             <Pressable onPress={onClose} style={styles.closeButton}>
