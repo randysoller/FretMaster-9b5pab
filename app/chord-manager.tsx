@@ -77,6 +77,14 @@ export default function ChordManagerScreen() {
   const [isBarre, setIsBarre] = useState(false);
   const [barreMode, setBarreMode] = useState(false);
   const [barreSelection, setBarreSelection] = useState<number[]>([]);
+  
+  // Dropdown collapse states
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  
+  // Finger selection modal
+  const [showFingerModal, setShowFingerModal] = useState(false);
+  const [pendingDotPosition, setPendingDotPosition] = useState<{ stringIndex: number; fretIndex: number } | null>(null);
 
   // Redirect non-admins
   useEffect(() => {
@@ -288,53 +296,41 @@ export default function ChordManagerScreen() {
     }
   };
 
-  // Visual editor handlers
+  // Visual editor handlers - NEW WORKFLOW
   const handleFretboardTap = (stringIndex: number, fretIndex: number) => {
     if (!editingChord) return;
 
+    // Step 2: User tapped - show finger selection modal
+    setPendingDotPosition({ stringIndex, fretIndex });
+    setShowFingerModal(true);
+  };
+
+  const handleFingerChoice = (fingerValue: number) => {
+    if (!editingChord || !pendingDotPosition) return;
+
+    const { stringIndex, fretIndex } = pendingDotPosition;
     const newPositions = [...editingChord.positions];
     const newFingers = [...editingChord.fingers];
 
     const actualFret = baseFret + fretIndex - 1;
 
     // Handle special finger options
-    if (selectedFinger === -1) {
+    if (fingerValue === -1) {
       // Delete: Remove dot
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
-    } else if (selectedFinger === -2) {
+    } else if (fingerValue === -2) {
       // Open: Set to 0
       newPositions[stringIndex] = 0;
       newFingers[stringIndex] = 0;
-    } else if (selectedFinger === -3) {
+    } else if (fingerValue === -3) {
       // Mute: Set to -1
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
-    } else if (barreMode) {
-      // Barre mode: Collect strings for barre
-      if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
-        // Already has this finger - toggle selection
-        if (barreSelection.includes(stringIndex)) {
-          setBarreSelection(barreSelection.filter(s => s !== stringIndex));
-        } else {
-          setBarreSelection([...barreSelection, stringIndex]);
-        }
-      } else {
-        // Place finger first
-        newPositions[stringIndex] = actualFret;
-        newFingers[stringIndex] = selectedFinger;
-        setBarreSelection([stringIndex]);
-      }
     } else {
-      // Normal mode: Place or update finger
-      if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
-        // Remove dot if clicking same position with same finger
-        newPositions[stringIndex] = -1;
-        newFingers[stringIndex] = 0;
-      } else {
-        newPositions[stringIndex] = actualFret;
-        newFingers[stringIndex] = selectedFinger;
-      }
+      // Normal finger placement
+      newPositions[stringIndex] = actualFret;
+      newFingers[stringIndex] = fingerValue;
     }
 
     setEditingChord({
@@ -343,6 +339,10 @@ export default function ChordManagerScreen() {
       fingers: newFingers,
       baseFret,
     });
+
+    // Close modal and reset
+    setShowFingerModal(false);
+    setPendingDotPosition(null);
   };
 
   const handleStringMarkerTap = (stringIndex: number, marker: 'mute' | 'open') => {
@@ -366,23 +366,6 @@ export default function ChordManagerScreen() {
     });
   };
 
-  const handleFingerSelect = (fingerValue: number) => {
-    setSelectedFinger(fingerValue);
-    
-    // Reset barre mode if selecting special options
-    if (fingerValue < 0) {
-      setBarreMode(false);
-      setBarreSelection([]);
-    }
-    
-    // Set default colors based on shape
-    if (dotShape === 'circle' && dotColor !== '#D4952A') {
-      setDotColor('#D4952A'); // Orange for circles
-    } else if (dotShape === 'diamond' && dotColor !== '#4DB8E8') {
-      setDotColor('#4DB8E8'); // Cyan for diamonds
-    }
-  };
-
   const handleShapeSelect = (shape: 'circle' | 'diamond') => {
     setDotShape(shape);
     // Set default color for shape
@@ -390,23 +373,6 @@ export default function ChordManagerScreen() {
       setDotColor('#D4952A'); // Orange
     } else {
       setDotColor('#4DB8E8'); // Cyan
-    }
-  };
-
-  const handleBarreToggle = () => {
-    const newBarreMode = !barreMode;
-    setBarreMode(newBarreMode);
-    
-    if (!newBarreMode) {
-      // Exiting barre mode - create barre if we have 2+ selected strings
-      if (barreSelection.length >= 2 && editingChord) {
-        // Barres are already handled by the Fretboard rendering logic
-        // Just clear the selection
-        setBarreSelection([]);
-      }
-    } else {
-      // Entering barre mode
-      setBarreSelection([]);
     }
   };
 
@@ -580,7 +546,7 @@ export default function ChordManagerScreen() {
         </View>
 
         <Text style={styles.fretboardInstructions}>
-          Tap fret to place dot. Select finger/shape/color, then tap. Use Barre to connect dots.
+          1. Choose Circle or Diamond   2. Tap fret to place   3. Select finger from popup
         </Text>
 
         {/* String markers (mute/open) */}
@@ -608,41 +574,6 @@ export default function ChordManagerScreen() {
               </Pressable>
             </View>
           ))}
-        </View>
-
-        {/* Finger selector */}
-        <View style={styles.fingerRow}>
-          {FINGER_OPTIONS.map((option) => (
-            <Pressable
-              key={option.value}
-              onPress={() => handleFingerSelect(option.value)}
-              style={[
-                styles.fingerButtonLarge,
-                selectedFinger === option.value && styles.fingerButtonLargeActive,
-              ]}
-            >
-              <Text style={[
-                styles.fingerButtonLargeText,
-                selectedFinger === option.value && styles.fingerButtonLargeTextActive,
-              ]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={handleBarreToggle}
-            style={[
-              styles.barreButton,
-              barreMode && styles.barreButtonActive,
-            ]}
-          >
-            <Text style={[
-              styles.barreButtonText,
-              barreMode && styles.barreButtonTextActive,
-            ]}>
-              Barre
-            </Text>
-          </Pressable>
         </View>
 
         {/* Interactive Fretboard Grid */}
@@ -676,12 +607,10 @@ export default function ChordManagerScreen() {
             const x = stringIndex * STRING_SPACING;
             const y = (fretIndex - 0.5) * FRET_SPACING;
             const fingerNum = editingChord.fingers[stringIndex];
-            const isSelected = barreSelection.includes(stringIndex);
 
             return (
-              <Pressable
+              <View
                 key={`dot-${stringIndex}`}
-                onPress={() => handleFretboardTap(stringIndex, fretIndex)}
                 style={[
                   styles.fretDot,
                   { left: x - 16, top: y - 16 },
@@ -701,42 +630,7 @@ export default function ChordManagerScreen() {
                     )}
                   </>
                 )}
-                {isSelected && barreMode && (
-                  <View style={styles.barreSelectionIndicator} />
-                )}
-              </Pressable>
-            );
-          })}
-
-          {/* Barre lines */}
-          {editingChord.barres?.map((barreFret, idx) => {
-            const relFret = barreFret - baseFret + 1;
-            if (relFret < 1 || relFret > visibleFrets) return null;
-
-            const barreStrings = editingChord.positions
-              .map((f, sidx) => (f === barreFret ? sidx : -1))
-              .filter((sidx) => sidx >= 0);
-
-            if (barreStrings.length < 2) return null;
-
-            const fromString = barreStrings[0];
-            const toString = barreStrings[barreStrings.length - 1];
-            const y = (relFret - 0.5) * FRET_SPACING;
-            const barHeight = 12;
-
-            return (
-              <View
-                key={`barre-${idx}`}
-                style={[
-                  styles.barreLine,
-                  {
-                    left: fromString * STRING_SPACING,
-                    top: y - barHeight / 2,
-                    width: (toString - fromString) * STRING_SPACING,
-                    height: barHeight,
-                  }
-                ]}
-              />
+              </View>
             );
           })}
 
@@ -850,83 +744,103 @@ export default function ChordManagerScreen() {
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Category</Text>
-              <View style={styles.dropdownContainer}>
-                {CATEGORY_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setEditingChord({ ...editingChord, shape: option.value as ChordShape })}
-                    style={[
-                      styles.dropdownOption,
-                      editingChord.shape === option.value && styles.dropdownOptionActive,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.dropdownOptionText,
-                      editingChord.shape === option.value && styles.dropdownOptionTextActive,
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+              <Pressable
+                onPress={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                style={styles.dropdownButton}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {CATEGORY_OPTIONS.find(o => o.value === editingChord.shape)?.label || 'Select Category'}
+                </Text>
+                <MaterialIcons 
+                  name={isCategoryDropdownOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+                  size={20} 
+                  color={colors.text} 
+                />
+              </Pressable>
+              {isCategoryDropdownOpen && (
+                <View style={styles.dropdownContainer}>
+                  {CATEGORY_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => {
+                        setEditingChord({ ...editingChord, shape: option.value as ChordShape });
+                        setIsCategoryDropdownOpen(false);
+                      }}
+                      style={[
+                        styles.dropdownOption,
+                        editingChord.shape === option.value && styles.dropdownOptionActive,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.dropdownOptionText,
+                        editingChord.shape === option.value && styles.dropdownOptionTextActive,
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Type</Text>
-              <View style={styles.dropdownContainer}>
-                <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
-                  {TYPE_OPTIONS.map((option, index) => (
-                    option.disabled ? (
-                      <View key={index} style={styles.dropdownSeparator}>
-                        <Text style={styles.dropdownSeparatorText}>{option.label}</Text>
-                      </View>
-                    ) : (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => setEditingChord({ ...editingChord, type: option.value as ChordType })}
-                        style={[
-                          styles.dropdownOption,
-                          editingChord.type === option.value && styles.dropdownOptionActive,
-                        ]}
-                      >
-                        <Text style={[
-                          styles.dropdownOptionText,
-                          editingChord.type === option.value && styles.dropdownOptionTextActive,
-                        ]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    )
-                  ))}
-                </ScrollView>
-              </View>
+              <Pressable
+                onPress={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                style={styles.dropdownButton}
+              >
+                <Text style={styles.dropdownButtonText}>
+                  {TYPE_OPTIONS.find(o => o.value === editingChord.type)?.label || 'Select Type'}
+                </Text>
+                <MaterialIcons 
+                  name={isTypeDropdownOpen ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
+                  size={20} 
+                  color={colors.text} 
+                />
+              </Pressable>
+              {isTypeDropdownOpen && (
+                <View style={styles.dropdownContainer}>
+                  <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                    {TYPE_OPTIONS.map((option, index) => (
+                      option.disabled ? (
+                        <View key={index} style={styles.dropdownSeparator}>
+                          <Text style={styles.dropdownSeparatorText}>{option.label}</Text>
+                        </View>
+                      ) : (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => {
+                            setEditingChord({ ...editingChord, type: option.value as ChordType });
+                            setIsTypeDropdownOpen(false);
+                          }}
+                          style={[
+                            styles.dropdownOption,
+                            editingChord.type === option.value && styles.dropdownOptionActive,
+                          ]}
+                        >
+                          <Text style={[
+                            styles.dropdownOptionText,
+                            editingChord.type === option.value && styles.dropdownOptionTextActive,
+                          ]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      )
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
-        {/* Dot Appearance */}
+        {/* Dot Appearance - STEP 1: Choose Shape */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DOT APPEARANCE</Text>
+          <Text style={styles.sectionTitle}>STEP 1: CHOOSE DOT SHAPE</Text>
           <Text style={styles.dotAppearanceSubtitle}>
-            Configure the color, shape, and label for the next dot you place
+            Select circle or diamond before placing dots on fretboard
           </Text>
 
-          <Text style={styles.dotLabel}>DOT COLOR</Text>
-          <View style={styles.colorPalette}>
-            {DOT_COLORS.map((color) => (
-              <Pressable
-                key={color}
-                onPress={() => setDotColor(color)}
-                style={[
-                  styles.colorButton,
-                  { backgroundColor: color },
-                  dotColor === color && styles.colorButtonActive,
-                ]}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.dotLabel}>DOT SHAPE</Text>
           <View style={styles.shapeSelector}>
             <Pressable
               onPress={() => handleShapeSelect('circle')}
@@ -955,9 +869,24 @@ export default function ChordManagerScreen() {
               ]}>Diamond</Text>
             </Pressable>
           </View>
+
+          <Text style={styles.dotLabel}>DOT COLOR (Optional)</Text>
+          <View style={styles.colorPalette}>
+            {DOT_COLORS.map((color) => (
+              <Pressable
+                key={color}
+                onPress={() => setDotColor(color)}
+                style={[
+                  styles.colorButton,
+                  { backgroundColor: color },
+                  dotColor === color && styles.colorButtonActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
 
-        {/* Interactive Fretboard */}
+        {/* Interactive Fretboard - STEP 2: Tap to Place */}
         {renderInteractiveFretboard()}
 
         {/* Action Buttons */}
@@ -988,8 +917,10 @@ export default function ChordManagerScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>LIVE PREVIEW</Text>
           <View style={styles.previewContainer}>
-            <Text style={styles.previewSymbol}>{editingChord.name}</Text>
-            <Text style={styles.previewName}>{editingChord.fullName}</Text>
+            <View style={styles.previewTextSection}>
+              <Text style={styles.previewSymbol}>{editingChord.name}</Text>
+              <Text style={styles.previewName}>{editingChord.fullName}</Text>
+            </View>
             <View style={styles.fretboardWrapper}>
               <Fretboard chord={editingChord} size="lg" />
             </View>
@@ -1035,6 +966,40 @@ export default function ChordManagerScreen() {
 
         {/* Content */}
         {viewMode === 'list' ? renderListView() : renderVisualEditor()}
+
+        {/* STEP 3: Finger Selection Modal */}
+        <Modal
+          visible={showFingerModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setShowFingerModal(false);
+            setPendingDotPosition(null);
+          }}
+        >
+          <Pressable 
+            style={styles.modalOverlay} 
+            onPress={() => {
+              setShowFingerModal(false);
+              setPendingDotPosition(null);
+            }}
+          >
+            <View style={styles.fingerModalContent}>
+              <Text style={styles.fingerModalTitle}>Select Finger Number</Text>
+              <View style={styles.fingerModalGrid}>
+                {FINGER_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => handleFingerChoice(option.value)}
+                    style={styles.fingerModalButton}
+                  >
+                    <Text style={styles.fingerModalButtonText}>{option.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
 
         {/* Bulk Edit Menu */}
         <Modal
@@ -1406,11 +1371,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+  },
   dropdownContainer: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    marginTop: spacing.xs,
     maxHeight: 140,
   },
   dropdownScroll: {
@@ -1478,6 +1460,7 @@ const styles = StyleSheet.create({
   shapeSelector: {
     flexDirection: 'row',
     gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   shapeButton: {
     flex: 1,
@@ -1581,56 +1564,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '700',
   },
-  fingerRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-    flexWrap: 'wrap',
-  },
-  fingerButtonLarge: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#2A2A2A',
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fingerButtonLargeActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  fingerButtonLargeText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  fingerButtonLargeTextActive: {
-    color: '#000',
-  },
-  barreButton: {
-    flex: 1,
-    minWidth: 60,
-    backgroundColor: '#2A2A2A',
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  barreButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  barreButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  barreButtonTextActive: {
-    color: '#000',
-  },
   fretboardGrid: {
     position: 'relative',
     width: 216,
@@ -1693,21 +1626,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     lineHeight: 32,
-  },
-  barreSelectionIndicator: {
-    position: 'absolute',
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    top: -3,
-    left: -3,
-  },
-  barreLine: {
-    position: 'absolute',
-    backgroundColor: colors.primary,
-    borderRadius: 6,
   },
   fretClickArea: {
     position: 'absolute',
@@ -1782,6 +1700,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: borderRadius.lg,
   },
+  previewTextSection: {
+    alignItems: 'center',
+    marginLeft: 30, // Moved 30pts to the right
+  },
   previewSymbol: {
     fontSize: 32,
     fontWeight: '800',
@@ -1848,5 +1770,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textMuted,
+  },
+  // Finger Selection Modal
+  fingerModalContent: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    width: '90%',
+    maxWidth: 320,
+  },
+  fingerModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  fingerModalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    justifyContent: 'center',
+  },
+  fingerModalButton: {
+    width: 60,
+    height: 60,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fingerModalButtonText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
   },
 });
