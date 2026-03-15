@@ -39,7 +39,9 @@ export default function TabLayout() {
     <View style={{ flex: 1 }}>
       {/* Global Toolbar */}
       <View style={[styles.toolbar, { paddingTop: insets.top + spacing.md }]}>
-        <MaterialIcons name="music-note" size={24} color={colors.primary} />
+        <Pressable style={styles.logoButton}>
+          <MaterialIcons name="music-note" size={24} color={colors.primary} />
+        </Pressable>
         <View style={styles.headerBadge}>
           <MaterialIcons name="auto-awesome" size={12} color={colors.primary} />
           <Text style={styles.headerBadgeText}>
@@ -50,6 +52,7 @@ export default function TabLayout() {
           style={styles.statsButton}
           onPress={() => router.push('/stats' as any)}
         >
+          <Text style={styles.statsButtonText}>Stats</Text>
           <MaterialIcons name="bar-chart" size={24} color={colors.primary} />
         </Pressable>
       </View>
@@ -93,7 +96,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="av-timer" size={size} color={color} />
             ),
-            tabBarLabel: 'Metronome',
+            tabBarLabel: 'Metronome', // Full word
           }}
         />
         <Tabs.Screen
@@ -158,10 +161,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statsButton: {
-    width: 36,
-    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
     borderRadius: borderRadius.md,
     backgroundColor: colors.surface,
+  },
+  statsButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  logoButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },

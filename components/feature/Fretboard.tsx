@@ -58,6 +58,46 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   // Realistic string thickness: low E (thickest) → high e (thinnest)
   const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7];
 
+  // Detect and render barre chords
+  const detectBarres = () => {
+    const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
+    const fingerGroups = new Map<number, number[]>();
+    
+    chord.fingers.forEach((finger, idx) => {
+      if (finger > 0 && chord.positions[idx] > 0) {
+        if (!fingerGroups.has(finger)) {
+          fingerGroups.set(finger, []);
+        }
+        fingerGroups.get(finger)!.push(idx);
+      }
+    });
+
+    fingerGroups.forEach((stringIndices, finger) => {
+      if (stringIndices.length >= 2) {
+        const frets = stringIndices.map(si => chord.positions[si]);
+        const uniqueFrets = [...new Set(frets)];
+        if (uniqueFrets.length === 1) {
+          const fret = uniqueFrets[0];
+          const fromString = Math.min(...stringIndices);
+          const toString = Math.max(...stringIndices);
+          barres.push({ fret, fromString, toString, finger });
+        }
+      }
+    });
+
+    return barres;
+  };
+
+  const barres = detectBarres();
+  const barreRenderedStrings = new Set<string>();
+  barres.forEach(barre => {
+    for (let si = barre.fromString; si <= barre.toString; si++) {
+      if (chord.positions[si] === barre.fret) {
+        barreRenderedStrings.add(`${si}-${barre.fret}`);
+      }
+    }
+  });
+
   // Calculate root note for diamond detection
   const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -123,7 +163,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         </SvgText>
       )}
 
-      {/* Fret lines */}
+      {/* Fret lines - exact width to match strings */}
       {Array.from({ length: numFrets + 1 }).map((_, i) => (
         <Line
           key={`fret-${i}`}
@@ -196,7 +236,30 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         />
       )}
 
-      {/* Barre indicators */}
+      {/* Barre indicators - connecting lines */}
+      {barres.map((barre, idx) => {
+        const relFret = barre.fret - baseFret + 1;
+        if (relFret < 1 || relFret > numFrets) return null;
+
+        const y = getFretY(relFret) - fretSpacing / 2;
+        const x1 = getStringX(barre.fromString);
+        const x2 = getStringX(barre.toString);
+        const barHeight = config.dotRadius * 1.5;
+
+        return (
+          <Rect
+            key={`barre-line-${idx}`}
+            x={x1}
+            y={y - barHeight / 2}
+            width={x2 - x1}
+            height={barHeight}
+            fill={OTHER_NOTE_COLOR}
+            rx={barHeight / 2}
+          />
+        );
+      })}
+
+      {/* OLD Barre indicators - KEEP FOR DOTS */}
       {barres.map((barreFret, idx) => {
         const relFret = barreFret - baseFret + 1;
         if (relFret < 1 || relFret > numFrets) return null;
@@ -295,7 +358,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         return null;
       })} {/* Removed extra '}' here */}
 
-      {/* Finger dots (non-barre) */}
+      {/* Finger dots (non-barre) - KEEP EXISTING LOGIC */}
       {chord.positions.map((fret, i) => {
         if (fret <= 0) return null;
 

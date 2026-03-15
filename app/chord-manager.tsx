@@ -348,9 +348,10 @@ export default function ChordManagerScreen() {
       newShapes[stringIndex] = modalSelectedShape; // Store shape
       newColors[stringIndex] = dotColor; // Store color
     } else if (fingerValue === -3) {
-      // Mute: Set to -1
+      // Mute: X marker - set position to -1 (will be rendered as X above fretboard)
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
+      // Note: X markers are rendered separately in the topMarkers section
     } else {
       // Normal finger placement - save shape and color for THIS dot
       newPositions[stringIndex] = actualFret;
@@ -568,26 +569,28 @@ export default function ChordManagerScreen() {
     const STRING_SPACING = 36;
     const FRET_SPACING = 50;
     const PREVIEW_FRETS = 5;
+    const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
+    const PREVIEW_STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
 
     return (
       <View style={styles.previewFretboardGrid}>
-        {/* Fret lines */}
+        {/* Fret lines - exact width to match strings */}
         {Array.from({ length: PREVIEW_FRETS + 1 }).map((_, i) => (
           <View 
             key={`preview-fret-${i}`}
             style={[
               styles.previewFretLine,
-              { top: i * FRET_SPACING },
+              { top: i * FRET_SPACING, width: PREVIEW_FRET_WIDTH },
               i === 0 && baseFret === 1 && styles.previewNutLine,
             ]}
           />
         ))}
 
-        {/* String lines */}
+        {/* String lines with realistic thickness */}
         {Array.from({ length: STRINGS }).map((_, i) => (
           <View 
             key={`preview-string-${i}`}
-            style={[styles.previewStringLine, { left: i * STRING_SPACING }]}
+            style={[styles.previewStringLine, { left: i * STRING_SPACING, width: PREVIEW_STRING_WIDTHS[i] }]}
           />
         ))}
 
@@ -651,6 +654,7 @@ export default function ChordManagerScreen() {
     const STRING_SPACING = 36;
     const FRET_SPACING = 50;
     const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
+    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
 
     return (
       <View style={styles.fretboardEditor}>
@@ -681,23 +685,23 @@ export default function ChordManagerScreen() {
 
         {/* Interactive Fretboard Grid */}
         <View style={styles.fretboardGrid}>
-          {/* Fret lines */}
+          {/* Fret lines - exact width to match strings */}
           {Array.from({ length: visibleFrets + 1 }).map((_, i) => (
             <View 
               key={`fret-${i}`}
               style={[
                 styles.fretLine,
-                { top: i * FRET_SPACING },
+                { top: i * FRET_SPACING, width: FRET_WIDTH },
                 i === 0 && baseFret === 1 && styles.nutLine,
               ]}
             />
           ))}
 
-          {/* String lines */}
+          {/* String lines with realistic thickness */}
           {Array.from({ length: STRINGS }).map((_, i) => (
             <View 
               key={`string-${i}`}
-              style={[styles.stringLine, { left: i * STRING_SPACING }]}
+              style={[styles.stringLine, { left: i * STRING_SPACING, width: STRING_WIDTHS[i] }]}
             />
           ))}
 
@@ -1369,6 +1373,7 @@ const styles = StyleSheet.create({
   chordInfo: {
     flex: 1,
     gap: 2,
+    marginLeft: 80, // Move ~10 letter spaces to the right
   },
   chordName: {
     fontSize: 18,
@@ -1660,7 +1665,6 @@ const styles = StyleSheet.create({
   },
   fretLine: {
     position: 'absolute',
-    width: '100%',
     height: 2,
     backgroundColor: '#666',
   },
@@ -1671,7 +1675,6 @@ const styles = StyleSheet.create({
   stringLine: {
     position: 'absolute',
     height: '100%',
-    width: 2,
     backgroundColor: '#888',
   },
   fretDot: {
@@ -1816,7 +1819,6 @@ const styles = StyleSheet.create({
   },
   previewFretLine: {
     position: 'absolute',
-    width: '100%',
     height: 2,
     backgroundColor: '#666',
   },
@@ -1827,7 +1829,6 @@ const styles = StyleSheet.create({
   previewStringLine: {
     position: 'absolute',
     height: '100%',
-    width: 2,
     backgroundColor: '#888',
   },
   previewFretDot: {

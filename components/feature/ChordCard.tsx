@@ -48,6 +48,7 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
     const DIAGRAM_HEIGHT = 88; // Scaled proportionally to match 5 frets
     const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1);
     const FRET_SPACING = DIAGRAM_HEIGHT / FRETS;
+    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
 
     return (
       <View style={styles.fretboardContainer}>
@@ -72,11 +73,11 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
 
           {/* Fretboard grid */}
           <View style={styles.gridArea}>
-            {/* Strings (vertical lines) */}
+            {/* Strings (vertical lines) with realistic thickness */}
             {Array.from({ length: STRINGS }).map((_, i) => (
               <View 
                 key={`string-${i}`}
-                style={[styles.string, { left: i * STRING_SPACING }]}
+                style={[styles.string, { left: i * STRING_SPACING, width: STRING_WIDTHS[i] }]}
               />
             ))}
 
@@ -290,7 +291,6 @@ const styles = StyleSheet.create({
   },
   string: {
     position: 'absolute',
-    width: 2,
     height: '100%',
     backgroundColor: colors.string,
   },
@@ -354,7 +354,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 2,
-    paddingLeft: 32, // 4 letter widths to the right
   },
   chordLetter: {
     fontSize: 36,
