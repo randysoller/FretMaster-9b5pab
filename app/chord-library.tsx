@@ -93,10 +93,18 @@ export default function ChordLibraryScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Chord Library</Text>
-        <Text style={styles.subtitle}>
-          Browse all {CHORD_DATA.length} chord diagrams — tap the checkbox to select chords for a practice preset
-        </Text>
+        <View style={styles.titleRow}>
+          <View style={styles.titleContent}>
+            <Text style={styles.title}>Chord Library</Text>
+            <Text style={styles.subtitle}>
+              Browse all {CHORD_DATA.length} chord diagrams — tap the checkbox to select chords for a practice preset
+            </Text>
+          </View>
+          <Pressable onPress={() => router.push('/chord-manager' as any)} style={styles.manageButton}>
+            <MaterialIcons name="settings" size={24} color={colors.primary} />
+            <Text style={styles.manageButtonText}>Manage</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Preset Selector */}
@@ -259,6 +267,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  titleContent: {
+    flex: 1,
+    paddingRight: spacing.md,
+  },
   title: {
     fontSize: 30,
     fontWeight: '800',
@@ -269,6 +286,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     lineHeight: 20,
+  },
+  manageButton: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+  },
+  manageButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
   },
   presetRow: {
     marginHorizontal: spacing.lg,
