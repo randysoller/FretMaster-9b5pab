@@ -69,16 +69,39 @@ export function ChordDetailModal({
     }
   }, [chord?.id]);
 
+  // Safety timeout to reset navigation lock
+  useEffect(() => {
+    if (isNavigatingRef.current) {
+      const timeout = setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [chord?.id]);
+
   const navigate = (direction: 'prev' | 'next') => {
-    if (isNavigatingRef.current) return;
+    if (isNavigatingRef.current) {
+      console.log('Navigation blocked - already navigating');
+      return;
+    }
     isNavigatingRef.current = true;
     navigationDirectionRef.current = direction;
     onNavigate(direction);
+    
+    // Safety timeout in case chord doesn't update
+    setTimeout(() => {
+      if (isNavigatingRef.current) {
+        console.log('Navigation timeout - resetting lock');
+        isNavigatingRef.current = false;
+      }
+    }, 500);
   };
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       'worklet';
+      if (isNavigatingRef.current) return; // Prevent gesture during navigation
+      
       translateX.value = event.translationX;
       
       // Animate scale and opacity based on swipe progress
@@ -97,30 +120,23 @@ export function ChordDetailModal({
         currentIndex > 0;
 
       if (shouldNavigateNext) {
-        translateX.value = withTiming(
-          -SCREEN_WIDTH,
-          { duration: 250 },
-          (finished) => {
-            if (finished) {
-              runOnJS(navigate)('next');
-            }
-          }
-        );
+        // Animate exit to left
+        translateX.value = withTiming(-SCREEN_WIDTH, { duration: 250 });
         scale.value = withTiming(0.85, { duration: 250 });
         opacity.value = withTiming(0, { duration: 250 });
+        
+        // Trigger navigation immediately, don't wait for animation
+        runOnJS(navigate)('next');
       } else if (shouldNavigatePrev) {
-        translateX.value = withTiming(
-          SCREEN_WIDTH,
-          { duration: 250 },
-          (finished) => {
-            if (finished) {
-              runOnJS(navigate)('prev');
-            }
-          }
-        );
+        // Animate exit to right
+        translateX.value = withTiming(SCREEN_WIDTH, { duration: 250 });
         scale.value = withTiming(0.85, { duration: 250 });
         opacity.value = withTiming(0, { duration: 250 });
+        
+        // Trigger navigation immediately, don't wait for animation
+        runOnJS(navigate)('prev');
       } else {
+        // Snap back to center
         translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
         scale.value = withSpring(1, { damping: 20, stiffness: 200 });
         opacity.value = withSpring(1, { damping: 20, stiffness: 200 });
