@@ -154,9 +154,10 @@ export default function ChordDetailScreen() {
                   return (
                     <View key={`dot-${stringIndex}`} style={[styles.dotContainer, { left: xPos, top: yPos }]}>
                       {isRootNote ? (
-                        <View style={styles.diamondDot}>
+                        <>
+                          <View style={styles.diamondDot} />
                           <Text style={styles.diamondNumber}>{fingerNumber}</Text>
-                        </View>
+                        </>
                       ) : (
                         <View style={styles.circleDot}>
                           <Text style={styles.circleNumber}>{fingerNumber}</Text>
@@ -408,10 +409,8 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     backgroundColor: '#4DB8E8',
-    alignItems: 'center',
-    justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
-    overflow: 'visible',
+    position: 'absolute',
   },
   circleNumber: {
     color: '#000',
@@ -424,10 +423,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     includeFontPadding: false,
-    width: 24,
-    height: 24,
-    lineHeight: 24,
-    transform: [{ rotate: '-45deg' }],
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    lineHeight: 28,
+    // NO rotation - stays vertical!
   },
   stringNotationBox: {
     backgroundColor: '#FFFFFF',

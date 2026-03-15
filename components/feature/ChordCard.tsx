@@ -112,9 +112,10 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
                   style={[styles.dotContainer, { left: xPos, top: yPos }]}
                 >
                   {isRootNote ? (
-                    <View style={styles.diamondDot}>
+                    <>
+                      <View style={styles.diamondDot} />
                       <Text style={styles.diamondNumber}>{fingerNumber}</Text>
-                    </View>
+                    </>
                   ) : (
                     <View style={styles.circleDot}>
                       <Text style={styles.circleNumber}>{fingerNumber}</Text>
@@ -325,10 +326,8 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     backgroundColor: '#4DB8E8', // Root note blue
-    alignItems: 'center',
-    justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
-    overflow: 'visible',
+    position: 'absolute',
   },
   circleNumber: {
     color: '#000',
@@ -341,10 +340,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     includeFontPadding: false,
-    width: 16,
-    height: 16,
-    lineHeight: 16,
-    transform: [{ rotate: '-45deg' }], // Counter-rotate to make number vertical
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    lineHeight: 18,
+    // NO rotation - stays vertical!
   },
 
   // Chord info
