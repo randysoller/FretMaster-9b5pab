@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordCard } from '@/components/feature/ChordCard';
-import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
 import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
 import { PresetDropdown } from '@/components/feature/PresetDropdown';
 import { CHORD_DATA, ChordData, ChordShape, BarreRoot } from '@/constants/musicData';
@@ -25,8 +24,6 @@ const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
 
 export default function ChordLibraryScreen() {
   const router = useRouter();
-  const [selectedChord, setSelectedChord] = useState<ChordData | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   
   const {
     filterCategories,
@@ -75,8 +72,14 @@ export default function ChordLibraryScreen() {
   };
 
   const handleChordPress = (chord: ChordData) => {
-    setSelectedChord(chord);
-    setShowDetailModal(true);
+    const chordIndex = filteredChords.findIndex(c => c.id === chord.id);
+    router.push({
+      pathname: '/chord-detail' as any,
+      params: {
+        chords: JSON.stringify(filteredChords),
+        initialIndex: chordIndex.toString(),
+      },
+    });
   };
 
   return (
@@ -233,24 +236,6 @@ export default function ChordLibraryScreen() {
         ))}
       </ScrollView>
 
-      {/* Chord Detail Modal */}
-      <ChordDetailModal
-        visible={showDetailModal}
-        chord={selectedChord}
-        allChords={filteredChords}
-        currentIndex={selectedChord ? filteredChords.findIndex(c => c.id === selectedChord.id) : 0}
-        onClose={() => setShowDetailModal(false)}
-        onNavigate={(direction) => {
-          const currentIdx = filteredChords.findIndex(c => c.id === selectedChord?.id);
-          if (direction === 'prev' && currentIdx > 0) {
-            setSelectedChord(filteredChords[currentIdx - 1]);
-          } else if (direction === 'next' && currentIdx < filteredChords.length - 1) {
-            setSelectedChord(filteredChords[currentIdx + 1]);
-          }
-        }}
-        onPlay={() => {}}
-        onEdit={() => {}}
-      />
     </View>
   );
 }
