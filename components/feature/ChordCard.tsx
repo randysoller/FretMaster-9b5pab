@@ -12,9 +12,6 @@ interface ChordCardProps {
   onCheckboxPress?: () => void;
 }
 
-const ROOT_NOTE_COLOR = colors.rootNoteBlue; // Root note blue for diamonds
-const OTHER_NOTE_COLOR = colors.primary; // Primary color for finger positions
-
 export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCheckboxPress }: ChordCardProps) {
   // Calculate fret range
   const activeFrets = chord.positions.filter(f => f > 0);
@@ -115,11 +112,11 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
                   style={[styles.dotContainer, { left: xPos, top: yPos }]}
                 >
                   {isRootNote ? (
-                    <View style={[styles.diamondDot, { backgroundColor: ROOT_NOTE_COLOR }]}>
+                    <View style={styles.diamondDot}>
                       <Text style={styles.diamondNumber}>{fingerNumber}</Text>
                     </View>
                   ) : (
-                    <View style={[styles.circleDot, { backgroundColor: OTHER_NOTE_COLOR }]}>
+                    <View style={styles.circleDot}>
                       <Text style={styles.circleNumber}>{fingerNumber}</Text>
                     </View>
                   )}
@@ -309,37 +306,39 @@ const styles = StyleSheet.create({
   },
   dotContainer: {
     position: 'absolute',
-    width: 18,
-    height: 18,
-    marginLeft: -9,
-    marginTop: -9,
+    width: 20,
+    height: 20,
+    marginLeft: -10,
+    marginTop: -10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary, // #D4952A orange
     alignItems: 'center',
     justifyContent: 'center',
   },
   diamondDot: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
+    backgroundColor: '#4DB8E8', // Root note blue
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
   },
   circleNumber: {
     color: '#000',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   diamondNumber: {
     color: '#000',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    transform: [{ rotate: '-45deg' }],
+    transform: [{ rotate: '-45deg' }], // Counter-rotate to make number vertical
   },
 
   // Chord info
