@@ -38,13 +38,22 @@ export function ChordDetailModal({
   onEdit,
 }: ChordDetailModalProps) {
   const translateX = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
   const isNavigatingRef = useRef(false);
 
   // Reset animation when chord changes
   useEffect(() => {
     if (chord?.id) {
-      // Reset position instantly without animation to prevent getting stuck
+      // Reset position instantly, then animate entrance
       translateX.value = 0;
+      scale.value = 0.95;
+      opacity.value = 0;
+      
+      // Animate entrance
+      scale.value = withSpring(1, { damping: 20, stiffness: 300 });
+      opacity.value = withTiming(1, { duration: 200 });
+      
       isNavigatingRef.current = false;
     }
   }, [chord?.id]);
@@ -57,9 +66,16 @@ export function ChordDetailModal({
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
+      'worklet';
       translateX.value = event.translationX;
+      
+      // Animate scale and opacity based on swipe progress
+      const progress = Math.abs(event.translationX) / SCREEN_WIDTH;
+      scale.value = 1 - progress * 0.15; // Scale down to 0.85
+      opacity.value = 1 - progress * 0.5; // Fade to 0.5
     })
     .onEnd((event) => {
+      'worklet';
       const shouldNavigateNext = 
         (event.translationX < -SWIPE_THRESHOLD || event.velocityX < -SWIPE_VELOCITY) &&
         currentIndex < allChords.length - 1;
@@ -78,6 +94,8 @@ export function ChordDetailModal({
             }
           }
         );
+        scale.value = withTiming(0.85, { duration: 250 });
+        opacity.value = withTiming(0, { duration: 250 });
       } else if (shouldNavigatePrev) {
         translateX.value = withTiming(
           SCREEN_WIDTH,
@@ -88,13 +106,21 @@ export function ChordDetailModal({
             }
           }
         );
+        scale.value = withTiming(0.85, { duration: 250 });
+        opacity.value = withTiming(0, { duration: 250 });
       } else {
         translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+        scale.value = withSpring(1, { damping: 20, stiffness: 200 });
+        opacity.value = withSpring(1, { damping: 20, stiffness: 200 });
       }
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [
+      { translateX: translateX.value },
+      { scale: scale.value },
+    ],
+    opacity: opacity.value,
   }));
 
   if (!chord) return null;
@@ -412,6 +438,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: spacing.lg,
+    marginLeft: -16, // Move left by 2 letter widths
   },
   diagramRow: {
     flexDirection: 'row',
