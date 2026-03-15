@@ -367,6 +367,7 @@ export default function ChordManagerScreen() {
   };
 
   const handleShapeSelect = (shape: 'circle' | 'diamond') => {
+    // Only change the shape mode - don't modify existing chord
     setDotShape(shape);
     // Set default color for shape
     if (shape === 'circle') {
@@ -549,10 +550,10 @@ export default function ChordManagerScreen() {
           1. Choose Circle or Diamond   2. Tap fret to place   3. Select finger from popup
         </Text>
 
-        {/* String markers (mute/open) */}
-        <View style={styles.stringMarkers}>
+        {/* String markers positioned over strings */}
+        <View style={[styles.stringMarkers, { width: 216, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
-            <View key={i} style={[styles.stringMarkerColumn, { left: i * STRING_SPACING }]}>
+            <View key={i} style={[styles.stringMarkerColumn, { left: i * STRING_SPACING - 12 }]}>
               <Text style={styles.stringNote}>{note}</Text>
               <Pressable 
                 onPress={() => handleStringMarkerTap(i, 'mute')}
@@ -922,7 +923,11 @@ export default function ChordManagerScreen() {
               <Text style={styles.previewName}>{editingChord.fullName}</Text>
             </View>
             <View style={styles.fretboardWrapper}>
-              <Fretboard chord={editingChord} size="lg" />
+              <Fretboard 
+                key={`${JSON.stringify(editingChord.positions)}-${JSON.stringify(editingChord.fingers)}`}
+                chord={editingChord} 
+                size="lg" 
+              />
             </View>
           </View>
         </View>
@@ -1544,6 +1549,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     gap: 4,
+    width: 24,
   },
   stringNote: {
     fontSize: 12,
