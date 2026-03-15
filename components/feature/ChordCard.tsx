@@ -46,9 +46,9 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
   // Render fretboard diagram (smaller for card view)
   const renderFretboard = () => {
     const STRINGS = 6;
-    const FRETS = 4;
-    const DIAGRAM_WIDTH = 60;
-    const DIAGRAM_HEIGHT = 75;
+    const FRETS = 5; // Match detail page
+    const DIAGRAM_WIDTH = 66; // Scaled proportionally
+    const DIAGRAM_HEIGHT = 88; // Scaled proportionally to match 5 frets
     const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1);
     const FRET_SPACING = DIAGRAM_HEIGHT / FRETS;
 
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
 
   // Fretboard
   diagramSection: {
-    width: 70,
+    width: 80,
   },
   fretboardContainer: {
     position: 'relative',
