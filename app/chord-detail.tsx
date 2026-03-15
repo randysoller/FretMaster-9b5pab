@@ -183,23 +183,11 @@ export default function ChordDetailScreen() {
           </View>
         </View>
 
-        {/* Buttons */}
+        {/* Play Button - Centered */}
         <View style={styles.buttons}>
           <Pressable style={styles.playButton} onPress={() => playChord(chord)}>
             <MaterialIcons name="play-arrow" size={20} color="#000" />
             <Text style={styles.playButtonText}>Play</Text>
-          </Pressable>
-          <Pressable style={styles.editButton} onPress={() => {
-            router.push({
-              pathname: '/chord-manager' as any,
-              params: {
-                editChordId: chord.id,
-                editChordData: JSON.stringify(chord),
-              },
-            });
-          }}>
-            <MaterialIcons name="edit" size={18} color="#888" />
-            <Text style={styles.editButtonText}>Edit</Text>
           </Pressable>
         </View>
 
@@ -474,17 +462,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttons: {
-    flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'center',
     marginBottom: spacing.lg,
   },
   playButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl * 2,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
   },
@@ -493,21 +480,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000',
   },
-  editButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    backgroundColor: '#2A2A2A',
-    borderRadius: borderRadius.md,
-  },
-  editButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#888',
-  },
+
   fingerPositionsSection: {
     backgroundColor: '#0F0F0F',
     borderRadius: borderRadius.md,

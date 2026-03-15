@@ -109,6 +109,7 @@ export default function ChordLibraryScreen() {
 
       {/* Preset Selector */}
       <View style={styles.presetRow}>
+        <Text style={styles.presetLabel}>Practice Preset:</Text>
         <PresetDropdown />
       </View>
 
@@ -301,8 +302,16 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
+  },
+  presetLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
   },
   searchContainer: {
     flexDirection: 'row',

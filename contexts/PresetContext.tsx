@@ -11,6 +11,7 @@ export interface ChordPreset {
 interface PresetContextType {
   presets: ChordPreset[];
   addPreset: (name: string, chordIds: string[]) => Promise<string>;
+  updatePreset: (id: string, chordIds: string[]) => void;
   removePreset: (id: string) => void;
   renamePreset: (id: string, name: string) => void;
   reorderPreset: (fromIndex: number, toIndex: number) => void;
@@ -66,6 +67,12 @@ export function PresetProvider({ children }: { children: ReactNode }) {
     return id;
   };
 
+  const updatePreset = (id: string, chordIds: string[]) => {
+    setPresets(prev =>
+      prev.map((p) => (p.id === id ? { ...p, chordIds } : p))
+    );
+  };
+
   const removePreset = (id: string) => {
     setPresets(prev => prev.filter((p) => p.id !== id));
   };
@@ -98,6 +105,7 @@ export function PresetProvider({ children }: { children: ReactNode }) {
       value={{
         presets,
         addPreset,
+        updatePreset,
         removePreset,
         renamePreset,
         reorderPreset,

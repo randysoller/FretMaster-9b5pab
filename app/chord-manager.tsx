@@ -61,7 +61,7 @@ const DOT_COLORS = [
 export default function ChordManagerScreen() {
   const router = useRouter();
   const { isAdmin } = useAuth();
-  const { presets, addPreset } = usePresets();
+  const { presets, addPreset, updatePreset } = usePresets();
 
   // State
   const [chords, setChords] = useState<ChordData[]>([...CHORDS]);
@@ -1368,15 +1368,17 @@ export default function ChordManagerScreen() {
                   {presets.map((preset) => (
                     <Pressable
                       key={preset.id}
-                      onPress={async () => {
+                      onPress={() => {
                         if (editingChord?.id) {
                           const updatedChordIds = [...preset.chordIds];
                           if (!updatedChordIds.includes(editingChord.id)) {
                             updatedChordIds.push(editingChord.id);
+                            updatePreset(preset.id, updatedChordIds);
+                            Alert.alert('Success', `Added to "${preset.name}"`);
+                            setShowPresetModal(false);
+                          } else {
+                            Alert.alert('Already Added', `This chord is already in "${preset.name}"`);
                           }
-                          await addPreset(preset.name, updatedChordIds);
-                          Alert.alert('Success', `Added to "${preset.name}"`);
-                          setShowPresetModal(false);
                         }
                       }}
                       style={styles.modalButton}
