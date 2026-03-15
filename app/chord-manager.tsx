@@ -21,7 +21,6 @@ const FINGER_OPTIONS = [
   { value: -1, label: '–' }, // Delete
   { value: -2, label: 'O' }, // Open
   { value: -3, label: 'X' }, // Mute
-  { value: -4, label: 'Barre' }, // Barre chord
 ];
 
 const SHAPE_OPTIONS = [
@@ -86,9 +85,6 @@ export default function ChordManagerScreen() {
   const [dotShape, setDotShape] = useState<'circle' | 'diamond'>('circle');
   const [dotShapes, setDotShapes] = useState<('circle' | 'diamond')[]>(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
   const [dotColors, setDotColors] = useState<string[]>(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
-  const [isBarre, setIsBarre] = useState(false);
-  const [barreMode, setBarreMode] = useState(false);
-  const [barreSelection, setBarreSelection] = useState<Array<{ stringIndex: number; fret: number }>>([]);
   
   // Dropdown collapse states
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -122,6 +118,33 @@ export default function ChordManagerScreen() {
     const matchesType = filterType === 'all' || chord.type === filterType;
     return matchesSearch && matchesShape && matchesType;
   });
+
+  // Auto-detect barres: find dots on same fret with same finger number
+  const detectBarres = (positions: number[], fingers: number[]) => {
+    const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
+    const fretMap: { [key: string]: number[] } = {};
+
+    // Group strings by fret and finger
+    positions.forEach((fret, stringIndex) => {
+      if (fret > 0 && fingers[stringIndex] > 0) {
+        const key = `${fret}-${fingers[stringIndex]}`;
+        if (!fretMap[key]) fretMap[key] = [];
+        fretMap[key].push(stringIndex);
+      }
+    });
+
+    // Create barre for groups with 2+ strings
+    Object.entries(fretMap).forEach(([key, strings]) => {
+      if (strings.length >= 2) {
+        const [fret, finger] = key.split('-').map(Number);
+        const fromString = Math.min(...strings);
+        const toString = Math.max(...strings);
+        barres.push({ fret, fromString, toString, finger });
+      }
+    });
+
+    return barres;
+  };
 
   // Handlers
   const handleSelectChord = (chordId: string) => {
@@ -162,8 +185,6 @@ export default function ChordManagerScreen() {
     setDotShapes(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
     setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
     setSelectedFinger(1);
-    setBarreMode(false);
-    setBarreSelection([]);
     setViewMode('editor');
   };
 
@@ -177,8 +198,6 @@ export default function ChordManagerScreen() {
     setDotShapes(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
     setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
     setSelectedFinger(1);
-    setBarreMode(false);
-    setBarreSelection([]);
     setViewMode('editor');
   };
 
@@ -227,8 +246,6 @@ export default function ChordManagerScreen() {
   const handleCancelEdit = () => {
     setEditingChord(null);
     setIsNewChord(false);
-    setBarreMode(false);
-    setBarreSelection([]);
     setViewMode('list');
   };
 
@@ -314,91 +331,11 @@ export default function ChordManagerScreen() {
     }
   };
 
-  // Visual editor handlers - NEW WORKFLOW
+  // Visual editor handlers
   const handleFretboardTap = (stringIndex: number, fretIndex: number) => {
     if (!editingChord) return;
 
-    // Handle barre mode
-    if (barreMode) {
-      const actualFret = fretIndex === 0 ? 0 : baseFret + fretIndex - 1;
-      
-      if (barreSelection.length === 0) {
-        // First position - record it
-        setBarreSelection([{ stringIndex, fret: actualFret }]);
-        Alert.alert('First Position Set', 'Now tap the last string position for the barre.');
-      } else {
-        // Second position - create barre
-        const firstPos = barreSelection[0];
-        
-        if (firstPos.fret !== actualFret) {
-          Alert.alert('Error', 'Both positions must be on the same fret for a barre chord.');
-          setBarreMode(false);
-          setBarreSelection([]);
-          return;
-        }
-
-        // Prompt for finger number
-        Alert.prompt(
-          'Barre Finger Number',
-          'Enter finger number (1-4) for this barre:',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => {
-              setBarreMode(false);
-              setBarreSelection([]);
-            }},
-            { text: 'OK', onPress: (fingerStr) => {
-              const finger = parseInt(fingerStr || '1', 10);
-              if (finger < 1 || finger > 4) {
-                Alert.alert('Error', 'Finger number must be between 1 and 4');
-                setBarreMode(false);
-                setBarreSelection([]);
-                return;
-              }
-
-              // Create barre
-              const fromString = Math.min(firstPos.stringIndex, stringIndex);
-              const toString = Math.max(firstPos.stringIndex, stringIndex);
-              
-              const newPositions = [...editingChord.positions];
-              const newFingers = [...editingChord.fingers];
-              const newShapes = [...dotShapes];
-              const newColors = [...dotColors];
-              
-              // Set all strings in range to same fret and finger
-              for (let i = fromString; i <= toString; i++) {
-                newPositions[i] = actualFret;
-                newFingers[i] = finger;
-                newShapes[i] = modalSelectedShape;
-                newColors[i] = dotColor;
-              }
-
-              // Add barre to chord data
-              const newBarres = editingChord.barres || [];
-              newBarres.push({ fret: actualFret, fromString, toString, finger });
-
-              setEditingChord({
-                ...editingChord,
-                positions: newPositions,
-                fingers: newFingers,
-                barres: newBarres,
-                baseFret,
-              });
-              setDotShapes(newShapes);
-              setDotColors(newColors);
-
-              Alert.alert('Success', `Barre created on fret ${actualFret}`);
-              setBarreMode(false);
-              setBarreSelection([]);
-            }}
-          ],
-          'plain-text',
-          '1'
-        );
-      }
-      return;
-    }
-
-    // Normal mode: Step 2: User tapped - show finger selection modal with current shape
+    // Show finger selection modal
     setPendingDotPosition({ stringIndex, fretIndex });
     setModalSelectedShape(dotShape); // Use current shape as default
     // Set default color based on shape when opening modal
@@ -437,18 +374,6 @@ export default function ChordManagerScreen() {
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
       // Note: X markers are rendered separately in the topMarkers section
-    } else if (fingerValue === -4) {
-      // Barre: Enter barre mode
-      setBarreMode(true);
-      setBarreSelection([]);
-      Alert.alert(
-        'Barre Mode Active',
-        'Tap the first string position, then tap the last string position to create a barre. Both positions must be on the same fret.',
-        [{ text: 'OK' }]
-      );
-      setShowFingerModal(false);
-      setPendingDotPosition(null);
-      return;
     } else {
       // Normal finger placement - save shape and color for THIS dot
       newPositions[stringIndex] = actualFret;
@@ -663,15 +588,15 @@ export default function ChordManagerScreen() {
     if (!editingChord) return null;
 
     const STRINGS = 6;
-    const STRING_SPACING = 40; // Increased from 36 to 40 for better spacing
+    const STRING_SPACING = 40;
     const FRET_SPACING = 50;
     const PREVIEW_FRETS = 5;
-    const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1); // Now 200px (40 * 5)
-    const PREVIEW_STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8]; // Increased thickness for better visibility - low E (thickest) to high e (thinnest)
+    const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
+    const PREVIEW_STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
     return (
       <View style={styles.previewFretboardGrid}>
-        {/* Fret marker inlays (3rd, 5th, 7th, 9th, 12th) */}
+        {/* Fret marker inlays */}
         {Array.from({ length: PREVIEW_FRETS }).map((_, i) => {
           const absoluteFret = baseFret + i;
           const inlayR = 4;
@@ -701,7 +626,7 @@ export default function ChordManagerScreen() {
           );
         })}
 
-        {/* Fret lines - exact width to match strings */}
+        {/* Fret lines */}
         {Array.from({ length: PREVIEW_FRETS + 1 }).map((_, i) => (
           <View 
             key={`preview-fret-${i}`}
@@ -713,7 +638,7 @@ export default function ChordManagerScreen() {
           />
         ))}
 
-        {/* String lines with realistic thickness (low E thickest → high e thinnest) */}
+        {/* String lines */}
         {Array.from({ length: STRINGS }).map((_, i) => (
           <View 
             key={`preview-string-${i}`}
@@ -721,12 +646,12 @@ export default function ChordManagerScreen() {
           />
         ))}
 
-        {/* Mute (X) markers - render X for muted strings */}
+        {/* Mute (X) markers */}
         {editingChord.positions.map((fret, stringIndex) => {
-          if (fret !== -1) return null; // Only render for muted strings
+          if (fret !== -1) return null;
           const x = stringIndex * STRING_SPACING;
           const y = -22;
-          const size = 12; // Enlarged by 4 points (was 8)
+          const size = 12;
           return (
             <View key={`preview-mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
               <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 1.5 }} />
@@ -735,54 +660,105 @@ export default function ChordManagerScreen() {
           );
         })}
 
-        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT - Including open strings as outlined dots */}
-        {editingChord.positions.map((fret, stringIndex) => {
-          if (fret < 0) return null; // Skip muted strings
-          const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
-          if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
+        {/* Auto-detected barres */}
+        {(() => {
+          const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+          const barreRenderedStrings = new Set<number>();
 
-          const x = stringIndex * STRING_SPACING;
-          const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING; // Open strings above fretboard
-          const fingerNum = editingChord.fingers[stringIndex];
-          const thisShape = dotShapes[stringIndex]; // Use stored shape
-          const thisColor = dotColors[stringIndex]; // Use stored color
-          const isOpenString = fret === 0;
+          return detectedBarres.map((barre, idx) => {
+            const fretIndex = barre.fret - baseFret + 1;
+            if (fretIndex < 1 || fretIndex > PREVIEW_FRETS) return null;
 
-          return (
-            <View
-              key={`preview-dot-${stringIndex}`}
-              style={[
-                styles.previewFretDot,
-                { left: x - 16, top: y - 16 },
-              ]}
-            >
-              {thisShape === 'circle' ? (
-                <View style={[
-                  styles.previewDotCircle, 
-                  isOpenString 
-                    ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
-                    : { backgroundColor: thisColor }
-                ]}>
-                  {fingerNum > 0 && (
-                    <Text style={styles.previewDotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
-                  )}
-                </View>
-              ) : (
-                <>
+            const y = (fretIndex - 0.5) * FRET_SPACING;
+            const fromX = barre.fromString * STRING_SPACING;
+            const toX = barre.toString * STRING_SPACING;
+            const barreWidth = toX - fromX;
+
+            // Mark these strings as barre-rendered
+            for (let s = barre.fromString; s <= barre.toString; s++) {
+              barreRenderedStrings.add(s);
+            }
+
+            return (
+              <View
+                key={`preview-barre-${idx}`}
+                style={{
+                  position: 'absolute',
+                  left: fromX - 12,
+                  top: y - 12,
+                  width: barreWidth + 24,
+                  height: 24,
+                  backgroundColor: '#D4952A',
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={styles.previewDotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
+              </View>
+            );
+          });
+        })()}
+
+        {/* Dots */}
+        {(() => {
+          const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+          const barreRenderedStrings = new Set<number>();
+          detectedBarres.forEach(barre => {
+            for (let s = barre.fromString; s <= barre.toString; s++) {
+              barreRenderedStrings.add(s);
+            }
+          });
+
+          return editingChord.positions.map((fret, stringIndex) => {
+            if (fret < 0) return null;
+            if (barreRenderedStrings.has(stringIndex)) return null;
+            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+            if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
+
+            const x = stringIndex * STRING_SPACING;
+            const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
+            const fingerNum = editingChord.fingers[stringIndex];
+            const thisShape = dotShapes[stringIndex];
+            const thisColor = dotColors[stringIndex];
+            const isOpenString = fret === 0;
+
+            return (
+              <View
+                key={`preview-dot-${stringIndex}`}
+                style={[
+                  styles.previewFretDot,
+                  { left: x - 16, top: y - 16 },
+                ]}
+              >
+                {thisShape === 'circle' ? (
                   <View style={[
-                    styles.previewDotDiamond, 
+                    styles.previewDotCircle, 
                     isOpenString 
                       ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
                       : { backgroundColor: thisColor }
-                  ]} />
-                  {fingerNum > 0 && (
-                    <Text style={styles.previewDiamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
-                  )}
-                </>
-              )}
-            </View>
-          );
-        })}
+                  ]}>
+                    {fingerNum > 0 && (
+                      <Text style={styles.previewDotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                    )}
+                  </View>
+                ) : (
+                  <>
+                    <View style={[
+                      styles.previewDotDiamond, 
+                      isOpenString 
+                        ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                        : { backgroundColor: thisColor }
+                    ]} />
+                    {fingerNum > 0 && (
+                      <Text style={styles.previewDiamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                    )}
+                  </>
+                )}
+              </View>
+            );
+          });
+        })()}
       </View>
     );
   };
@@ -792,10 +768,10 @@ export default function ChordManagerScreen() {
     if (!editingChord) return null;
 
     const STRINGS = 6;
-    const STRING_SPACING = 40; // Increased from 36 to 40 for better spacing
+    const STRING_SPACING = 40;
     const FRET_SPACING = 50;
-    const FRET_WIDTH = STRING_SPACING * (STRINGS - 1); // Now 200px (40 * 5)
-    const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8]; // Increased thickness for better visibility - low E (thickest) to high e (thinnest)
+    const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
+    const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
     return (
       <View style={styles.fretboardEditor}>
@@ -808,10 +784,10 @@ export default function ChordManagerScreen() {
         </View>
 
         <Text style={styles.fretboardInstructions}>
-          Tap string labels (E-A-D-G-B-E) or any fret position, then choose shape and finger from the popup
+          Tap string labels (E-A-D-G-B-E) or any fret position, then choose shape and finger from the popup. Barres appear automatically when 2+ dots share the same fret and finger.
         </Text>
 
-        {/* String labels - clickable E A D G B E */}
+        {/* String labels */}
         <View style={[styles.stringLabels, { width: 300, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
             <Pressable 
@@ -826,7 +802,7 @@ export default function ChordManagerScreen() {
 
         {/* Interactive Fretboard Grid */}
         <View style={styles.fretboardGrid}>
-          {/* Fret lines - exact width to match strings */}
+          {/* Fret lines */}
           {Array.from({ length: visibleFrets + 1 }).map((_, i) => (
             <View 
               key={`fret-${i}`}
@@ -838,7 +814,7 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* String lines with realistic thickness - low E thickest to high e thinnest */}
+          {/* String lines */}
           {Array.from({ length: STRINGS }).map((_, i) => (
             <View 
               key={`string-${i}`}
@@ -846,12 +822,12 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* Mute (X) markers - render X for muted strings */}
+          {/* Mute (X) markers */}
           {editingChord.positions.map((fret, stringIndex) => {
-            if (fret !== -1) return null; // Only render for muted strings
+            if (fret !== -1) return null;
             const x = stringIndex * STRING_SPACING;
             const y = -22;
-            const size = 12; // Enlarged by 4 points (was 8)
+            const size = 12;
             return (
               <View key={`mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
                 <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 1.5 }} />
@@ -860,54 +836,105 @@ export default function ChordManagerScreen() {
             );
           })}
 
-          {/* Dots - USE STORED SHAPE FOR EACH DOT - Including open strings as outlined dots */}
-          {editingChord.positions.map((fret, stringIndex) => {
-            if (fret < 0) return null; // Skip muted strings
-            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
-            if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
+          {/* Auto-detected barres */}
+          {(() => {
+            const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+            const barreRenderedStrings = new Set<number>();
 
-            const x = stringIndex * STRING_SPACING;
-            const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING; // Open strings above fretboard
-            const fingerNum = editingChord.fingers[stringIndex];
-            const thisShape = dotShapes[stringIndex]; // Use stored shape for THIS dot
-            const thisColor = dotColors[stringIndex]; // Use stored color for THIS dot
-            const isOpenString = fret === 0;
+            return detectedBarres.map((barre, idx) => {
+              const fretIndex = barre.fret - baseFret + 1;
+              if (fretIndex < 1 || fretIndex > visibleFrets) return null;
 
-            return (
-              <View
-                key={`dot-${stringIndex}`}
-                style={[
-                  styles.fretDot,
-                  { left: x - 16, top: y - 16 },
-                ]}
-              >
-                {thisShape === 'circle' ? (
-                  <View style={[
-                    styles.dotCircle, 
-                    isOpenString 
-                      ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
-                      : { backgroundColor: thisColor }
-                  ]}>
-                    {fingerNum > 0 && (
-                      <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
-                    )}
-                  </View>
-                ) : (
-                  <>
+              const y = (fretIndex - 0.5) * FRET_SPACING;
+              const fromX = barre.fromString * STRING_SPACING;
+              const toX = barre.toString * STRING_SPACING;
+              const barreWidth = toX - fromX;
+
+              // Mark these strings as barre-rendered
+              for (let s = barre.fromString; s <= barre.toString; s++) {
+                barreRenderedStrings.add(s);
+              }
+
+              return (
+                <View
+                  key={`barre-${idx}`}
+                  style={{
+                    position: 'absolute',
+                    left: fromX - 12,
+                    top: y - 12,
+                    width: barreWidth + 24,
+                    height: 24,
+                    backgroundColor: '#D4952A',
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={styles.dotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
+                </View>
+              );
+            });
+          })()}
+
+          {/* Dots */}
+          {(() => {
+            const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+            const barreRenderedStrings = new Set<number>();
+            detectedBarres.forEach(barre => {
+              for (let s = barre.fromString; s <= barre.toString; s++) {
+                barreRenderedStrings.add(s);
+              }
+            });
+
+            return editingChord.positions.map((fret, stringIndex) => {
+              if (fret < 0) return null;
+              if (barreRenderedStrings.has(stringIndex)) return null;
+              const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+              if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
+
+              const x = stringIndex * STRING_SPACING;
+              const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
+              const fingerNum = editingChord.fingers[stringIndex];
+              const thisShape = dotShapes[stringIndex];
+              const thisColor = dotColors[stringIndex];
+              const isOpenString = fret === 0;
+
+              return (
+                <View
+                  key={`dot-${stringIndex}`}
+                  style={[
+                    styles.fretDot,
+                    { left: x - 16, top: y - 16 },
+                  ]}
+                >
+                  {thisShape === 'circle' ? (
                     <View style={[
-                      styles.dotDiamond, 
+                      styles.dotCircle, 
                       isOpenString 
                         ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
                         : { backgroundColor: thisColor }
-                    ]} />
-                    {fingerNum > 0 && (
-                      <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
-                    )}
-                  </>
-                )}
-              </View>
-            );
-          })}
+                    ]}>
+                      {fingerNum > 0 && (
+                        <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                      )}
+                    </View>
+                  ) : (
+                    <>
+                      <View style={[
+                        styles.dotDiamond, 
+                        isOpenString 
+                          ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                          : { backgroundColor: thisColor }
+                      ]} />
+                      {fingerNum > 0 && (
+                        <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                      )}
+                    </>
+                  )}
+                </View>
+              );
+            });
+          })()}
 
           {/* Fret clickable areas */}
           {Array.from({ length: visibleFrets }).map((_, fretIndex) => 
@@ -1257,14 +1284,11 @@ export default function ChordManagerScreen() {
                     key={option.value}
                     onPress={() => handleFingerChoice(option.value)}
                     style={[
-                      option.value === -4 ? styles.fingerModalBarreButton : styles.fingerModalButton,
-                      modalSelectedShape === 'diamond' && option.value !== -4 && { backgroundColor: '#4DB8E8' }
+                      styles.fingerModalButton,
+                      modalSelectedShape === 'diamond' && { backgroundColor: '#4DB8E8' }
                     ]}
                   >
-                    <Text style={[
-                      styles.fingerModalButtonText,
-                      option.value === -4 && styles.fingerModalBarreText
-                    ]}>{option.label}</Text>
+                    <Text style={styles.fingerModalButtonText}>{option.label}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -1632,7 +1656,7 @@ const styles = StyleSheet.create({
   chordInfo: {
     flex: 1,
     gap: 2,
-    marginLeft: 80, // Move ~10 letter spaces to the right
+    marginLeft: 80,
   },
   chordName: {
     fontSize: 18,
@@ -1792,77 +1816,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     letterSpacing: 1,
   },
-  dotAppearanceSubtitle: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-    fontStyle: 'italic',
-  },
-  dotLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    letterSpacing: 1,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  colorPalette: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  colorButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  colorButtonActive: {
-    borderColor: colors.text,
-    borderWidth: 3,
-  },
-  shapeSelector: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  shapeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  shapeButtonActive: {
-    backgroundColor: colors.primary + '20',
-    borderColor: colors.primary,
-  },
-  shapeCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-  },
-  shapeDiamond: {
-    width: 12,
-    height: 12,
-    backgroundColor: '#4DB8E8',
-    transform: [{ rotate: '45deg' }],
-  },
-  shapeButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  shapeButtonTextActive: {
-    color: colors.primary,
-  },
   fretboardEditor: {
     padding: spacing.lg,
     backgroundColor: '#0F0F0F',
@@ -1917,7 +1870,7 @@ const styles = StyleSheet.create({
   },
   fretboardGrid: {
     position: 'relative',
-    width: 300, // Increased to 300 to ensure all 6 strings (including B and high e) are fully visible
+    width: 300,
     height: 300,
     marginVertical: spacing.lg,
     alignSelf: 'center',
@@ -2063,16 +2016,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.md,
   },
-  fretboardWrapper: {
-    marginVertical: spacing.md,
-  },
-  // Preview Fretboard Styles - EXACT MATCH to interactive
   previewFretboardContainer: {
     marginTop: spacing.md,
   },
   previewFretboardGrid: {
     position: 'relative',
-    width: 300, // Increased to 300 to ensure all 6 strings (including B and high e) are fully visible
+    width: 300,
     height: 250,
     alignSelf: 'center',
   },
@@ -2187,7 +2136,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textMuted,
   },
-  // Finger Selection Modal
   fingerModalContent: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
@@ -2257,21 +2205,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#000',
-  },
-  fingerModalBarreButton: {
-    width: 130,
-    height: 60,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  fingerModalBarreText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.primary,
   },
   saveToPresetButton: {
     flexDirection: 'row',
