@@ -328,6 +328,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
+    overflow: 'visible',
   },
   circleNumber: {
     color: '#000',
@@ -338,6 +339,11 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',
+    includeFontPadding: false,
+    width: 16,
+    height: 16,
+    lineHeight: 16,
     transform: [{ rotate: '-45deg' }], // Counter-rotate to make number vertical
   },
 

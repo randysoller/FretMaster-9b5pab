@@ -411,6 +411,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
+    overflow: 'visible',
   },
   circleNumber: {
     color: '#000',
@@ -421,6 +422,11 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 18,
     fontWeight: '700',
+    textAlign: 'center',
+    includeFontPadding: false,
+    width: 24,
+    height: 24,
+    lineHeight: 24,
     transform: [{ rotate: '-45deg' }],
   },
   stringNotationBox: {
