@@ -43,7 +43,8 @@ export function ChordDetailModal({
   // Reset animation when chord changes
   useEffect(() => {
     if (chord?.id) {
-      translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+      // Reset position instantly without animation to prevent getting stuck
+      translateX.value = 0;
       isNavigatingRef.current = false;
     }
   }, [chord?.id]);

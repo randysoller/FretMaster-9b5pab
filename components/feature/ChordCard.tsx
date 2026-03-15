@@ -346,7 +346,9 @@ const styles = StyleSheet.create({
   infoSection: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 2,
+    paddingLeft: 32, // 4 letter widths to the right
   },
   chordLetter: {
     fontSize: 36,
@@ -354,6 +356,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     lineHeight: 40,
     marginBottom: -4,
+    textAlign: 'center',
   },
   chordCategory: {
     fontSize: 9,
@@ -361,11 +364,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   chordFullName: {
     fontSize: 13,
     color: '#AAA',
     fontWeight: '400',
+    textAlign: 'center',
   },
   
   // String notation box
