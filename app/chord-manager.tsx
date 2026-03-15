@@ -88,7 +88,7 @@ export default function ChordManagerScreen() {
   const [dotColors, setDotColors] = useState<string[]>(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
   const [isBarre, setIsBarre] = useState(false);
   const [barreMode, setBarreMode] = useState(false);
-  const [barreSelection, setBarreSelection] = useState<number[]>([]);
+  const [barreSelection, setBarreSelection] = useState<Array<{ stringIndex: number; fret: number }>>([]);
   
   // Dropdown collapse states
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);

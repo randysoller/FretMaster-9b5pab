@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
 import { PresetDropdown } from '@/components/feature/PresetDropdown';
+import { usePresets } from '@/contexts/PresetContext';
 import { CHORD_DATA, ChordData, ChordShape, BarreRoot } from '@/constants/musicData';
 import { useChordLibrary } from '@/contexts/ChordLibraryContext';
 import { colors, spacing, borderRadius } from '@/constants/theme';
@@ -24,6 +25,7 @@ const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
 
 export default function ChordLibraryScreen() {
   const router = useRouter();
+  const { presets } = usePresets();
   
   const {
     filterCategories,
@@ -31,6 +33,7 @@ export default function ChordLibraryScreen() {
     filterBarreRoots,
     searchQuery,
     selectedChordIds,
+    activeLibraryPresetId,
     toggleCategory,
     toggleBarreRoot,
     setSearchQuery,
@@ -40,7 +43,18 @@ export default function ChordLibraryScreen() {
   } = useChordLibrary();
 
   const filteredChords = useMemo(() => {
-    return CHORD_DATA.filter(chord => {
+    let result = CHORD_DATA;
+
+    // If a preset is active, filter by preset chords first
+    if (activeLibraryPresetId) {
+      const activePreset = presets.find(p => p.id === activeLibraryPresetId);
+      if (activePreset) {
+        result = CHORD_DATA.filter(chord => activePreset.chordIds.includes(chord.id!));
+      }
+    }
+
+    // Then apply other filters
+    return result.filter(chord => {
       if (searchQuery && !chord.fullName.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
@@ -58,7 +72,7 @@ export default function ChordLibraryScreen() {
       }
       return true;
     });
-  }, [searchQuery, filterCategories, filterTypes, filterBarreRoots]);
+  }, [searchQuery, filterCategories, filterTypes, filterBarreRoots, activeLibraryPresetId, presets]);
   
   const showBarreRootFilter = filterCategories.includes('barre') || filterCategories.includes('movable');
   const hasActiveFilters = filterCategories.length > 0 || filterTypes.length > 0 || filterBarreRoots.length > 0 || searchQuery.length > 0;
