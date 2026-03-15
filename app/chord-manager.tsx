@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components';
 import { Fretboard } from '@/components/feature/Fretboard';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
@@ -11,6 +12,8 @@ import { ChordData, ChordShape, ChordType, ALL_CHORD_TYPES, CHORD_TYPE_LABELS, C
 import { supabase } from '@/services/supabaseClient';
 
 type ViewMode = 'list' | 'editor';
+
+const STORAGE_KEY = 'fretmaster-chord-manager-edits';
 
 const FINGER_OPTIONS = [
   { value: 1, label: '1' },
@@ -63,7 +66,7 @@ export default function ChordManagerScreen() {
   const { presets, addPreset, updatePreset } = usePresets();
 
   // State
-  const [chords, setChords] = useState<ChordData[]>([...CHORDS]);
+  const [chords, setChords] = useState<ChordData[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterShape, setFilterShape] = useState<ChordShape | 'all'>('all');
@@ -95,6 +98,18 @@ export default function ChordManagerScreen() {
   const [pendingDotPosition, setPendingDotPosition] = useState<{ stringIndex: number; fretIndex: number } | null>(null);
   const [modalSelectedShape, setModalSelectedShape] = useState<'circle' | 'diamond'>('circle');
 
+  // Load chords from storage on mount
+  useEffect(() => {
+    loadChords();
+  }, []);
+
+  // Save chords whenever they change
+  useEffect(() => {
+    if (chords.length > 0) {
+      saveChords();
+    }
+  }, [chords]);
+
   // Redirect non-admins
   useEffect(() => {
     if (!isAdmin) {
@@ -105,6 +120,38 @@ export default function ChordManagerScreen() {
       );
     }
   }, [isAdmin]);
+
+  const loadChords = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const editedChords = JSON.parse(stored);
+        // Merge edited chords with original CHORDS
+        const mergedChords = [...CHORDS].map(originalChord => {
+          const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
+          return editedChord || originalChord;
+        });
+        // Add any new chords that don't exist in CHORDS
+        const newChords = editedChords.filter((c: ChordData) => 
+          !CHORDS.some(original => original.id === c.id)
+        );
+        setChords([...mergedChords, ...newChords]);
+      } else {
+        setChords([...CHORDS]);
+      }
+    } catch (error) {
+      console.error('Failed to load chords:', error);
+      setChords([...CHORDS]);
+    }
+  };
+
+  const saveChords = async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(chords));
+    } catch (error) {
+      console.error('Failed to save chords:', error);
+    }
+  };
 
   if (!isAdmin) {
     return null;
@@ -691,12 +738,8 @@ export default function ChordManagerScreen() {
                   height: 18,
                   backgroundColor: '#D4952A',
                   borderRadius: 9,
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
-              >
-                <Text style={styles.previewDotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
-              </View>
+              />
             );
           });
         })()}
@@ -858,12 +901,8 @@ export default function ChordManagerScreen() {
                     height: 18,
                     backgroundColor: '#D4952A',
                     borderRadius: 9,
-                    alignItems: 'center',
-                    justifyContent: 'center',
                   }}
-                >
-                  <Text style={styles.dotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
-                </View>
+                />
               );
             });
           })()}
