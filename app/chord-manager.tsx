@@ -21,6 +21,7 @@ const FINGER_OPTIONS = [
   { value: -1, label: '–' }, // Delete
   { value: -2, label: 'O' }, // Open
   { value: -3, label: 'X' }, // Mute
+  { value: -4, label: 'Barre' }, // Barre chord
 ];
 
 const SHAPE_OPTIONS = [
@@ -317,7 +318,87 @@ export default function ChordManagerScreen() {
   const handleFretboardTap = (stringIndex: number, fretIndex: number) => {
     if (!editingChord) return;
 
-    // Step 2: User tapped - show finger selection modal with current shape
+    // Handle barre mode
+    if (barreMode) {
+      const actualFret = fretIndex === 0 ? 0 : baseFret + fretIndex - 1;
+      
+      if (barreSelection.length === 0) {
+        // First position - record it
+        setBarreSelection([{ stringIndex, fret: actualFret }]);
+        Alert.alert('First Position Set', 'Now tap the last string position for the barre.');
+      } else {
+        // Second position - create barre
+        const firstPos = barreSelection[0];
+        
+        if (firstPos.fret !== actualFret) {
+          Alert.alert('Error', 'Both positions must be on the same fret for a barre chord.');
+          setBarreMode(false);
+          setBarreSelection([]);
+          return;
+        }
+
+        // Prompt for finger number
+        Alert.prompt(
+          'Barre Finger Number',
+          'Enter finger number (1-4) for this barre:',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => {
+              setBarreMode(false);
+              setBarreSelection([]);
+            }},
+            { text: 'OK', onPress: (fingerStr) => {
+              const finger = parseInt(fingerStr || '1', 10);
+              if (finger < 1 || finger > 4) {
+                Alert.alert('Error', 'Finger number must be between 1 and 4');
+                setBarreMode(false);
+                setBarreSelection([]);
+                return;
+              }
+
+              // Create barre
+              const fromString = Math.min(firstPos.stringIndex, stringIndex);
+              const toString = Math.max(firstPos.stringIndex, stringIndex);
+              
+              const newPositions = [...editingChord.positions];
+              const newFingers = [...editingChord.fingers];
+              const newShapes = [...dotShapes];
+              const newColors = [...dotColors];
+              
+              // Set all strings in range to same fret and finger
+              for (let i = fromString; i <= toString; i++) {
+                newPositions[i] = actualFret;
+                newFingers[i] = finger;
+                newShapes[i] = modalSelectedShape;
+                newColors[i] = dotColor;
+              }
+
+              // Add barre to chord data
+              const newBarres = editingChord.barres || [];
+              newBarres.push({ fret: actualFret, fromString, toString, finger });
+
+              setEditingChord({
+                ...editingChord,
+                positions: newPositions,
+                fingers: newFingers,
+                barres: newBarres,
+                baseFret,
+              });
+              setDotShapes(newShapes);
+              setDotColors(newColors);
+
+              Alert.alert('Success', `Barre created on fret ${actualFret}`);
+              setBarreMode(false);
+              setBarreSelection([]);
+            }}
+          ],
+          'plain-text',
+          '1'
+        );
+      }
+      return;
+    }
+
+    // Normal mode: Step 2: User tapped - show finger selection modal with current shape
     setPendingDotPosition({ stringIndex, fretIndex });
     setModalSelectedShape(dotShape); // Use current shape as default
     // Set default color based on shape when opening modal
@@ -356,6 +437,18 @@ export default function ChordManagerScreen() {
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
       // Note: X markers are rendered separately in the topMarkers section
+    } else if (fingerValue === -4) {
+      // Barre: Enter barre mode
+      setBarreMode(true);
+      setBarreSelection([]);
+      Alert.alert(
+        'Barre Mode Active',
+        'Tap the first string position, then tap the last string position to create a barre. Both positions must be on the same fret.',
+        [{ text: 'OK' }]
+      );
+      setShowFingerModal(false);
+      setPendingDotPosition(null);
+      return;
     } else {
       // Normal finger placement - save shape and color for THIS dot
       newPositions[stringIndex] = actualFret;
@@ -1163,9 +1256,15 @@ export default function ChordManagerScreen() {
                   <Pressable
                     key={option.value}
                     onPress={() => handleFingerChoice(option.value)}
-                    style={[styles.fingerModalButton, modalSelectedShape === 'diamond' && { backgroundColor: '#4DB8E8' }]}
+                    style={[
+                      option.value === -4 ? styles.fingerModalBarreButton : styles.fingerModalButton,
+                      modalSelectedShape === 'diamond' && option.value !== -4 && { backgroundColor: '#4DB8E8' }
+                    ]}
                   >
-                    <Text style={styles.fingerModalButtonText}>{option.label}</Text>
+                    <Text style={[
+                      styles.fingerModalButtonText,
+                      option.value === -4 && styles.fingerModalBarreText
+                    ]}>{option.label}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -2150,6 +2249,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#000',
+  },
+  fingerModalBarreButton: {
+    width: 130,
+    height: 60,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  fingerModalBarreText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
   },
   saveToPresetButton: {
     flexDirection: 'row',
