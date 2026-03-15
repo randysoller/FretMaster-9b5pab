@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
 import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
@@ -128,8 +127,7 @@ export default function LibraryScreen() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Chord Library</Text>
@@ -310,8 +308,7 @@ export default function LibraryScreen() {
           onPlay={handlePlayChord}
           onEdit={handleEditChord}
         />
-      </View>
-    </GestureHandlerRootView>
+    </View>
   );
 }
 
