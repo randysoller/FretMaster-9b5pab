@@ -6,6 +6,7 @@ import { Screen } from '@/components';
 import { Fretboard } from '@/components/feature/Fretboard';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { usePresets } from '@/contexts/PresetContext';
 import { ChordData, ChordShape, ChordType, ALL_CHORD_TYPES, CHORD_TYPE_LABELS, CATEGORY_LABELS, STANDARD_TUNING, CHORDS } from '@/constants/musicData';
 import { supabase } from '@/services/supabaseClient';
 
@@ -59,6 +60,7 @@ const DOT_COLORS = [
 export default function ChordManagerScreen() {
   const router = useRouter();
   const { isAdmin } = useAuth();
+  const { presets, addPreset } = usePresets();
 
   // State
   const [chords, setChords] = useState<ChordData[]>([...CHORDS]);
@@ -71,6 +73,8 @@ export default function ChordManagerScreen() {
   const [isNewChord, setIsNewChord] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
 
   // Visual editor state
   const [baseFret, setBaseFret] = useState(1);
@@ -629,11 +633,11 @@ export default function ChordManagerScreen() {
           if (fret !== -1) return null; // Only render for muted strings
           const x = stringIndex * STRING_SPACING;
           const y = -22;
-          const size = 8;
+          const size = 12; // Enlarged by 4 points (was 8)
           return (
             <View key={`preview-mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
-              <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 0.75 }} />
-              <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 0.75 }} />
+              <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 1.5 }} />
+              <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 1.5 }} />
             </View>
           );
         })}
@@ -715,7 +719,7 @@ export default function ChordManagerScreen() {
         </Text>
 
         {/* String labels - clickable E A D G B E */}
-        <View style={[styles.stringLabels, { width: 216, marginLeft: 0, alignSelf: 'center' }]}>
+        <View style={[styles.stringLabels, { width: 260, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
             <Pressable 
               key={i} 
@@ -754,11 +758,11 @@ export default function ChordManagerScreen() {
             if (fret !== -1) return null; // Only render for muted strings
             const x = stringIndex * STRING_SPACING;
             const y = -22;
-            const size = 8;
+            const size = 12; // Enlarged by 4 points (was 8)
             return (
               <View key={`mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
-                <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 0.75 }} />
-                <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 0.75 }} />
+                <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 1.5 }} />
+                <View style={{ position: 'absolute', width: size * 2, height: 3, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 1.5 }} />
               </View>
             );
           })}
@@ -1017,6 +1021,11 @@ export default function ChordManagerScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionsSection}>
+          <Pressable onPress={() => setShowPresetModal(true)} style={styles.saveToPresetButton}>
+            <MaterialIcons name="bookmark" size={20} color={colors.primary} />
+            <Text style={styles.saveToPresetButtonText}>Save to Preset</Text>
+          </Pressable>
+
           <Pressable onPress={handleSaveEdit} style={styles.updateButton}>
             <MaterialIcons name="save" size={20} color="#000" />
             <Text style={styles.updateButtonText}>
@@ -1228,6 +1237,91 @@ export default function ChordManagerScreen() {
               </Pressable>
 
               <Pressable onPress={() => setShowExportMenu(false)} style={styles.modalCancelButton}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+
+        {/* Save to Preset Modal */}
+        <Modal
+          visible={showPresetModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setShowPresetModal(false);
+            setNewPresetName('');
+          }}
+        >
+          <Pressable 
+            style={styles.modalOverlay} 
+            onPress={() => {
+              setShowPresetModal(false);
+              setNewPresetName('');
+            }}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Save Chord to Preset</Text>
+              
+              {presets.length > 0 && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Existing Presets</Text>
+                  {presets.map((preset) => (
+                    <Pressable
+                      key={preset.id}
+                      onPress={async () => {
+                        if (editingChord?.id) {
+                          const updatedChordIds = [...preset.chordIds];
+                          if (!updatedChordIds.includes(editingChord.id)) {
+                            updatedChordIds.push(editingChord.id);
+                          }
+                          await addPreset(preset.name, updatedChordIds);
+                          Alert.alert('Success', `Added to "${preset.name}"`);
+                          setShowPresetModal(false);
+                        }
+                      }}
+                      style={styles.modalButton}
+                    >
+                      <MaterialIcons name="bookmark" size={20} color={colors.primary} />
+                      <Text style={styles.modalButtonText}>{preset.name}</Text>
+                      <Text style={styles.modalButtonSubtext}>({preset.chordIds.length} chords)</Text>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+
+              <Text style={styles.modalSectionTitle}>Create New Preset</Text>
+              <TextInput
+                style={styles.presetInput}
+                value={newPresetName}
+                onChangeText={setNewPresetName}
+                placeholder="Enter preset name..."
+                placeholderTextColor={colors.textMuted}
+              />
+              <Pressable 
+                onPress={async () => {
+                  if (newPresetName.trim() && editingChord?.id) {
+                    await addPreset(newPresetName.trim(), [editingChord.id]);
+                    Alert.alert('Success', `Created preset "${newPresetName.trim()}"`);
+                    setNewPresetName('');
+                    setShowPresetModal(false);
+                  } else {
+                    Alert.alert('Error', 'Please enter a preset name');
+                  }
+                }}
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+              >
+                <MaterialIcons name="add" size={20} color="#000" />
+                <Text style={[styles.modalButtonText, { color: '#000' }]}>Create Preset</Text>
+              </Pressable>
+
+              <Pressable 
+                onPress={() => {
+                  setShowPresetModal(false);
+                  setNewPresetName('');
+                }} 
+                style={styles.modalCancelButton}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
             </View>
@@ -1716,7 +1810,7 @@ const styles = StyleSheet.create({
   },
   fretboardGrid: {
     position: 'relative',
-    width: 216,
+    width: 260, // Increased from 216 to ensure all 6 strings are visible
     height: 300,
     marginVertical: spacing.lg,
     alignSelf: 'center',
@@ -1871,7 +1965,7 @@ const styles = StyleSheet.create({
   },
   previewFretboardGrid: {
     position: 'relative',
-    width: 216,
+    width: 260, // Increased from 216 to ensure all 6 strings are visible
     height: 250,
     alignSelf: 'center',
   },
@@ -2056,5 +2150,37 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#000',
+  },
+  saveToPresetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  saveToPresetButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  presetInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.text,
+    fontSize: 16,
+    marginBottom: spacing.sm,
+  },
+  modalButtonSubtext: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginLeft: 'auto',
   },
 });
