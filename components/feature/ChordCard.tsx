@@ -339,6 +339,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
+    textAlignVertical: 'center',
     includeFontPadding: false,
     position: 'absolute',
     width: 18,
