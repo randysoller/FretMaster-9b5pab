@@ -570,10 +570,40 @@ export default function ChordManagerScreen() {
     const FRET_SPACING = 50;
     const PREVIEW_FRETS = 5;
     const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
-    const PREVIEW_STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
+    const PREVIEW_STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness - thickest to thinnest
 
     return (
       <View style={styles.previewFretboardGrid}>
+        {/* Fret marker inlays (3rd, 5th, 7th, 9th, 12th) */}
+        {Array.from({ length: PREVIEW_FRETS }).map((_, i) => {
+          const absoluteFret = baseFret + i;
+          const inlayR = 4;
+          const y = (i + 0.5) * FRET_SPACING;
+          const centerX = (PREVIEW_FRET_WIDTH) / 2;
+          const isSingle = [3, 5, 7, 9, 15, 17, 19, 21].includes(absoluteFret);
+          const isDouble = [12, 24].includes(absoluteFret);
+          
+          if (!isSingle && !isDouble) return null;
+          
+          if (isDouble) {
+            const leftX = STRING_SPACING * 1.5;
+            const rightX = STRING_SPACING * 3.5;
+            return (
+              <React.Fragment key={`preview-inlay-${i}`}>
+                <View style={[styles.previewInlayDot, { left: leftX - inlayR, top: y - inlayR, width: inlayR * 2, height: inlayR * 2, borderRadius: inlayR }]} />
+                <View style={[styles.previewInlayDot, { left: rightX - inlayR, top: y - inlayR, width: inlayR * 2, height: inlayR * 2, borderRadius: inlayR }]} />
+              </React.Fragment>
+            );
+          }
+          
+          return (
+            <View 
+              key={`preview-inlay-${i}`}
+              style={[styles.previewInlayDot, { left: centerX - inlayR, top: y - inlayR, width: inlayR * 2, height: inlayR * 2, borderRadius: inlayR }]}
+            />
+          );
+        })}
+
         {/* Fret lines - exact width to match strings */}
         {Array.from({ length: PREVIEW_FRETS + 1 }).map((_, i) => (
           <View 
@@ -586,13 +616,27 @@ export default function ChordManagerScreen() {
           />
         ))}
 
-        {/* String lines with realistic thickness */}
+        {/* String lines with realistic thickness (low E thickest → high e thinnest) */}
         {Array.from({ length: STRINGS }).map((_, i) => (
           <View 
             key={`preview-string-${i}`}
             style={[styles.previewStringLine, { left: i * STRING_SPACING, width: PREVIEW_STRING_WIDTHS[i] }]}
           />
         ))}
+
+        {/* Mute (X) markers - render X for muted strings */}
+        {editingChord.positions.map((fret, stringIndex) => {
+          if (fret !== -1) return null; // Only render for muted strings
+          const x = stringIndex * STRING_SPACING;
+          const y = -22;
+          const size = 8;
+          return (
+            <View key={`preview-mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
+              <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 0.75 }} />
+              <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 0.75 }} />
+            </View>
+          );
+        })}
 
         {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT - Including open strings as outlined dots */}
         {editingChord.positions.map((fret, stringIndex) => {
@@ -654,7 +698,7 @@ export default function ChordManagerScreen() {
     const STRING_SPACING = 36;
     const FRET_SPACING = 50;
     const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
-    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
+    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness - low E (thickest) to high e (thinnest)
 
     return (
       <View style={styles.fretboardEditor}>
@@ -697,13 +741,27 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* String lines with realistic thickness */}
+          {/* String lines with realistic thickness - low E thickest to high e thinnest */}
           {Array.from({ length: STRINGS }).map((_, i) => (
             <View 
               key={`string-${i}`}
               style={[styles.stringLine, { left: i * STRING_SPACING, width: STRING_WIDTHS[i] }]}
             />
           ))}
+
+          {/* Mute (X) markers - render X for muted strings */}
+          {editingChord.positions.map((fret, stringIndex) => {
+            if (fret !== -1) return null; // Only render for muted strings
+            const x = stringIndex * STRING_SPACING;
+            const y = -22;
+            const size = 8;
+            return (
+              <View key={`mute-${stringIndex}`} style={{ position: 'absolute', left: x - size, top: y - size, width: size * 2, height: size * 2 }}>
+                <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '45deg' }], top: size - 0.75 }} />
+                <View style={{ position: 'absolute', width: size * 2, height: 1.5, backgroundColor: '#999', transform: [{ rotate: '-45deg' }], top: size - 0.75 }} />
+              </View>
+            );
+          })}
 
           {/* Dots - USE STORED SHAPE FOR EACH DOT - Including open strings as outlined dots */}
           {editingChord.positions.map((fret, stringIndex) => {
@@ -1830,6 +1888,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: '100%',
     backgroundColor: '#888',
+  },
+  previewInlayDot: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   previewFretDot: {
     position: 'absolute',
