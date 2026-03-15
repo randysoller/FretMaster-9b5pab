@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { ChordDetailModal } from '@/components/feature/ChordDetailModal';
 import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
@@ -30,6 +31,17 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [selectedChord, setSelectedChord] = useState<ChordData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Initialize screen
+  useEffect(() => {
+    try {
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Library screen initialization error:', error);
+      setIsLoading(false);
+    }
+  }, []);
   
   const {
     filterCategories,
@@ -107,8 +119,17 @@ export default function LibraryScreen() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.text }}>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Chord Library</Text>
@@ -271,25 +292,26 @@ export default function LibraryScreen() {
         ))}
       </ScrollView>
 
-      {/* Chord Detail Modal */}
-      <ChordDetailModal
-        visible={showDetailModal}
-        chord={selectedChord}
-        allChords={filteredChords}
-        currentIndex={selectedChord ? filteredChords.findIndex(c => c.id === selectedChord.id) : 0}
-        onClose={() => setShowDetailModal(false)}
-        onNavigate={(direction) => {
-          const currentIdx = filteredChords.findIndex(c => c.id === selectedChord?.id);
-          if (direction === 'prev' && currentIdx > 0) {
-            setSelectedChord(filteredChords[currentIdx - 1]);
-          } else if (direction === 'next' && currentIdx < filteredChords.length - 1) {
-            setSelectedChord(filteredChords[currentIdx + 1]);
-          }
-        }}
-        onPlay={handlePlayChord}
-        onEdit={handleEditChord}
-      />
-    </View>
+        {/* Chord Detail Modal */}
+        <ChordDetailModal
+          visible={showDetailModal}
+          chord={selectedChord}
+          allChords={filteredChords}
+          currentIndex={selectedChord ? filteredChords.findIndex(c => c.id === selectedChord.id) : 0}
+          onClose={() => setShowDetailModal(false)}
+          onNavigate={(direction) => {
+            const currentIdx = filteredChords.findIndex(c => c.id === selectedChord?.id);
+            if (direction === 'prev' && currentIdx > 0) {
+              setSelectedChord(filteredChords[currentIdx - 1]);
+            } else if (direction === 'next' && currentIdx < filteredChords.length - 1) {
+              setSelectedChord(filteredChords[currentIdx + 1]);
+            }
+          }}
+          onPlay={handlePlayChord}
+          onEdit={handleEditChord}
+        />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
