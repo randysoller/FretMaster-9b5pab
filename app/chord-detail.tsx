@@ -324,9 +324,10 @@ const styles = StyleSheet.create({
   },
   diagramRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 20, // 4pts more space from diagram
     marginBottom: spacing.lg,
     justifyContent: 'center',
+    alignItems: 'center', // Center tab box to diagram
   },
   fretboardContainer: {
     position: 'relative',
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
   stringNotationBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 8, // Reduced from 12 to shorten box
     paddingHorizontal: 14,
     minWidth: 90,
     shadowColor: '#000',
@@ -437,7 +438,7 @@ const styles = StyleSheet.create({
   stringNotationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
+    paddingVertical: 2, // Reduced from 4 to minimize spacing
   },
   stringName: {
     fontSize: 14,

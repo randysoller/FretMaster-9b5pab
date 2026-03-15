@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 20, // 4pts more space between elements
   },
   checkboxContainer: {
     padding: 2,
@@ -376,21 +376,22 @@ const styles = StyleSheet.create({
   stringNotationBox: {
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
-    paddingVertical: 6,
+    paddingVertical: 4, // Reduced from 6 to shorten box
     paddingHorizontal: 10,
-    gap: 2,
+    gap: 1, // Reduced from 2 to minimize spacing
     minWidth: 75,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    alignSelf: 'center', // Center to diagram
   },
   stringNotationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingVertical: 2,
+    paddingVertical: 1, // Reduced from 2 to minimize spacing
   },
   stringName: {
     fontSize: 11,
