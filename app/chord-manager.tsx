@@ -12,12 +12,38 @@ import { supabase } from '@/services/supabaseClient';
 type ViewMode = 'list' | 'editor';
 
 const FINGER_OPTIONS = [
-  { value: 0, label: '–' },
   { value: 1, label: '1' },
   { value: 2, label: '2' },
   { value: 3, label: '3' },
   { value: 4, label: '4' },
   { value: 5, label: 'T' },
+  { value: -1, label: '–' }, // Delete
+  { value: -2, label: 'O' }, // Open
+  { value: -3, label: 'X' }, // Mute
+];
+
+const CATEGORY_OPTIONS = [
+  { label: 'Open Chords', value: 'open' },
+  { label: 'Barre Chords', value: 'barre' },
+  { label: 'Moveable Chords', value: 'movable' },
+];
+
+const TYPE_OPTIONS = [
+  { label: '— Basic —', value: '', disabled: true },
+  { label: 'Major', value: 'major' },
+  { label: 'Minor', value: 'minor' },
+  { label: 'Augmented', value: 'augmented' },
+  { label: 'Diminished', value: 'diminished' },
+  { label: '— 7th Chords —', value: '', disabled: true },
+  { label: 'Major 7', value: 'major7' },
+  { label: 'Dominant 7', value: 'dominant7' },
+  { label: 'Minor 7', value: 'minor7' },
+  { label: 'Half-Diminished 7', value: 'halfDim7' },
+  { label: 'Diminished 7', value: 'dim7' },
+  { label: '— Extensions —', value: '', disabled: true },
+  { label: '9th', value: 'ninth' },
+  { label: '11th', value: 'eleventh' },
+  { label: '13th', value: 'thirteenth' },
 ];
 
 const DOT_COLORS = [
@@ -49,6 +75,8 @@ export default function ChordManagerScreen() {
   const [dotColor, setDotColor] = useState('#D4952A');
   const [dotShape, setDotShape] = useState<'circle' | 'diamond'>('circle');
   const [isBarre, setIsBarre] = useState(false);
+  const [barreMode, setBarreMode] = useState(false);
+  const [barreSelection, setBarreSelection] = useState<number[]>([]);
 
   // Redirect non-admins
   useEffect(() => {
@@ -108,6 +136,11 @@ export default function ChordManagerScreen() {
     setIsNewChord(true);
     setBaseFret(1);
     setVisibleFrets(5);
+    setDotColor('#D4952A'); // Default orange for circles
+    setDotShape('circle');
+    setSelectedFinger(1);
+    setBarreMode(false);
+    setBarreSelection([]);
     setViewMode('editor');
   };
 
@@ -115,6 +148,11 @@ export default function ChordManagerScreen() {
     setEditingChord({ ...chord });
     setIsNewChord(false);
     setBaseFret(chord.baseFret || 1);
+    setDotColor('#D4952A'); // Default orange for circles
+    setDotShape('circle');
+    setSelectedFinger(1);
+    setBarreMode(false);
+    setBarreSelection([]);
     setViewMode('editor');
   };
 
@@ -163,6 +201,8 @@ export default function ChordManagerScreen() {
   const handleCancelEdit = () => {
     setEditingChord(null);
     setIsNewChord(false);
+    setBarreMode(false);
+    setBarreSelection([]);
     setViewMode('list');
   };
 
@@ -257,13 +297,44 @@ export default function ChordManagerScreen() {
 
     const actualFret = baseFret + fretIndex - 1;
 
-    if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
-      // Remove dot if clicking same position
+    // Handle special finger options
+    if (selectedFinger === -1) {
+      // Delete: Remove dot
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
+    } else if (selectedFinger === -2) {
+      // Open: Set to 0
+      newPositions[stringIndex] = 0;
+      newFingers[stringIndex] = 0;
+    } else if (selectedFinger === -3) {
+      // Mute: Set to -1
+      newPositions[stringIndex] = -1;
+      newFingers[stringIndex] = 0;
+    } else if (barreMode) {
+      // Barre mode: Collect strings for barre
+      if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
+        // Already has this finger - toggle selection
+        if (barreSelection.includes(stringIndex)) {
+          setBarreSelection(barreSelection.filter(s => s !== stringIndex));
+        } else {
+          setBarreSelection([...barreSelection, stringIndex]);
+        }
+      } else {
+        // Place finger first
+        newPositions[stringIndex] = actualFret;
+        newFingers[stringIndex] = selectedFinger;
+        setBarreSelection([stringIndex]);
+      }
     } else {
-      newPositions[stringIndex] = actualFret;
-      newFingers[stringIndex] = selectedFinger;
+      // Normal mode: Place or update finger
+      if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
+        // Remove dot if clicking same position with same finger
+        newPositions[stringIndex] = -1;
+        newFingers[stringIndex] = 0;
+      } else {
+        newPositions[stringIndex] = actualFret;
+        newFingers[stringIndex] = selectedFinger;
+      }
     }
 
     setEditingChord({
@@ -293,6 +364,50 @@ export default function ChordManagerScreen() {
       positions: newPositions,
       fingers: newFingers,
     });
+  };
+
+  const handleFingerSelect = (fingerValue: number) => {
+    setSelectedFinger(fingerValue);
+    
+    // Reset barre mode if selecting special options
+    if (fingerValue < 0) {
+      setBarreMode(false);
+      setBarreSelection([]);
+    }
+    
+    // Set default colors based on shape
+    if (dotShape === 'circle' && dotColor !== '#D4952A') {
+      setDotColor('#D4952A'); // Orange for circles
+    } else if (dotShape === 'diamond' && dotColor !== '#4DB8E8') {
+      setDotColor('#4DB8E8'); // Cyan for diamonds
+    }
+  };
+
+  const handleShapeSelect = (shape: 'circle' | 'diamond') => {
+    setDotShape(shape);
+    // Set default color for shape
+    if (shape === 'circle') {
+      setDotColor('#D4952A'); // Orange
+    } else {
+      setDotColor('#4DB8E8'); // Cyan
+    }
+  };
+
+  const handleBarreToggle = () => {
+    const newBarreMode = !barreMode;
+    setBarreMode(newBarreMode);
+    
+    if (!newBarreMode) {
+      // Exiting barre mode - create barre if we have 2+ selected strings
+      if (barreSelection.length >= 2 && editingChord) {
+        // Barres are already handled by the Fretboard rendering logic
+        // Just clear the selection
+        setBarreSelection([]);
+      }
+    } else {
+      // Entering barre mode
+      setBarreSelection([]);
+    }
   };
 
   const clearFretboard = () => {
@@ -465,7 +580,7 @@ export default function ChordManagerScreen() {
         </View>
 
         <Text style={styles.fretboardInstructions}>
-          Tap fret to place dot. Tap dot to change finger. Drag dots to move. Double-click barre to remove.
+          Tap fret to place dot. Select finger/shape/color, then tap. Use Barre to connect dots.
         </Text>
 
         {/* String markers (mute/open) */}
@@ -500,7 +615,7 @@ export default function ChordManagerScreen() {
           {FINGER_OPTIONS.map((option) => (
             <Pressable
               key={option.value}
-              onPress={() => setSelectedFinger(option.value)}
+              onPress={() => handleFingerSelect(option.value)}
               style={[
                 styles.fingerButtonLarge,
                 selectedFinger === option.value && styles.fingerButtonLargeActive,
@@ -515,15 +630,15 @@ export default function ChordManagerScreen() {
             </Pressable>
           ))}
           <Pressable
-            onPress={() => setIsBarre(!isBarre)}
+            onPress={handleBarreToggle}
             style={[
               styles.barreButton,
-              isBarre && styles.barreButtonActive,
+              barreMode && styles.barreButtonActive,
             ]}
           >
             <Text style={[
               styles.barreButtonText,
-              isBarre && styles.barreButtonTextActive,
+              barreMode && styles.barreButtonTextActive,
             ]}>
               Barre
             </Text>
@@ -560,6 +675,8 @@ export default function ChordManagerScreen() {
 
             const x = stringIndex * STRING_SPACING;
             const y = (fretIndex - 0.5) * FRET_SPACING;
+            const fingerNum = editingChord.fingers[stringIndex];
+            const isSelected = barreSelection.includes(stringIndex);
 
             return (
               <Pressable
@@ -568,16 +685,58 @@ export default function ChordManagerScreen() {
                 style={[
                   styles.fretDot,
                   { left: x - 16, top: y - 16 },
-                  dotShape === 'diamond' && styles.fretDotDiamond,
                 ]}
               >
-                <View style={[
-                  dotShape === 'circle' ? styles.dotCircle : styles.dotDiamond,
-                  { backgroundColor: dotColor }
-                ]}>
-                  <Text style={styles.dotNumber}>{editingChord.fingers[stringIndex]}</Text>
-                </View>
+                {dotShape === 'circle' ? (
+                  <View style={[styles.dotCircle, { backgroundColor: dotColor }]}>
+                    {fingerNum > 0 && (
+                      <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                    )}
+                  </View>
+                ) : (
+                  <>
+                    <View style={[styles.dotDiamond, { backgroundColor: dotColor }]} />
+                    {fingerNum > 0 && (
+                      <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                    )}
+                  </>
+                )}
+                {isSelected && barreMode && (
+                  <View style={styles.barreSelectionIndicator} />
+                )}
               </Pressable>
+            );
+          })}
+
+          {/* Barre lines */}
+          {editingChord.barres?.map((barreFret, idx) => {
+            const relFret = barreFret - baseFret + 1;
+            if (relFret < 1 || relFret > visibleFrets) return null;
+
+            const barreStrings = editingChord.positions
+              .map((f, sidx) => (f === barreFret ? sidx : -1))
+              .filter((sidx) => sidx >= 0);
+
+            if (barreStrings.length < 2) return null;
+
+            const fromString = barreStrings[0];
+            const toString = barreStrings[barreStrings.length - 1];
+            const y = (relFret - 0.5) * FRET_SPACING;
+            const barHeight = 12;
+
+            return (
+              <View
+                key={`barre-${idx}`}
+                style={[
+                  styles.barreLine,
+                  {
+                    left: fromString * STRING_SPACING,
+                    top: y - barHeight / 2,
+                    width: (toString - fromString) * STRING_SPACING,
+                    height: barHeight,
+                  }
+                ]}
+              />
             );
           })}
 
@@ -691,21 +850,21 @@ export default function ChordManagerScreen() {
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Category</Text>
-              <View style={styles.pickerWrapper}>
-                {(['open', 'barre', 'movable'] as ChordShape[]).map((shape) => (
+              <View style={styles.dropdownContainer}>
+                {CATEGORY_OPTIONS.map((option) => (
                   <Pressable
-                    key={shape}
-                    onPress={() => setEditingChord({ ...editingChord, shape })}
+                    key={option.value}
+                    onPress={() => setEditingChord({ ...editingChord, shape: option.value as ChordShape })}
                     style={[
-                      styles.pickerButton,
-                      editingChord.shape === shape && styles.pickerButtonActive,
+                      styles.dropdownOption,
+                      editingChord.shape === option.value && styles.dropdownOptionActive,
                     ]}
                   >
                     <Text style={[
-                      styles.pickerButtonText,
-                      editingChord.shape === shape && styles.pickerButtonTextActive,
+                      styles.dropdownOptionText,
+                      editingChord.shape === option.value && styles.dropdownOptionTextActive,
                     ]}>
-                      {shape === 'open' ? 'Open' : shape === 'barre' ? 'Barre' : 'Movable'}
+                      {option.label}
                     </Text>
                   </Pressable>
                 ))}
@@ -714,24 +873,32 @@ export default function ChordManagerScreen() {
 
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.inputLabel}>Type</Text>
-              <View style={styles.pickerWrapper}>
-                {(['major', 'minor', 'dominant7'] as ChordType[]).map((type) => (
-                  <Pressable
-                    key={type}
-                    onPress={() => setEditingChord({ ...editingChord, type })}
-                    style={[
-                      styles.pickerButton,
-                      editingChord.type === type && styles.pickerButtonActive,
-                    ]}
-                  >
-                    <Text style={[
-                      styles.pickerButtonText,
-                      editingChord.type === type && styles.pickerButtonTextActive,
-                    ]}>
-                      {type === 'major' ? 'Major' : type === 'minor' ? 'Minor' : 'Dom7'}
-                    </Text>
-                  </Pressable>
-                ))}
+              <View style={styles.dropdownContainer}>
+                <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                  {TYPE_OPTIONS.map((option, index) => (
+                    option.disabled ? (
+                      <View key={index} style={styles.dropdownSeparator}>
+                        <Text style={styles.dropdownSeparatorText}>{option.label}</Text>
+                      </View>
+                    ) : (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setEditingChord({ ...editingChord, type: option.value as ChordType })}
+                        style={[
+                          styles.dropdownOption,
+                          editingChord.type === option.value && styles.dropdownOptionActive,
+                        ]}
+                      >
+                        <Text style={[
+                          styles.dropdownOptionText,
+                          editingChord.type === option.value && styles.dropdownOptionTextActive,
+                        ]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  ))}
+                </ScrollView>
               </View>
             </View>
           </View>
@@ -762,7 +929,7 @@ export default function ChordManagerScreen() {
           <Text style={styles.dotLabel}>DOT SHAPE</Text>
           <View style={styles.shapeSelector}>
             <Pressable
-              onPress={() => setDotShape('circle')}
+              onPress={() => handleShapeSelect('circle')}
               style={[
                 styles.shapeButton,
                 dotShape === 'circle' && styles.shapeButtonActive,
@@ -775,7 +942,7 @@ export default function ChordManagerScreen() {
               ]}>Circle</Text>
             </Pressable>
             <Pressable
-              onPress={() => setDotShape('diamond')}
+              onPress={() => handleShapeSelect('diamond')}
               style={[
                 styles.shapeButton,
                 dotShape === 'diamond' && styles.shapeButtonActive,
@@ -1239,30 +1406,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  pickerWrapper: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  pickerButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
+  dropdownContainer: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: 140,
   },
-  pickerButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  dropdownScroll: {
+    maxHeight: 140,
   },
-  pickerButtonText: {
-    fontSize: 11,
-    fontWeight: '600',
+  dropdownOption: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border + '20',
+  },
+  dropdownOptionActive: {
+    backgroundColor: colors.primary + '30',
+  },
+  dropdownOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
     color: colors.text,
   },
-  pickerButtonTextActive: {
-    color: '#000',
+  dropdownOptionTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  dropdownSeparator: {
+    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.card,
+  },
+  dropdownSeparatorText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 1,
   },
   dotAppearanceSubtitle: {
     fontSize: 11,
@@ -1393,7 +1574,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   markerText: {
-    fontSize: 16,
+    fontSize: 18,
     color: colors.textMuted,
   },
   markerTextActive: {
@@ -1404,10 +1585,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.md,
+    flexWrap: 'wrap',
   },
   fingerButtonLarge: {
-    flex: 1,
-    aspectRatio: 1,
+    width: 40,
+    height: 40,
     backgroundColor: '#2A2A2A',
     borderRadius: borderRadius.md,
     borderWidth: 2,
@@ -1420,7 +1602,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   fingerButtonLargeText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
   },
@@ -1429,6 +1611,7 @@ const styles = StyleSheet.create({
   },
   barreButton: {
     flex: 1,
+    minWidth: 60,
     backgroundColor: '#2A2A2A',
     borderRadius: borderRadius.md,
     borderWidth: 2,
@@ -1489,16 +1672,42 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     transform: [{ rotate: '45deg' }],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fretDotDiamond: {
-    transform: [{ rotate: '45deg' }],
+    position: 'absolute',
   },
   dotNumber: {
     fontSize: 16,
     fontWeight: '700',
     color: '#000',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  diamondNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    lineHeight: 32,
+  },
+  barreSelectionIndicator: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    top: -3,
+    left: -3,
+  },
+  barreLine: {
+    position: 'absolute',
+    backgroundColor: colors.primary,
+    borderRadius: 6,
   },
   fretClickArea: {
     position: 'absolute',
