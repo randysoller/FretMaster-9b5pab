@@ -23,8 +23,8 @@ const FINGER_OPTIONS = [
 ];
 
 const SHAPE_OPTIONS = [
-  { value: 'circle', label: '●' },
-  { value: 'diamond', label: '◆' },
+  { value: 'circle', label: '●', color: '#D4952A' },
+  { value: 'diamond', label: '◆', color: '#4DB8E8' },
 ];
 
 const CATEGORY_OPTIONS = [
@@ -660,7 +660,7 @@ export default function ChordManagerScreen() {
         </View>
 
         <Text style={styles.fretboardInstructions}>
-          1. Choose Circle or Diamond   2. Tap fret to place   3. Select finger from popup
+          Tap any fret position to place a dot, then choose shape and finger from the popup
         </Text>
 
         {/* String markers positioned over strings */}
@@ -950,59 +950,7 @@ export default function ChordManagerScreen() {
           </View>
         </View>
 
-        {/* Dot Appearance - STEP 1: Choose Shape */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>STEP 1: CHOOSE DOT SHAPE</Text>
-          <Text style={styles.dotAppearanceSubtitle}>
-            Select circle or diamond before placing dots on fretboard
-          </Text>
-
-          <View style={styles.shapeSelector}>
-            <Pressable
-              onPress={() => handleShapeSelect('circle')}
-              style={[
-                styles.shapeButton,
-                dotShape === 'circle' && styles.shapeButtonActive,
-              ]}
-            >
-              <View style={styles.shapeCircle} />
-              <Text style={[
-                styles.shapeButtonText,
-                dotShape === 'circle' && styles.shapeButtonTextActive,
-              ]}>Circle</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleShapeSelect('diamond')}
-              style={[
-                styles.shapeButton,
-                dotShape === 'diamond' && styles.shapeButtonActive,
-              ]}
-            >
-              <View style={styles.shapeDiamond} />
-              <Text style={[
-                styles.shapeButtonText,
-                dotShape === 'diamond' && styles.shapeButtonTextActive,
-              ]}>Diamond</Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.dotLabel}>DOT COLOR (Optional)</Text>
-          <View style={styles.colorPalette}>
-            {DOT_COLORS.map((color) => (
-              <Pressable
-                key={color}
-                onPress={() => setDotColor(color)}
-                style={[
-                  styles.colorButton,
-                  { backgroundColor: color },
-                  dotColor === color && styles.colorButtonActive,
-                ]}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* Interactive Fretboard - STEP 2: Tap to Place */}
+        {/* Interactive Fretboard */}
         {renderInteractiveFretboard()}
 
         {/* Action Buttons */}
@@ -1128,6 +1076,7 @@ export default function ChordManagerScreen() {
                       <Text style={[
                         styles.modalShapeButtonText,
                         modalSelectedShape === option.value && styles.modalShapeButtonTextActive,
+                        { color: option.color },
                       ]}>
                         {option.label}
                       </Text>
@@ -1855,7 +1804,6 @@ const styles = StyleSheet.create({
   },
   previewTextSection: {
     alignItems: 'center',
-    marginLeft: 30, // Moved 30pts to the right
   },
   previewSymbol: {
     fontSize: 32,
@@ -2051,11 +1999,10 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   modalShapeButtonText: {
-    fontSize: 24,
-    color: colors.textMuted,
+    fontSize: 32,
   },
   modalShapeButtonTextActive: {
-    color: colors.primary,
+    fontWeight: '700',
   },
   fingerModalTitle: {
     fontSize: 11,
