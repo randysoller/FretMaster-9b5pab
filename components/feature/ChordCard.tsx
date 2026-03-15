@@ -307,44 +307,44 @@ const styles = StyleSheet.create({
   },
   dotContainer: {
     position: 'absolute',
-    width: 16, // Reduced from 20 to match smaller dots
-    height: 16,
-    marginLeft: -8, // Adjusted from -10
-    marginTop: -8, // Adjusted from -10
+    width: 12, // Reduced by 4pts from 16
+    height: 12,
+    marginLeft: -6, // Adjusted from -8
+    marginTop: -6, // Adjusted from -8
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleDot: {
-    width: 16, // Reduced from 20 (4pts smaller)
-    height: 16,
-    borderRadius: 8,
+    width: 12, // Reduced by 4pts from 16
+    height: 12,
+    borderRadius: 6,
     backgroundColor: colors.primary, // #D4952A orange
     alignItems: 'center',
     justifyContent: 'center',
   },
   diamondDot: {
-    width: 14, // Reduced from 18 (4pts smaller)
-    height: 14,
+    width: 10, // Reduced by 4pts from 14
+    height: 10,
     backgroundColor: '#4DB8E8', // Root note blue
     transform: [{ rotate: '45deg' }],
     position: 'absolute',
   },
   circleNumber: {
     color: '#000',
-    fontSize: 10, // Reduced from 12 for smaller circle
+    fontSize: 8, // Reduced by 2pts from 10 for smaller circle
     fontWeight: '700',
   },
   diamondNumber: {
     color: '#000',
-    fontSize: 10, // Reduced from 12 for smaller diamond
+    fontSize: 8, // Reduced by 2pts from 10 for smaller diamond
     fontWeight: '700',
     textAlign: 'center',
     textAlignVertical: 'center',
     includeFontPadding: false,
     position: 'absolute',
-    width: 14, // Reduced from 18 to match smaller diamond
-    height: 14,
-    lineHeight: 14,
+    width: 10, // Reduced by 4pts from 14 to match smaller diamond
+    height: 10,
+    lineHeight: 10,
     // NO rotation - stays vertical!
   },
 

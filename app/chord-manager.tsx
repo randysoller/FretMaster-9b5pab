@@ -20,6 +20,11 @@ const FINGER_OPTIONS = [
   { value: 5, label: 'T' },
 ];
 
+const DOT_COLORS = [
+  '#D4952A', '#4DB8E8', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6', '#F59E0B', '#3B82F6', '#FFFFFF',
+  '#6B7280'
+];
+
 export default function ChordManagerScreen() {
   const router = useRouter();
   const { isAdmin } = useAuth();
@@ -32,12 +37,18 @@ export default function ChordManagerScreen() {
   const [filterType, setFilterType] = useState<ChordType | 'all'>('all');
   const [selectedChords, setSelectedChords] = useState<Set<string>>(new Set());
   const [editingChord, setEditingChord] = useState<ChordData | null>(null);
+  const [isNewChord, setIsNewChord] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Visual editor state
+  const [baseFret, setBaseFret] = useState(1);
+  const [visibleFrets, setVisibleFrets] = useState(5);
   const [selectedString, setSelectedString] = useState<number | null>(null);
   const [selectedFinger, setSelectedFinger] = useState(1);
+  const [dotColor, setDotColor] = useState('#D4952A');
+  const [dotShape, setDotShape] = useState<'circle' | 'diamond'>('circle');
+  const [isBarre, setIsBarre] = useState(false);
 
   // Redirect non-admins
   useEffect(() => {
@@ -82,21 +93,77 @@ export default function ChordManagerScreen() {
     }
   };
 
+  const handleCreateNewChord = () => {
+    const newChord: ChordData = {
+      id: `chord-${Date.now()}`,
+      name: 'C',
+      fullName: 'C Major',
+      positions: [-1, -1, -1, -1, -1, -1],
+      fingers: [0, 0, 0, 0, 0, 0],
+      shape: 'open',
+      type: 'major',
+      baseFret: 1,
+    };
+    setEditingChord(newChord);
+    setIsNewChord(true);
+    setBaseFret(1);
+    setVisibleFrets(5);
+    setViewMode('editor');
+  };
+
   const handleEditChord = (chord: ChordData) => {
     setEditingChord({ ...chord });
+    setIsNewChord(false);
+    setBaseFret(chord.baseFret || 1);
     setViewMode('editor');
   };
 
   const handleSaveEdit = () => {
     if (!editingChord) return;
 
-    const updatedChords = chords.map(c => 
-      c.id === editingChord.id ? editingChord : c
-    );
-    setChords(updatedChords);
+    if (isNewChord) {
+      setChords([...chords, editingChord]);
+      Alert.alert('Success', 'New chord created successfully');
+    } else {
+      const updatedChords = chords.map(c => 
+        c.id === editingChord.id ? editingChord : c
+      );
+      setChords(updatedChords);
+      Alert.alert('Success', 'Chord updated successfully');
+    }
+    
     setEditingChord(null);
+    setIsNewChord(false);
     setViewMode('list');
-    Alert.alert('Success', 'Chord updated successfully');
+  };
+
+  const handleDeleteChord = () => {
+    if (!editingChord) return;
+
+    Alert.alert(
+      'Delete Chord',
+      `Are you sure you want to delete "${editingChord.fullName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const updatedChords = chords.filter(c => c.id !== editingChord.id);
+            setChords(updatedChords);
+            setEditingChord(null);
+            setViewMode('list');
+            Alert.alert('Success', 'Chord deleted from library');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleCancelEdit = () => {
+    setEditingChord(null);
+    setIsNewChord(false);
+    setViewMode('list');
   };
 
   const handleDeleteSelected = () => {
@@ -146,7 +213,6 @@ export default function ChordManagerScreen() {
       'Copy the code below and replace the contents of constants/musicData.ts',
       [
         { text: 'Copy to Clipboard', onPress: () => {
-          // In a real app, you'd use Clipboard.setString(exportCode)
           Alert.alert('Note', 'Code copied to clipboard (simulated)');
         }},
         { text: 'Close' }
@@ -183,19 +249,44 @@ export default function ChordManagerScreen() {
   };
 
   // Visual editor handlers
-  const handleStringPress = (stringIndex: number) => {
+  const handleFretboardTap = (stringIndex: number, fretIndex: number) => {
     if (!editingChord) return;
-    setSelectedString(stringIndex);
-  };
-
-  const handleFretPress = (fret: number) => {
-    if (!editingChord || selectedString === null) return;
 
     const newPositions = [...editingChord.positions];
     const newFingers = [...editingChord.fingers];
 
-    newPositions[selectedString] = fret;
-    newFingers[selectedString] = fret === -1 || fret === 0 ? 0 : selectedFinger;
+    const actualFret = baseFret + fretIndex - 1;
+
+    if (newPositions[stringIndex] === actualFret && newFingers[stringIndex] === selectedFinger) {
+      // Remove dot if clicking same position
+      newPositions[stringIndex] = -1;
+      newFingers[stringIndex] = 0;
+    } else {
+      newPositions[stringIndex] = actualFret;
+      newFingers[stringIndex] = selectedFinger;
+    }
+
+    setEditingChord({
+      ...editingChord,
+      positions: newPositions,
+      fingers: newFingers,
+      baseFret,
+    });
+  };
+
+  const handleStringMarkerTap = (stringIndex: number, marker: 'mute' | 'open') => {
+    if (!editingChord) return;
+
+    const newPositions = [...editingChord.positions];
+    const newFingers = [...editingChord.fingers];
+
+    if (marker === 'mute') {
+      newPositions[stringIndex] = -1;
+      newFingers[stringIndex] = 0;
+    } else {
+      newPositions[stringIndex] = 0;
+      newFingers[stringIndex] = 0;
+    }
 
     setEditingChord({
       ...editingChord,
@@ -211,7 +302,6 @@ export default function ChordManagerScreen() {
       positions: [-1, -1, -1, -1, -1, -1],
       fingers: [0, 0, 0, 0, 0, 0],
     });
-    setSelectedString(null);
   };
 
   // Render List View
@@ -355,34 +445,245 @@ export default function ChordManagerScreen() {
     </View>
   );
 
+  // Render Interactive Fretboard
+  const renderInteractiveFretboard = () => {
+    if (!editingChord) return null;
+
+    const STRINGS = 6;
+    const STRING_SPACING = 36;
+    const FRET_SPACING = 50;
+    const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
+
+    return (
+      <View style={styles.fretboardEditor}>
+        <View style={styles.fretboardHeader}>
+          <Text style={styles.fretboardTitle}>FRETBOARD</Text>
+          <Pressable onPress={clearFretboard} style={styles.clearFretButton}>
+            <MaterialIcons name="refresh" size={16} color={colors.textMuted} />
+            <Text style={styles.clearFretButtonText}>Clear</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.fretboardInstructions}>
+          Tap fret to place dot. Tap dot to change finger. Drag dots to move. Double-click barre to remove.
+        </Text>
+
+        {/* String markers (mute/open) */}
+        <View style={styles.stringMarkers}>
+          {STANDARD_TUNING.map((note, i) => (
+            <View key={i} style={[styles.stringMarkerColumn, { left: i * STRING_SPACING }]}>
+              <Text style={styles.stringNote}>{note}</Text>
+              <Pressable 
+                onPress={() => handleStringMarkerTap(i, 'mute')}
+                style={styles.markerButton}
+              >
+                <Text style={[
+                  styles.markerText,
+                  editingChord.positions[i] === -1 && styles.markerTextActive
+                ]}>×</Text>
+              </Pressable>
+              <Pressable 
+                onPress={() => handleStringMarkerTap(i, 'open')}
+                style={styles.markerButton}
+              >
+                <Text style={[
+                  styles.markerText,
+                  editingChord.positions[i] === 0 && styles.markerTextActive
+                ]}>○</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+
+        {/* Finger selector */}
+        <View style={styles.fingerRow}>
+          {FINGER_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              onPress={() => setSelectedFinger(option.value)}
+              style={[
+                styles.fingerButtonLarge,
+                selectedFinger === option.value && styles.fingerButtonLargeActive,
+              ]}
+            >
+              <Text style={[
+                styles.fingerButtonLargeText,
+                selectedFinger === option.value && styles.fingerButtonLargeTextActive,
+              ]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => setIsBarre(!isBarre)}
+            style={[
+              styles.barreButton,
+              isBarre && styles.barreButtonActive,
+            ]}
+          >
+            <Text style={[
+              styles.barreButtonText,
+              isBarre && styles.barreButtonTextActive,
+            ]}>
+              Barre
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Interactive Fretboard Grid */}
+        <View style={styles.fretboardGrid}>
+          {/* Fret lines */}
+          {Array.from({ length: visibleFrets + 1 }).map((_, i) => (
+            <View 
+              key={`fret-${i}`}
+              style={[
+                styles.fretLine,
+                { top: i * FRET_SPACING },
+                i === 0 && baseFret === 1 && styles.nutLine,
+              ]}
+            />
+          ))}
+
+          {/* String lines */}
+          {Array.from({ length: STRINGS }).map((_, i) => (
+            <View 
+              key={`string-${i}`}
+              style={[styles.stringLine, { left: i * STRING_SPACING }]}
+            />
+          ))}
+
+          {/* Dots */}
+          {editingChord.positions.map((fret, stringIndex) => {
+            if (fret <= 0) return null;
+            const fretIndex = fret - baseFret + 1;
+            if (fretIndex < 1 || fretIndex > visibleFrets) return null;
+
+            const x = stringIndex * STRING_SPACING;
+            const y = (fretIndex - 0.5) * FRET_SPACING;
+
+            return (
+              <Pressable
+                key={`dot-${stringIndex}`}
+                onPress={() => handleFretboardTap(stringIndex, fretIndex)}
+                style={[
+                  styles.fretDot,
+                  { left: x - 16, top: y - 16 },
+                  dotShape === 'diamond' && styles.fretDotDiamond,
+                ]}
+              >
+                <View style={[
+                  dotShape === 'circle' ? styles.dotCircle : styles.dotDiamond,
+                  { backgroundColor: dotColor }
+                ]}>
+                  <Text style={styles.dotNumber}>{editingChord.fingers[stringIndex]}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+
+          {/* Fret clickable areas */}
+          {Array.from({ length: visibleFrets }).map((_, fretIndex) => 
+            Array.from({ length: STRINGS }).map((_, stringIndex) => (
+              <Pressable
+                key={`click-${stringIndex}-${fretIndex}`}
+                onPress={() => handleFretboardTap(stringIndex, fretIndex + 1)}
+                style={[
+                  styles.fretClickArea,
+                  {
+                    left: stringIndex * STRING_SPACING - 16,
+                    top: fretIndex * FRET_SPACING + FRET_SPACING / 2 - 16,
+                  }
+                ]}
+              />
+            ))
+          )}
+
+          {/* Fret numbers */}
+          <View style={styles.fretNumbers}>
+            {Array.from({ length: visibleFrets }).map((_, i) => (
+              <Text key={i} style={[styles.fretNumberText, { top: (i + 0.5) * FRET_SPACING - 10 }]}>
+                {baseFret + i}
+              </Text>
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   // Render Visual Editor
   const renderVisualEditor = () => {
     if (!editingChord) return null;
 
     return (
       <ScrollView style={styles.editorContainer} showsVerticalScrollIndicator={false}>
+        {/* Fret Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>FRET SETTINGS</Text>
+          
+          <View style={styles.fretSettingsRow}>
+            <View style={styles.fretSetting}>
+              <Text style={styles.fretSettingLabel}>Base Fret</Text>
+              <View style={styles.fretSettingControls}>
+                <Pressable 
+                  onPress={() => setBaseFret(Math.max(1, baseFret - 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="remove" size={16} color={colors.text} />
+                </Pressable>
+                <Text style={styles.fretSettingValue}>{baseFret}</Text>
+                <Pressable 
+                  onPress={() => setBaseFret(baseFret + 1)}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="add" size={16} color={colors.text} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.fretSetting}>
+              <Text style={styles.fretSettingLabel}>Visible Frets</Text>
+              <View style={styles.fretSettingControls}>
+                <Pressable 
+                  onPress={() => setVisibleFrets(Math.max(3, visibleFrets - 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="remove" size={16} color={colors.text} />
+                </Pressable>
+                <Text style={styles.fretSettingValue}>{visibleFrets}</Text>
+                <Pressable 
+                  onPress={() => setVisibleFrets(Math.min(12, visibleFrets + 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="add" size={16} color={colors.text} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Chord Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>CHORD INFO</Text>
           
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Chord Name</Text>
+            <Text style={styles.inputLabel}>Chord Name *</Text>
             <TextInput
               style={styles.input}
               value={editingChord.fullName}
               onChangeText={(text) => setEditingChord({ ...editingChord, fullName: text })}
-              placeholder="e.g., C Major"
+              placeholder="C Major"
               placeholderTextColor={colors.textMuted}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Symbol</Text>
+            <Text style={styles.inputLabel}>Symbol *</Text>
             <TextInput
               style={styles.input}
               value={editingChord.name}
               onChangeText={(text) => setEditingChord({ ...editingChord, name: text })}
-              placeholder="e.g., C, Am7"
+              placeholder="C"
               placeholderTextColor={colors.textMuted}
             />
           </View>
@@ -404,7 +705,7 @@ export default function ChordManagerScreen() {
                       styles.pickerButtonText,
                       editingChord.shape === shape && styles.pickerButtonTextActive,
                     ]}>
-                      {CATEGORY_LABELS[shape]}
+                      {shape === 'open' ? 'Open' : shape === 'barre' ? 'Barre' : 'Movable'}
                     </Text>
                   </Pressable>
                 ))}
@@ -427,7 +728,7 @@ export default function ChordManagerScreen() {
                       styles.pickerButtonText,
                       editingChord.type === type && styles.pickerButtonTextActive,
                     ]}>
-                      {CHORD_TYPE_LABELS[type]}
+                      {type === 'major' ? 'Major' : type === 'minor' ? 'Minor' : 'Dom7'}
                     </Text>
                   </Pressable>
                 ))}
@@ -436,97 +737,84 @@ export default function ChordManagerScreen() {
           </View>
         </View>
 
-        {/* Fretboard Editor */}
+        {/* Dot Appearance */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>FRETBOARD EDITOR</Text>
-            <Pressable onPress={clearFretboard} style={styles.clearButton}>
-              <MaterialIcons name="delete-outline" size={16} color={colors.error} />
-              <Text style={styles.clearButtonText}>Clear</Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.instructions}>
-            1. Tap a string below to select it{'\n'}
-            2. Choose a finger number{'\n'}
-            3. Tap a fret position to place the finger
+          <Text style={styles.sectionTitle}>DOT APPEARANCE</Text>
+          <Text style={styles.dotAppearanceSubtitle}>
+            Configure the color, shape, and label for the next dot you place
           </Text>
 
-          {/* String Selector */}
-          <View style={styles.stringSelector}>
-            {STANDARD_TUNING.map((note, i) => (
+          <Text style={styles.dotLabel}>DOT COLOR</Text>
+          <View style={styles.colorPalette}>
+            {DOT_COLORS.map((color) => (
               <Pressable
-                key={i}
-                onPress={() => handleStringPress(i)}
+                key={color}
+                onPress={() => setDotColor(color)}
                 style={[
-                  styles.stringButton,
-                  selectedString === i && styles.stringButtonActive,
+                  styles.colorButton,
+                  { backgroundColor: color },
+                  dotColor === color && styles.colorButtonActive,
                 ]}
-              >
-                <Text style={[
-                  styles.stringNote,
-                  selectedString === i && styles.stringNoteActive,
-                ]}>
-                  {note}
-                </Text>
-                <Text style={[
-                  styles.stringNumber,
-                  selectedString === i && styles.stringNumberActive,
-                ]}>
-                  {6 - i}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
 
-          {/* Finger Selector */}
-          <View style={styles.fingerSelector}>
-            <Text style={styles.fingerSelectorLabel}>Finger:</Text>
-            {FINGER_OPTIONS.map((option) => (
-              <Pressable
-                key={option.value}
-                onPress={() => setSelectedFinger(option.value)}
-                style={[
-                  styles.fingerButton,
-                  selectedFinger === option.value && styles.fingerButtonActive,
-                ]}
-              >
-                <Text style={[
-                  styles.fingerButtonText,
-                  selectedFinger === option.value && styles.fingerButtonTextActive,
-                ]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
+          <Text style={styles.dotLabel}>DOT SHAPE</Text>
+          <View style={styles.shapeSelector}>
+            <Pressable
+              onPress={() => setDotShape('circle')}
+              style={[
+                styles.shapeButton,
+                dotShape === 'circle' && styles.shapeButtonActive,
+              ]}
+            >
+              <View style={styles.shapeCircle} />
+              <Text style={[
+                styles.shapeButtonText,
+                dotShape === 'circle' && styles.shapeButtonTextActive,
+              ]}>Circle</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setDotShape('diamond')}
+              style={[
+                styles.shapeButton,
+                dotShape === 'diamond' && styles.shapeButtonActive,
+              ]}
+            >
+              <View style={styles.shapeDiamond} />
+              <Text style={[
+                styles.shapeButtonText,
+                dotShape === 'diamond' && styles.shapeButtonTextActive,
+              ]}>Diamond</Text>
+            </Pressable>
           </View>
+        </View>
 
-          {/* Fret Position Selector */}
-          <View style={styles.fretSelector}>
-            <Pressable
-              onPress={() => handleFretPress(-1)}
-              style={styles.fretButton}
-            >
-              <MaterialIcons name="close" size={20} color={colors.error} />
-              <Text style={styles.fretButtonLabel}>Mute</Text>
+        {/* Interactive Fretboard */}
+        {renderInteractiveFretboard()}
+
+        {/* Action Buttons */}
+        <View style={styles.actionsSection}>
+          <Pressable onPress={handleSaveEdit} style={styles.updateButton}>
+            <MaterialIcons name="save" size={20} color="#000" />
+            <Text style={styles.updateButtonText}>
+              {isNewChord ? 'Create Chord' : 'Update Chord'}
+            </Text>
+          </Pressable>
+
+          <Pressable onPress={handleCancelEdit} style={styles.cancelActionButton}>
+            <MaterialIcons name="close" size={16} color={colors.textMuted} />
+            <Text style={styles.cancelActionButtonText}>
+              {isNewChord ? 'Cancel — Start New' : 'Cancel'}
+            </Text>
+          </Pressable>
+
+          {!isNewChord && (
+            <Pressable onPress={handleDeleteChord} style={styles.deleteButton}>
+              <MaterialIcons name="delete" size={16} color={colors.error} />
+              <Text style={styles.deleteButtonText}>Delete from Library</Text>
             </Pressable>
-            <Pressable
-              onPress={() => handleFretPress(0)}
-              style={styles.fretButton}
-            >
-              <MaterialIcons name="radio-button-unchecked" size={20} color={colors.success} />
-              <Text style={styles.fretButtonLabel}>Open</Text>
-            </Pressable>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((fret) => (
-              <Pressable
-                key={fret}
-                onPress={() => handleFretPress(fret)}
-                style={styles.fretButton}
-              >
-                <Text style={styles.fretButtonText}>{fret}</Text>
-              </Pressable>
-            ))}
-          </View>
+          )}
         </View>
 
         {/* Live Preview */}
@@ -534,25 +822,11 @@ export default function ChordManagerScreen() {
           <Text style={styles.sectionTitle}>LIVE PREVIEW</Text>
           <View style={styles.previewContainer}>
             <Text style={styles.previewSymbol}>{editingChord.name}</Text>
+            <Text style={styles.previewName}>{editingChord.fullName}</Text>
             <View style={styles.fretboardWrapper}>
               <Fretboard chord={editingChord} size="lg" />
             </View>
-            <Text style={styles.previewName}>{editingChord.fullName}</Text>
           </View>
-        </View>
-
-        {/* Save Button */}
-        <View style={styles.saveSection}>
-          <Pressable onPress={handleSaveEdit} style={styles.saveButtonLarge}>
-            <MaterialIcons name="save" size={24} color="#000" />
-            <Text style={styles.saveButtonText}>Save Changes</Text>
-          </Pressable>
-          <Pressable onPress={() => {
-            setEditingChord(null);
-            setViewMode('list');
-          }} style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
         </View>
       </ScrollView>
     );
@@ -569,23 +843,26 @@ export default function ChordManagerScreen() {
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Chord Manager</Text>
             <Text style={styles.headerSubtitle}>
-              {chords.length} chords • {selectedChords.size} selected
+              {viewMode === 'list' 
+                ? `${chords.length} chords • ${selectedChords.size} selected`
+                : isNewChord ? 'Creating new chord' : 'Editing chord'
+              }
             </Text>
           </View>
-          <Pressable onPress={() => setShowExportMenu(true)} style={styles.exportButton}>
-            <MaterialIcons name="download" size={24} color={colors.primary} />
-          </Pressable>
+          {viewMode === 'list' && (
+            <Pressable onPress={() => setShowExportMenu(true)} style={styles.exportButton}>
+              <MaterialIcons name="download" size={24} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
 
         {/* View Toggle */}
         {viewMode === 'list' && (
           <View style={styles.viewToggle}>
-            <View style={styles.viewToggleButtons}>
-              <View style={[styles.viewToggleButton, styles.viewToggleButtonActive]}>
-                <MaterialIcons name="list" size={20} color={colors.primary} />
-                <Text style={[styles.viewToggleText, styles.viewToggleTextActive]}>List View</Text>
-              </View>
-            </View>
+            <Pressable onPress={handleCreateNewChord} style={styles.createNewButton}>
+              <MaterialIcons name="add" size={20} color="#000" />
+              <Text style={styles.createNewButtonText}>Create New Chord</Text>
+            </Pressable>
           </View>
         )}
 
@@ -722,33 +999,23 @@ const styles = StyleSheet.create({
   },
   viewToggle: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  viewToggleButtons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  viewToggleButton: {
+  createNewButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
   },
-  viewToggleButtonActive: {
-    backgroundColor: colors.primary + '20',
-  },
-  viewToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  viewToggleTextActive: {
-    color: colors.primary,
+  createNewButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
   },
   listContainer: {
     flex: 1,
@@ -906,12 +1173,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
   sectionTitle: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -919,19 +1180,41 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: spacing.md,
   },
-  clearButton: {
+  fretSettingsRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+  },
+  fretSetting: {
+    flex: 1,
+  },
+  fretSettingLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
+  fretSettingControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    justifyContent: 'center',
+    gap: spacing.md,
     backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+  },
+  fretSettingButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
     borderRadius: borderRadius.sm,
   },
-  clearButtonText: {
-    color: colors.error,
-    fontSize: 12,
-    fontWeight: '600',
+  fretSettingValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+    minWidth: 30,
+    textAlign: 'center',
   },
   inputGroup: {
     marginBottom: spacing.md,
@@ -974,113 +1257,315 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   pickerButtonText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: colors.text,
   },
   pickerButtonTextActive: {
     color: '#000',
   },
-  instructions: {
-    fontSize: 12,
+  dotAppearanceSubtitle: {
+    fontSize: 11,
     color: colors.textMuted,
-    lineHeight: 18,
     marginBottom: spacing.md,
     fontStyle: 'italic',
   },
-  stringSelector: {
+  dotLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  colorPalette: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  colorButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  colorButtonActive: {
+    borderColor: colors.text,
+    borderWidth: 3,
+  },
+  shapeSelector: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  shapeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  shapeButtonActive: {
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+  },
+  shapeCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  shapeDiamond: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#4DB8E8',
+    transform: [{ rotate: '45deg' }],
+  },
+  shapeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  shapeButtonTextActive: {
+    color: colors.primary,
+  },
+  fretboardEditor: {
+    padding: spacing.lg,
+    backgroundColor: '#0F0F0F',
+  },
+  fretboardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  fretboardTitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  clearFretButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+  },
+  clearFretButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  fretboardInstructions: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+    lineHeight: 16,
+  },
+  stringMarkers: {
+    flexDirection: 'row',
+    height: 70,
+    marginBottom: spacing.md,
+    position: 'relative',
+  },
+  stringMarkerColumn: {
+    position: 'absolute',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stringNote: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  markerButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerText: {
+    fontSize: 16,
+    color: colors.textMuted,
+  },
+  markerTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  fingerRow: {
     flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.md,
   },
-  stringButton: {
+  fingerButtonLarge: {
     flex: 1,
     aspectRatio: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stringButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  stringNote: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  stringNoteActive: {
-    color: '#000',
-  },
-  stringNumber: {
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  stringNumberActive: {
-    color: '#000',
-  },
-  fingerSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  fingerSelectorLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  fingerButton: {
-    width: 36,
-    height: 36,
-    backgroundColor: colors.surface,
+    backgroundColor: '#2A2A2A',
     borderRadius: borderRadius.md,
     borderWidth: 2,
     borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fingerButtonActive: {
+  fingerButtonLargeActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  fingerButtonText: {
+  fingerButtonLargeText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  fingerButtonLargeTextActive: {
+    color: '#000',
+  },
+  barreButton: {
+    flex: 1,
+    backgroundColor: '#2A2A2A',
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barreButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  barreButtonText: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.text,
   },
-  fingerButtonTextActive: {
+  barreButtonTextActive: {
     color: '#000',
   },
-  fretSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+  fretboardGrid: {
+    position: 'relative',
+    width: 216,
+    height: 300,
+    marginVertical: spacing.lg,
+    alignSelf: 'center',
   },
-  fretButton: {
-    width: 60,
-    height: 50,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+  fretLine: {
+    position: 'absolute',
+    width: '100%',
+    height: 2,
+    backgroundColor: '#666',
+  },
+  nutLine: {
+    height: 6,
+    backgroundColor: '#FFF',
+  },
+  stringLine: {
+    position: 'absolute',
+    height: '100%',
+    width: 2,
+    backgroundColor: '#888',
+  },
+  fretDot: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fretButtonLabel: {
+  dotCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotDiamond: {
+    width: 24,
+    height: 24,
+    transform: [{ rotate: '45deg' }],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fretDotDiamond: {
+    transform: [{ rotate: '45deg' }],
+  },
+  dotNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+  fretClickArea: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+  },
+  fretNumbers: {
+    position: 'absolute',
+    left: -30,
+    top: 0,
+    height: '100%',
+  },
+  fretNumberText: {
+    position: 'absolute',
     fontSize: 10,
     color: colors.textMuted,
-    marginTop: 2,
+    fontWeight: '600',
   },
-  fretButtonText: {
-    fontSize: 18,
+  actionsSection: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  updateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  updateButtonText: {
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: '#000',
+  },
+  cancelActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+  },
+  cancelActionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    backgroundColor: 'transparent',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.error,
   },
   previewContainer: {
     alignItems: 'center',
@@ -1089,45 +1574,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
   },
   previewSymbol: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: spacing.sm,
+    marginBottom: 4,
+  },
+  previewName: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
   },
   fretboardWrapper: {
     marginVertical: spacing.md,
-  },
-  previewName: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-  },
-  saveSection: {
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  saveButtonLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textMuted,
   },
   modalOverlay: {
     flex: 1,
