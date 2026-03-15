@@ -342,9 +342,11 @@ export default function ChordManagerScreen() {
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
     } else if (fingerValue === -2) {
-      // Open: Set to 0
+      // Open: Render as visual dot (blue diamond or orange circle) at fret 0
       newPositions[stringIndex] = 0;
-      newFingers[stringIndex] = 0;
+      newFingers[stringIndex] = 0; // No finger number for open strings
+      newShapes[stringIndex] = modalSelectedShape; // Store shape
+      newColors[stringIndex] = dotColor; // Store color
     } else if (fingerValue === -3) {
       // Mute: Set to -1
       newPositions[stringIndex] = -1;
@@ -589,14 +591,14 @@ export default function ChordManagerScreen() {
           />
         ))}
 
-        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT */}
+        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT - Including open strings as visual dots */}
         {editingChord.positions.map((fret, stringIndex) => {
-          if (fret <= 0) return null;
-          const fretIndex = fret - baseFret + 1;
-          if (fretIndex < 1 || fretIndex > PREVIEW_FRETS) return null;
+          if (fret < 0) return null; // Skip muted strings
+          const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
+          if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
 
           const x = stringIndex * STRING_SPACING;
-          const y = (fretIndex - 0.5) * FRET_SPACING;
+          const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING; // Open strings above fretboard
           const fingerNum = editingChord.fingers[stringIndex];
           const thisShape = dotShapes[stringIndex]; // Use stored shape
           const thisColor = dotColors[stringIndex]; // Use stored color
@@ -626,16 +628,6 @@ export default function ChordManagerScreen() {
             </View>
           );
         })}
-
-        {/* Top markers (open/mute) */}
-        <View style={[styles.previewTopMarkersRow, { width: 216 }]}>
-          {editingChord.positions.map((fret, stringIndex) => (
-            <View key={`preview-marker-${stringIndex}`} style={[styles.previewTopMarker, { left: stringIndex * STRING_SPACING - 10 }]}>
-              {fret === -1 && <Text style={styles.previewMutedX}>×</Text>}
-              {fret === 0 && <Text style={styles.previewOpenO}>○</Text>}
-            </View>
-          ))}
-        </View>
       </View>
     );
   };
@@ -663,29 +655,11 @@ export default function ChordManagerScreen() {
           Tap any fret position to place a dot, then choose shape and finger from the popup
         </Text>
 
-        {/* String markers positioned over strings */}
-        <View style={[styles.stringMarkers, { width: 216, marginLeft: 0, alignSelf: 'center' }]}>
+        {/* String labels - just E A D G B E */}
+        <View style={[styles.stringLabels, { width: 216, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
-            <View key={i} style={[styles.stringMarkerColumn, { left: i * STRING_SPACING - 12 }]}>
+            <View key={i} style={[styles.stringLabelColumn, { left: i * STRING_SPACING - 12 }]}>
               <Text style={styles.stringNote}>{note}</Text>
-              <Pressable 
-                onPress={() => handleStringMarkerTap(i, 'mute')}
-                style={styles.markerButton}
-              >
-                <Text style={[
-                  styles.markerText,
-                  editingChord.positions[i] === -1 && styles.markerTextActive
-                ]}>×</Text>
-              </Pressable>
-              <Pressable 
-                onPress={() => handleStringMarkerTap(i, 'open')}
-                style={styles.markerButton}
-              >
-                <Text style={[
-                  styles.markerText,
-                  editingChord.positions[i] === 0 && styles.markerTextActive
-                ]}>○</Text>
-              </Pressable>
             </View>
           ))}
         </View>
@@ -712,14 +686,14 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* Dots - USE STORED SHAPE FOR EACH DOT */}
+          {/* Dots - USE STORED SHAPE FOR EACH DOT - Including open strings as visual dots */}
           {editingChord.positions.map((fret, stringIndex) => {
-            if (fret <= 0) return null;
-            const fretIndex = fret - baseFret + 1;
-            if (fretIndex < 1 || fretIndex > visibleFrets) return null;
+            if (fret < 0) return null; // Skip muted strings
+            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
+            if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
 
             const x = stringIndex * STRING_SPACING;
-            const y = (fretIndex - 0.5) * FRET_SPACING;
+            const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING; // Open strings above fretboard
             const fingerNum = editingChord.fingers[stringIndex];
             const thisShape = dotShapes[stringIndex]; // Use stored shape for THIS dot
             const thisColor = dotColors[stringIndex]; // Use stored color for THIS dot
@@ -786,51 +760,6 @@ export default function ChordManagerScreen() {
 
     return (
       <ScrollView style={styles.editorContainer} showsVerticalScrollIndicator={false}>
-        {/* Fret Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>FRET SETTINGS</Text>
-          
-          <View style={styles.fretSettingsRow}>
-            <View style={styles.fretSetting}>
-              <Text style={styles.fretSettingLabel}>Base Fret</Text>
-              <View style={styles.fretSettingControls}>
-                <Pressable 
-                  onPress={() => setBaseFret(Math.max(1, baseFret - 1))}
-                  style={styles.fretSettingButton}
-                >
-                  <MaterialIcons name="remove" size={16} color={colors.text} />
-                </Pressable>
-                <Text style={styles.fretSettingValue}>{baseFret}</Text>
-                <Pressable 
-                  onPress={() => setBaseFret(baseFret + 1)}
-                  style={styles.fretSettingButton}
-                >
-                  <MaterialIcons name="add" size={16} color={colors.text} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.fretSetting}>
-              <Text style={styles.fretSettingLabel}>Visible Frets</Text>
-              <View style={styles.fretSettingControls}>
-                <Pressable 
-                  onPress={() => setVisibleFrets(Math.max(3, visibleFrets - 1))}
-                  style={styles.fretSettingButton}
-                >
-                  <MaterialIcons name="remove" size={16} color={colors.text} />
-                </Pressable>
-                <Text style={styles.fretSettingValue}>{visibleFrets}</Text>
-                <Pressable 
-                  onPress={() => setVisibleFrets(Math.min(12, visibleFrets + 1))}
-                  style={styles.fretSettingButton}
-                >
-                  <MaterialIcons name="add" size={16} color={colors.text} />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* Chord Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>CHORD INFO</Text>
@@ -950,6 +879,51 @@ export default function ChordManagerScreen() {
           </View>
         </View>
 
+        {/* Fret Settings */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>FRET SETTINGS</Text>
+          
+          <View style={styles.fretSettingsRow}>
+            <View style={styles.fretSetting}>
+              <Text style={styles.fretSettingLabel}>Base Fret</Text>
+              <View style={styles.fretSettingControls}>
+                <Pressable 
+                  onPress={() => setBaseFret(Math.max(1, baseFret - 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="remove" size={16} color={colors.text} />
+                </Pressable>
+                <Text style={styles.fretSettingValue}>{baseFret}</Text>
+                <Pressable 
+                  onPress={() => setBaseFret(baseFret + 1)}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="add" size={16} color={colors.text} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.fretSetting}>
+              <Text style={styles.fretSettingLabel}>Visible Frets</Text>
+              <View style={styles.fretSettingControls}>
+                <Pressable 
+                  onPress={() => setVisibleFrets(Math.max(3, visibleFrets - 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="remove" size={16} color={colors.text} />
+                </Pressable>
+                <Text style={styles.fretSettingValue}>{visibleFrets}</Text>
+                <Pressable 
+                  onPress={() => setVisibleFrets(Math.min(12, visibleFrets + 1))}
+                  style={styles.fretSettingButton}
+                >
+                  <MaterialIcons name="add" size={16} color={colors.text} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* Interactive Fretboard */}
         {renderInteractiveFretboard()}
 
@@ -1053,7 +1027,7 @@ export default function ChordManagerScreen() {
             <View style={styles.fingerModalContent}>
               {/* Shape Selection */}
               <View style={styles.modalShapeSection}>
-                <Text style={styles.modalSectionLabel}>DOT SHAPE</Text>
+                <Text style={[styles.modalSectionLabel, modalSelectedShape === 'diamond' && { color: '#4DB8E8' }]}>DOT SHAPE</Text>
                 <View style={styles.modalShapeButtons}>
                   {SHAPE_OPTIONS.map((option) => (
                     <Pressable
@@ -1086,13 +1060,13 @@ export default function ChordManagerScreen() {
               </View>
 
               {/* Finger Selection */}
-              <Text style={styles.fingerModalTitle}>SELECT FINGER</Text>
+              <Text style={[styles.fingerModalTitle, modalSelectedShape === 'diamond' && { color: '#4DB8E8' }]}>SELECT FINGER</Text>
               <View style={styles.fingerModalGrid}>
                 {FINGER_OPTIONS.map((option) => (
                   <Pressable
                     key={option.value}
                     onPress={() => handleFingerChoice(option.value)}
-                    style={styles.fingerModalButton}
+                    style={[styles.fingerModalButton, modalSelectedShape === 'diamond' && { backgroundColor: '#4DB8E8' }]}
                   >
                     <Text style={styles.fingerModalButtonText}>{option.label}</Text>
                   </Pressable>
@@ -1635,36 +1609,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     lineHeight: 16,
   },
-  stringMarkers: {
+  stringLabels: {
     flexDirection: 'row',
-    height: 70,
-    marginBottom: spacing.md,
+    height: 30,
+    marginBottom: spacing.sm,
     position: 'relative',
   },
-  stringMarkerColumn: {
+  stringLabelColumn: {
     position: 'absolute',
     alignItems: 'center',
-    gap: 4,
     width: 24,
   },
   stringNote: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.text,
-  },
-  markerButton: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerText: {
-    fontSize: 18,
-    color: colors.textMuted,
-  },
-  markerTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
   },
   fretboardGrid: {
     position: 'relative',
@@ -1884,28 +1843,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     lineHeight: 32,
-  },
-  previewTopMarkersRow: {
-    position: 'absolute',
-    top: -26,
-    height: 20,
-  },
-  previewTopMarker: {
-    position: 'absolute',
-    width: 18,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewMutedX: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: '700',
-  },
-  previewOpenO: {
-    fontSize: 18,
-    color: '#999',
-    fontWeight: '400',
   },
   modalOverlay: {
     flex: 1,
