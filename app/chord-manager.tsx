@@ -22,6 +22,11 @@ const FINGER_OPTIONS = [
   { value: -3, label: 'X' }, // Mute
 ];
 
+const SHAPE_OPTIONS = [
+  { value: 'circle', label: '●' },
+  { value: 'diamond', label: '◆' },
+];
+
 const CATEGORY_OPTIONS = [
   { label: 'Open Chords', value: 'open' },
   { label: 'Barre Chords', value: 'barre' },
@@ -85,6 +90,7 @@ export default function ChordManagerScreen() {
   // Finger selection modal
   const [showFingerModal, setShowFingerModal] = useState(false);
   const [pendingDotPosition, setPendingDotPosition] = useState<{ stringIndex: number; fretIndex: number } | null>(null);
+  const [modalSelectedShape, setModalSelectedShape] = useState<'circle' | 'diamond'>('circle');
 
   // Redirect non-admins
   useEffect(() => {
@@ -300,8 +306,9 @@ export default function ChordManagerScreen() {
   const handleFretboardTap = (stringIndex: number, fretIndex: number) => {
     if (!editingChord) return;
 
-    // Step 2: User tapped - show finger selection modal
+    // Step 2: User tapped - show finger selection modal with current shape
     setPendingDotPosition({ stringIndex, fretIndex });
+    setModalSelectedShape(dotShape); // Use current shape as default
     setShowFingerModal(true);
   };
 
@@ -328,9 +335,11 @@ export default function ChordManagerScreen() {
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
     } else {
-      // Normal finger placement
+      // Normal finger placement - use the selected shape from modal
       newPositions[stringIndex] = actualFret;
       newFingers[stringIndex] = fingerValue;
+      // Update the global dotShape to match what was used
+      setDotShape(modalSelectedShape);
     }
 
     setEditingChord({
@@ -367,7 +376,7 @@ export default function ChordManagerScreen() {
   };
 
   const handleShapeSelect = (shape: 'circle' | 'diamond') => {
-    // Only change the shape mode - don't modify existing chord
+    // ONLY change the shape mode - DO NOT modify existing chord
     setDotShape(shape);
     // Set default color for shape
     if (shape === 'circle') {
@@ -375,6 +384,7 @@ export default function ChordManagerScreen() {
     } else {
       setDotColor('#4DB8E8'); // Cyan
     }
+    // DO NOT modify editingChord here - that's the bug!
   };
 
   const clearFretboard = () => {
@@ -972,7 +982,7 @@ export default function ChordManagerScreen() {
         {/* Content */}
         {viewMode === 'list' ? renderListView() : renderVisualEditor()}
 
-        {/* STEP 3: Finger Selection Modal */}
+        {/* Finger & Shape Selection Modal */}
         <Modal
           visible={showFingerModal}
           transparent
@@ -990,7 +1000,32 @@ export default function ChordManagerScreen() {
             }}
           >
             <View style={styles.fingerModalContent}>
-              <Text style={styles.fingerModalTitle}>Select Finger Number</Text>
+              {/* Shape Selection */}
+              <View style={styles.modalShapeSection}>
+                <Text style={styles.modalSectionLabel}>DOT SHAPE</Text>
+                <View style={styles.modalShapeButtons}>
+                  {SHAPE_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setModalSelectedShape(option.value as 'circle' | 'diamond')}
+                      style={[
+                        styles.modalShapeButton,
+                        modalSelectedShape === option.value && styles.modalShapeButtonActive,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.modalShapeButtonText,
+                        modalSelectedShape === option.value && styles.modalShapeButtonTextActive,
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Finger Selection */}
+              <Text style={styles.fingerModalTitle}>SELECT FINGER</Text>
               <View style={styles.fingerModalGrid}>
                 {FINGER_OPTIONS.map((option) => (
                   <Pressable
@@ -1785,10 +1820,48 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 320,
   },
-  fingerModalTitle: {
-    fontSize: 18,
+  modalShapeSection: {
+    marginBottom: spacing.lg,
+  },
+  modalSectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textSecondary,
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modalShapeButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+  },
+  modalShapeButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalShapeButtonActive: {
+    backgroundColor: colors.primary + '20',
+    borderColor: colors.primary,
+  },
+  modalShapeButtonText: {
+    fontSize: 24,
+    color: colors.textMuted,
+  },
+  modalShapeButtonTextActive: {
+    color: colors.primary,
+  },
+  fingerModalTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    letterSpacing: 1,
     marginBottom: spacing.lg,
     textAlign: 'center',
   },

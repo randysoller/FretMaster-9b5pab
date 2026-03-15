@@ -189,7 +189,15 @@ export default function ChordDetailScreen() {
             <MaterialIcons name="play-arrow" size={20} color="#000" />
             <Text style={styles.playButtonText}>Play</Text>
           </Pressable>
-          <Pressable style={styles.editButton} onPress={() => router.push('/editor' as any)}>
+          <Pressable style={styles.editButton} onPress={() => {
+            router.push({
+              pathname: '/chord-manager' as any,
+              params: {
+                editChordId: chord.id,
+                editChordData: JSON.stringify(chord),
+              },
+            });
+          }}>
             <MaterialIcons name="edit" size={18} color="#888" />
             <Text style={styles.editButtonText}>Edit</Text>
           </Pressable>
