@@ -41,26 +41,38 @@ export function ChordDetailModal({
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
   const isNavigatingRef = useRef(false);
+  const lastChordIdRef = useRef<string | null>(null);
+  const navigationDirectionRef = useRef<'prev' | 'next' | null>(null);
 
-  // Reset animation when chord changes
+  // Animate entrance when chord changes
   useEffect(() => {
-    if (chord?.id) {
-      // Reset position instantly, then animate entrance
-      translateX.value = 0;
-      scale.value = 0.95;
+    if (chord?.id && chord.id !== lastChordIdRef.current) {
+      lastChordIdRef.current = chord.id;
+      
+      // Determine entrance direction
+      const entranceX = navigationDirectionRef.current === 'next' ? SCREEN_WIDTH : 
+                        navigationDirectionRef.current === 'prev' ? -SCREEN_WIDTH : 0;
+      
+      // Set initial off-screen position
+      translateX.value = entranceX;
+      scale.value = 0.9;
       opacity.value = 0;
       
-      // Animate entrance
+      // Animate entrance to center
+      translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
       scale.value = withSpring(1, { damping: 20, stiffness: 300 });
       opacity.value = withTiming(1, { duration: 200 });
       
+      // Reset navigation state
       isNavigatingRef.current = false;
+      navigationDirectionRef.current = null;
     }
   }, [chord?.id]);
 
   const navigate = (direction: 'prev' | 'next') => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
+    navigationDirectionRef.current = direction;
     onNavigate(direction);
   };
 
