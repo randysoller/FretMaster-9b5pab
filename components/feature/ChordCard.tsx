@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ChordData } from '@/constants/musicData';
+import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { colors, spacing, borderRadius, opacity } from '@/constants/theme';
 
 interface ChordCardProps {
