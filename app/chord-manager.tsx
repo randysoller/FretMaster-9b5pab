@@ -680,22 +680,17 @@ export default function ChordManagerScreen() {
             const toX = barre.toString * STRING_SPACING;
             const barreWidth = toX - fromX;
 
-            // Mark these strings as barre-rendered
-            for (let s = barre.fromString; s <= barre.toString; s++) {
-              barreRenderedStrings.add(s);
-            }
-
             return (
               <View
                 key={`preview-barre-${idx}`}
                 style={{
                   position: 'absolute',
-                  left: fromX - 12,
-                  top: y - 12,
-                  width: barreWidth + 24,
-                  height: 24,
+                  left: fromX - 9,
+                  top: y - 9,
+                  width: barreWidth + 18,
+                  height: 18,
                   backgroundColor: '#D4952A',
-                  borderRadius: 12,
+                  borderRadius: 9,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -703,25 +698,13 @@ export default function ChordManagerScreen() {
                 <Text style={styles.previewDotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
               </View>
             );
-          });
-        })()}
+        })}
 
         {/* Dots */}
-        {(() => {
-          const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
-          const barreRenderedStrings = new Set<number>();
-          detectedBarres.forEach(barre => {
-            for (let s = barre.fromString; s <= barre.toString; s++) {
-              barreRenderedStrings.add(s);
-            }
-          });
-
-          return editingChord.positions.map((fret, stringIndex) => {
-            if (fret < 0) return null;
-            // Skip only if it's in a barre AND it's not a root note (diamond)
-            if (barreRenderedStrings.has(stringIndex) && !isRootNotePreview(stringIndex)) return null;
-            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
-            if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
+        {editingChord.positions.map((fret, stringIndex) => {
+          if (fret < 0) return null;
+          const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+          if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
 
             const x = stringIndex * STRING_SPACING;
             const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
@@ -764,8 +747,7 @@ export default function ChordManagerScreen() {
                 )}
               </View>
             );
-          });
-        })()}
+        })}
       </View>
     );
   };
@@ -864,22 +846,17 @@ export default function ChordManagerScreen() {
               const toX = barre.toString * STRING_SPACING;
               const barreWidth = toX - fromX;
 
-              // Mark these strings as barre-rendered
-              for (let s = barre.fromString; s <= barre.toString; s++) {
-                barreRenderedStrings.add(s);
-              }
-
               return (
                 <View
                   key={`barre-${idx}`}
                   style={{
                     position: 'absolute',
-                    left: fromX - 12,
-                    top: y - 12,
-                    width: barreWidth + 24,
-                    height: 24,
+                    left: fromX - 9,
+                    top: y - 9,
+                    width: barreWidth + 18,
+                    height: 18,
                     backgroundColor: '#D4952A',
-                    borderRadius: 12,
+                    borderRadius: 9,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -887,25 +864,13 @@ export default function ChordManagerScreen() {
                   <Text style={styles.dotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
                 </View>
               );
-            });
-          })()}
+          })}
 
           {/* Dots */}
-          {(() => {
-            const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
-            const barreRenderedStrings = new Set<number>();
-            detectedBarres.forEach(barre => {
-              for (let s = barre.fromString; s <= barre.toString; s++) {
-                barreRenderedStrings.add(s);
-              }
-            });
-
-            return editingChord.positions.map((fret, stringIndex) => {
-              if (fret < 0) return null;
-              // Skip only if it's in a barre AND it's not a root note (diamond)
-              if (barreRenderedStrings.has(stringIndex) && !isRootNote(stringIndex)) return null;
-              const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
-              if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
+          {editingChord.positions.map((fret, stringIndex) => {
+            if (fret < 0) return null;
+            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+            if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
 
               const x = stringIndex * STRING_SPACING;
               const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
@@ -948,8 +913,7 @@ export default function ChordManagerScreen() {
                   )}
                 </View>
               );
-            });
-          })()}
+          })}
 
           {/* Fret clickable areas */}
           {Array.from({ length: visibleFrets }).map((_, fretIndex) => 
