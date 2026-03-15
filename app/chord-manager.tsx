@@ -698,7 +698,8 @@ export default function ChordManagerScreen() {
                 <Text style={styles.previewDotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
               </View>
             );
-        })}
+          });
+        })()}
 
         {/* Dots */}
         {editingChord.positions.map((fret, stringIndex) => {
@@ -864,7 +865,8 @@ export default function ChordManagerScreen() {
                   <Text style={styles.dotNumber}>{barre.finger === 5 ? 'T' : barre.finger}</Text>
                 </View>
               );
-          })}
+            });
+          })()}
 
           {/* Dots */}
           {editingChord.positions.map((fret, stringIndex) => {
