@@ -79,6 +79,8 @@ export default function ChordManagerScreen() {
   const [selectedFinger, setSelectedFinger] = useState(1);
   const [dotColor, setDotColor] = useState('#D4952A');
   const [dotShape, setDotShape] = useState<'circle' | 'diamond'>('circle');
+  const [dotShapes, setDotShapes] = useState<('circle' | 'diamond')[]>(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
+  const [dotColors, setDotColors] = useState<string[]>(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
   const [isBarre, setIsBarre] = useState(false);
   const [barreMode, setBarreMode] = useState(false);
   const [barreSelection, setBarreSelection] = useState<number[]>([]);
@@ -152,6 +154,8 @@ export default function ChordManagerScreen() {
     setVisibleFrets(5);
     setDotColor('#D4952A'); // Default orange for circles
     setDotShape('circle');
+    setDotShapes(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
+    setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
     setSelectedFinger(1);
     setBarreMode(false);
     setBarreSelection([]);
@@ -164,6 +168,9 @@ export default function ChordManagerScreen() {
     setBaseFret(chord.baseFret || 1);
     setDotColor('#D4952A'); // Default orange for circles
     setDotShape('circle');
+    // Initialize shapes array - default to circles, but preserve any existing data
+    setDotShapes(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
+    setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
     setSelectedFinger(1);
     setBarreMode(false);
     setBarreSelection([]);
@@ -318,6 +325,8 @@ export default function ChordManagerScreen() {
     const { stringIndex, fretIndex } = pendingDotPosition;
     const newPositions = [...editingChord.positions];
     const newFingers = [...editingChord.fingers];
+    const newShapes = [...dotShapes];
+    const newColors = [...dotColors];
 
     const actualFret = baseFret + fretIndex - 1;
 
@@ -335,9 +344,11 @@ export default function ChordManagerScreen() {
       newPositions[stringIndex] = -1;
       newFingers[stringIndex] = 0;
     } else {
-      // Normal finger placement - use the selected shape from modal
+      // Normal finger placement - save shape and color for THIS dot
       newPositions[stringIndex] = actualFret;
       newFingers[stringIndex] = fingerValue;
+      newShapes[stringIndex] = modalSelectedShape;
+      newColors[stringIndex] = dotColor;
       // Update the global dotShape to match what was used
       setDotShape(modalSelectedShape);
     }
@@ -348,6 +359,8 @@ export default function ChordManagerScreen() {
       fingers: newFingers,
       baseFret,
     });
+    setDotShapes(newShapes);
+    setDotColors(newColors);
 
     // Close modal and reset
     setShowFingerModal(false);
@@ -394,6 +407,8 @@ export default function ChordManagerScreen() {
       positions: [-1, -1, -1, -1, -1, -1],
       fingers: [0, 0, 0, 0, 0, 0],
     });
+    setDotShapes(['circle', 'circle', 'circle', 'circle', 'circle', 'circle']);
+    setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
   };
 
   // Render List View
@@ -609,7 +624,7 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* Dots */}
+          {/* Dots - USE STORED SHAPE FOR EACH DOT */}
           {editingChord.positions.map((fret, stringIndex) => {
             if (fret <= 0) return null;
             const fretIndex = fret - baseFret + 1;
@@ -618,6 +633,8 @@ export default function ChordManagerScreen() {
             const x = stringIndex * STRING_SPACING;
             const y = (fretIndex - 0.5) * FRET_SPACING;
             const fingerNum = editingChord.fingers[stringIndex];
+            const thisShape = dotShapes[stringIndex]; // Use stored shape for THIS dot
+            const thisColor = dotColors[stringIndex]; // Use stored color for THIS dot
 
             return (
               <View
@@ -627,15 +644,15 @@ export default function ChordManagerScreen() {
                   { left: x - 16, top: y - 16 },
                 ]}
               >
-                {dotShape === 'circle' ? (
-                  <View style={[styles.dotCircle, { backgroundColor: dotColor }]}>
+                {thisShape === 'circle' ? (
+                  <View style={[styles.dotCircle, { backgroundColor: thisColor }]}>
                     {fingerNum > 0 && (
                       <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                     )}
                   </View>
                 ) : (
                   <>
-                    <View style={[styles.dotDiamond, { backgroundColor: dotColor }]} />
+                    <View style={[styles.dotDiamond, { backgroundColor: thisColor }]} />
                     {fingerNum > 0 && (
                       <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                     )}
