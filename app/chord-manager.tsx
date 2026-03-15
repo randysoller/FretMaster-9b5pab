@@ -334,7 +334,7 @@ export default function ChordManagerScreen() {
     const newShapes = [...dotShapes];
     const newColors = [...dotColors];
 
-    const actualFret = baseFret + fretIndex - 1;
+    const actualFret = fretIndex === 0 ? 0 : baseFret + fretIndex - 1;
 
     // Handle special finger options
     if (fingerValue === -1) {
@@ -591,7 +591,7 @@ export default function ChordManagerScreen() {
           />
         ))}
 
-        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT - Including open strings as visual dots */}
+        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT - Including open strings as outlined dots */}
         {editingChord.positions.map((fret, stringIndex) => {
           if (fret < 0) return null; // Skip muted strings
           const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
@@ -602,6 +602,7 @@ export default function ChordManagerScreen() {
           const fingerNum = editingChord.fingers[stringIndex];
           const thisShape = dotShapes[stringIndex]; // Use stored shape
           const thisColor = dotColors[stringIndex]; // Use stored color
+          const isOpenString = fret === 0;
 
           return (
             <View
@@ -612,14 +613,24 @@ export default function ChordManagerScreen() {
               ]}
             >
               {thisShape === 'circle' ? (
-                <View style={[styles.previewDotCircle, { backgroundColor: thisColor }]}>
+                <View style={[
+                  styles.previewDotCircle, 
+                  isOpenString 
+                    ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                    : { backgroundColor: thisColor }
+                ]}>
                   {fingerNum > 0 && (
                     <Text style={styles.previewDotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                   )}
                 </View>
               ) : (
                 <>
-                  <View style={[styles.previewDotDiamond, { backgroundColor: thisColor }]} />
+                  <View style={[
+                    styles.previewDotDiamond, 
+                    isOpenString 
+                      ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                      : { backgroundColor: thisColor }
+                  ]} />
                   {fingerNum > 0 && (
                     <Text style={styles.previewDiamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                   )}
@@ -652,15 +663,19 @@ export default function ChordManagerScreen() {
         </View>
 
         <Text style={styles.fretboardInstructions}>
-          Tap any fret position to place a dot, then choose shape and finger from the popup
+          Tap string labels (E-A-D-G-B-E) or any fret position, then choose shape and finger from the popup
         </Text>
 
-        {/* String labels - just E A D G B E */}
+        {/* String labels - clickable E A D G B E */}
         <View style={[styles.stringLabels, { width: 216, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
-            <View key={i} style={[styles.stringLabelColumn, { left: i * STRING_SPACING - 12 }]}>
+            <Pressable 
+              key={i} 
+              style={[styles.stringLabelColumn, { left: i * STRING_SPACING - 12 }]}
+              onPress={() => handleFretboardTap(i, 0)}
+            >
               <Text style={styles.stringNote}>{note}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
 
@@ -686,7 +701,7 @@ export default function ChordManagerScreen() {
             />
           ))}
 
-          {/* Dots - USE STORED SHAPE FOR EACH DOT - Including open strings as visual dots */}
+          {/* Dots - USE STORED SHAPE FOR EACH DOT - Including open strings as outlined dots */}
           {editingChord.positions.map((fret, stringIndex) => {
             if (fret < 0) return null; // Skip muted strings
             const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1; // Open strings at top of fretboard
@@ -697,6 +712,7 @@ export default function ChordManagerScreen() {
             const fingerNum = editingChord.fingers[stringIndex];
             const thisShape = dotShapes[stringIndex]; // Use stored shape for THIS dot
             const thisColor = dotColors[stringIndex]; // Use stored color for THIS dot
+            const isOpenString = fret === 0;
 
             return (
               <View
@@ -707,14 +723,24 @@ export default function ChordManagerScreen() {
                 ]}
               >
                 {thisShape === 'circle' ? (
-                  <View style={[styles.dotCircle, { backgroundColor: thisColor }]}>
+                  <View style={[
+                    styles.dotCircle, 
+                    isOpenString 
+                      ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                      : { backgroundColor: thisColor }
+                  ]}>
                     {fingerNum > 0 && (
                       <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                     )}
                   </View>
                 ) : (
                   <>
-                    <View style={[styles.dotDiamond, { backgroundColor: thisColor }]} />
+                    <View style={[
+                      styles.dotDiamond, 
+                      isOpenString 
+                        ? { backgroundColor: 'transparent', borderWidth: 3, borderColor: thisColor } 
+                        : { backgroundColor: thisColor }
+                    ]} />
                     {fingerNum > 0 && (
                       <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
                     )}
