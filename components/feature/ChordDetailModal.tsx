@@ -1,142 +1,108 @@
-import React, { useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Dimensions } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS, Easing } from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Modal, Pressable, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius } from '@/constants/theme';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
-import { audioService } from '@/services/audioService';
-import { useAuth } from '@/hooks/useAuth';
+import { colors, spacing, borderRadius } from '@/constants/theme';
 
-// Design colors matching web app screenshot
-const ROOT_NOTE_COLOR = '#4DB8E8'; // Cyan for root notes
-const FINGER_NUMBER_COLOR = '#D4952A'; // Orange for finger numbers
-const FRETBOARD_BG = '#1A1D24';
-const BUTTON_GOLD = '#D4952A';
-const BORDER_CYAN = '#4DB8E8';
-const OPEN_STRING_COLOR = '#00C896'; // Green for open strings
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const SWIPE_VELOCITY = 500;
 
 interface ChordDetailModalProps {
   visible: boolean;
   chord: ChordData | null;
-  allChords?: ChordData[];
-  currentIndex?: number;
+  allChords: ChordData[];
+  currentIndex: number;
   onClose: () => void;
-  onNavigate?: (direction: 'prev' | 'next') => void;
-  onPlay?: () => void;
-  onEdit?: () => void;
+  onNavigate: (direction: 'prev' | 'next') => void;
+  onPlay: () => void;
+  onEdit: () => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25; // 25% of screen for easier swipes
-
-export function ChordDetailModal({ 
-  visible, 
-  chord, 
-  allChords = [],
-  currentIndex = 0,
-  onClose, 
+export function ChordDetailModal({
+  visible,
+  chord,
+  allChords,
+  currentIndex,
+  onClose,
   onNavigate,
-  onPlay, 
-  onEdit 
+  onPlay,
+  onEdit,
 }: ChordDetailModalProps) {
-  const { isAdmin } = useAuth();
   const translateX = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const modalOpacity = useSharedValue(1);
   const isNavigatingRef = useRef(false);
-  
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < allChords.length - 1;
-  const prevChord = hasPrev ? allChords[currentIndex - 1] : null;
-  const nextChord = hasNext ? allChords[currentIndex + 1] : null;
-  
-  // Reset animation values when chord changes
+
+  // Reset animation when chord changes
   useEffect(() => {
-    if (visible && chord) {
+    if (chord?.id) {
+      translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
       isNavigatingRef.current = false;
-      translateX.value = 0;
-      scale.value = 0.95;
-      modalOpacity.value = 0;
-      scale.value = withSpring(1, { damping: 18, stiffness: 150 });
-      modalOpacity.value = withTiming(1, { duration: 200 });
     }
-  }, [chord?.id, visible]);
-  
-  // Navigation handler
-  const navigate = useCallback((direction: 'prev' | 'next') => {
+  }, [chord?.id]);
+
+  const navigate = (direction: 'prev' | 'next') => {
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
-    onNavigate?.(direction);
-  }, [onNavigate]);
-  
-  // Pan gesture for swiping
+    onNavigate(direction);
+  };
+
   const panGesture = Gesture.Pan()
-    .activeOffsetX([-15, 15])
-    .onUpdate((e) => {
-      const canSwipeRight = e.translationX > 0 && hasPrev;
-      const canSwipeLeft = e.translationX < 0 && hasNext;
-      
-      if (!canSwipeRight && !canSwipeLeft) {
-        translateX.value = e.translationX * 0.15;
-        return;
-      }
-      
-      translateX.value = e.translationX;
-      const progress = Math.min(Math.abs(e.translationX) / SCREEN_WIDTH, 1);
-      scale.value = 1 - (progress * 0.08);
-      modalOpacity.value = 1 - (progress * 0.3);
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
     })
-    .onEnd((e) => {
-      const distance = Math.abs(e.translationX);
-      const velocity = Math.abs(e.velocityX);
-      const meetsThreshold = distance > SWIPE_THRESHOLD || velocity > 400;
+    .onEnd((event) => {
+      const shouldNavigateNext = 
+        (event.translationX < -SWIPE_THRESHOLD || event.velocityX < -SWIPE_VELOCITY) &&
+        currentIndex < allChords.length - 1;
       
-      if (meetsThreshold) {
-        if (e.translationX > 0 && hasPrev) {
-          const exitX = SCREEN_WIDTH * 1.2;
-          translateX.value = withTiming(exitX, { duration: 200, easing: Easing.out(Easing.ease) });
-          scale.value = withTiming(0.85, { duration: 200 });
-          modalOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
-            if (finished) runOnJS(navigate)('prev');
-          });
-        } else if (e.translationX < 0 && hasNext) {
-          const exitX = -SCREEN_WIDTH * 1.2;
-          translateX.value = withTiming(exitX, { duration: 200, easing: Easing.out(Easing.ease) });
-          scale.value = withTiming(0.85, { duration: 200 });
-          modalOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
-            if (finished) runOnJS(navigate)('next');
-          });
-        } else {
-          translateX.value = withSpring(0, { damping: 20, stiffness: 150 });
-          scale.value = withSpring(1, { damping: 20, stiffness: 150 });
-          modalOpacity.value = withTiming(1, { duration: 150 });
-        }
+      const shouldNavigatePrev = 
+        (event.translationX > SWIPE_THRESHOLD || event.velocityX > SWIPE_VELOCITY) &&
+        currentIndex > 0;
+
+      if (shouldNavigateNext) {
+        translateX.value = withTiming(
+          -SCREEN_WIDTH,
+          { duration: 250 },
+          (finished) => {
+            if (finished) {
+              runOnJS(navigate)('next');
+            }
+          }
+        );
+      } else if (shouldNavigatePrev) {
+        translateX.value = withTiming(
+          SCREEN_WIDTH,
+          { duration: 250 },
+          (finished) => {
+            if (finished) {
+              runOnJS(navigate)('prev');
+            }
+          }
+        );
       } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 150 });
-        scale.value = withSpring(1, { damping: 20, stiffness: 150 });
-        modalOpacity.value = withTiming(1, { duration: 150 });
+        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
       }
     });
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { scale: scale.value },
-    ],
-    opacity: modalOpacity.value,
+    transform: [{ translateX: translateX.value }],
   }));
-  
+
   if (!chord) return null;
 
-  // Get chord root note
-  const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
+  // Note calculation
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  
-  const normalizeNote = (note: string) => {
-    return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
+  const normalizeNote = (note: string) =>
+    note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
       .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
-  };
   
   const getNoteAtPosition = (stringIndex: number, fret: number): string => {
     if (fret < 0) return '';
@@ -145,264 +111,216 @@ export function ChordDetailModal({
     const noteIndex = (openNoteIndex + fret) % 12;
     return NOTES[noteIndex];
   };
-  
+
+  const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
   const normalizedRootNote = normalizeNote(rootNote);
 
-  const renderFretboardDiagram = () => {
-    const activeFrets = chord.positions.filter(p => p > 0);
-    const minFret = activeFrets.length > 0 ? Math.min(...activeFrets) : 1;
-    const startFret = minFret > 3 ? minFret : 1;
-    const numFrets = 4;
-    const STRINGS = 6;
-    const FRETBOARD_WIDTH = 140;
-    const FRETBOARD_HEIGHT = 160;
-    const STRING_SPACING = FRETBOARD_WIDTH / (STRINGS - 1);
-    const FRET_SPACING = FRETBOARD_HEIGHT / numFrets;
+  // Fretboard rendering
+  const activeFrets = chord.positions.filter(f => f > 0);
+  const minFret = activeFrets.length > 0 ? Math.min(...activeFrets) : 1;
+  const startFret = minFret > 3 ? minFret : 1;
+  const isBarreChord = startFret > 1;
 
-    return (
-      <View style={styles.fretboardContainer}>
-        <View style={styles.fretboard}>
-          {/* Top markers (muted/open) */}
-          <View style={[styles.topMarkers, { width: FRETBOARD_WIDTH }]}>
-            {chord.positions.map((fret, stringIndex) => (
-              <View 
-                key={`top-${stringIndex}`}
-                style={[styles.markerContainer, { left: stringIndex * STRING_SPACING - 8 }]}
-              >
-                {fret === -1 && <Text style={styles.mutedX}>×</Text>}
-                {fret === 0 && <Text style={styles.openO}>○</Text>}
-              </View>
-            ))}
-          </View>
+  const STRINGS = 6;
+  const FRETS = 5;
+  const DIAGRAM_WIDTH = 180;
+  const DIAGRAM_HEIGHT = 220;
+  const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1);
+  const FRET_SPACING = DIAGRAM_HEIGHT / FRETS;
 
-          {/* Fretboard grid */}
-          <View style={[styles.gridContainer, { width: FRETBOARD_WIDTH, height: FRETBOARD_HEIGHT }]}>
-            {/* Strings */}
-            {Array.from({ length: STRINGS }).map((_, i) => (
-              <View 
-                key={`string-${i}`}
-                style={[styles.string, { left: i * STRING_SPACING }]}
-              />
-            ))}
+  // String notation
+  const stringNotation = chord.positions.map((fret, index) => {
+    let stringName = STANDARD_TUNING[index];
+    if (index === 5) stringName = 'e';
+    let notation = fret === -1 ? '×' : fret === 0 ? '0' : fret.toString();
+    return { string: stringName, fret: notation };
+  }).reverse();
 
-            {/* Frets */}
-            {Array.from({ length: numFrets + 1 }).map((_, i) => (
-              <View 
-                key={`fret-${i}`}
-                style={[
-                  styles.fret,
-                  { top: i * FRET_SPACING },
-                  i === 0 && startFret === 1 && styles.nutLine
-                ]}
-              />
-            ))}
+  // Finger positions list
+  const fingerPositions = chord.positions.map((fret, stringIndex) => {
+    if (fret < 0) return null;
+    const stringName = STANDARD_TUNING[stringIndex];
+    const noteAtPosition = getNoteAtPosition(stringIndex, fret);
+    const isRootNote = normalizeNote(noteAtPosition) === normalizedRootNote;
+    const fingerNumber = chord.fingers?.[stringIndex] || 0;
 
-            {/* Finger position dots */}
-            {chord.positions.map((fret, stringIndex) => {
-              if (fret <= 0) return null;
-              
-              const displayFret = fret - startFret + 1;
-              if (displayFret < 1 || displayFret > numFrets) return null;
+    let fretLabel = '';
+    if (fret === 0) {
+      fretLabel = 'Open';
+    } else {
+      fretLabel = `Fret ${fret}`;
+    }
 
-              const noteAtPosition = getNoteAtPosition(stringIndex, fret);
-              const isRootNote = normalizeNote(noteAtPosition) === normalizedRootNote;
-              const fingerNumber = chord.fingers?.[stringIndex] || 1;
+    const finger = fingerNumber === 0 ? '—' : fingerNumber === 5 ? 'Thumb' : fingerNumber;
 
-              const xPos = stringIndex * STRING_SPACING;
-              const yPos = (displayFret - 0.5) * FRET_SPACING;
-
-              return (
-                <View
-                  key={`dot-${stringIndex}`}
-                  style={[
-                    styles.fingerDotContainer,
-                    { left: xPos, top: yPos }
-                  ]}
-                >
-                  <View style={[styles.fingerDot, { backgroundColor: FINGER_NUMBER_COLOR }]}>
-                    <Text style={styles.fingerNumber}>{fingerNumber}</Text>
-                  </View>
-                  {isRootNote && (
-                    <View style={styles.rootNoteDiamond}>
-                      <View style={styles.rootNoteDiamondInner} />
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Fret position label */}
-          {startFret > 1 && (
-            <Text style={styles.fretLabel}>{startFret}fr</Text>
-          )}
-        </View>
-
-        {/* String notation box */}
-        <View style={styles.stringNotationBox}>
-          {['E', 'A', 'D', 'G', 'B', 'e'].map((note, index) => {
-            const fret = chord.positions[index];
-            
-            return (
-              <View key={index} style={styles.notationRow}>
-                <Text style={styles.notationString}>{note}</Text>
-                <Text style={styles.notationSeparator}>—</Text>
-                <Text style={styles.notationFret}>{fret === -1 ? '×' : fret}</Text>
-                <Text style={styles.notationSeparator}>—</Text>
-              </View>
-            );
-          }).reverse()}
-        </View>
-      </View>
-    );
-  };
-
-  const renderFingerPositions = () => {
-    const stringData = [
-      { note: 'E', string: '(6th)' },
-      { note: 'A', string: '(5th)' },
-      { note: 'D', string: '(4th)' },
-      { note: 'G', string: '(3rd)' },
-      { note: 'B', string: '(2nd)' },
-      { note: 'e', string: '(1st)' },
-    ];
-    
-    return (
-      <View style={styles.fingerPositions}>
-        <View style={styles.fingerHeader}>
-          <MaterialIcons name="piano" size={14} color="#D4952A" />
-          <Text style={styles.fingerTitle}>FINGER POSITIONS</Text>
-        </View>
-        
-        {chord.positions.map((fret, index) => {
-          const finger = chord.fingers[index];
-          let fingerName = '';
-          
-          if (fret === -1) fingerName = 'Muted';
-          else if (fret === 0) fingerName = 'Open';
-          else if (finger === 1) fingerName = 'Index';
-          else if (finger === 2) fingerName = 'Middle';
-          else if (finger === 3) fingerName = 'Ring';
-          else if (finger === 4) fingerName = 'Pinky';
-
-          const isPlayed = fret >= 0;
-          const noteAtPosition = fret >= 0 ? getNoteAtPosition(index, fret) : '';
-          const isRootNote = noteAtPosition && normalizeNote(noteAtPosition) === normalizedRootNote;
-          
-          return (
-            <View key={index} style={styles.fingerRow}>
-              <View style={styles.fingerRowLeft}>
-                <Text style={[
-                  styles.fingerString,
-                  !isPlayed && styles.fingerStringMuted,
-                  isRootNote && styles.fingerStringRoot
-                ]}>
-                  {stringData[index].note} {stringData[index].string}
-                </Text>
-                {isRootNote && <View style={styles.rootDotIndicator} />}
-              </View>
-              <Text style={[
-                styles.fingerFret,
-                fret === 0 && styles.fingerFretOpen,
-                fret === -1 && styles.fingerFretMuted
-              ]}>
-                {fret === -1 ? 'Muted' : fret === 0 ? 'Open' : `Fret ${fret}`}
-              </Text>
-              <Text style={styles.fingerName}>{fret > 0 ? fingerName : ''}</Text>
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
+    return {
+      string: `${stringName} (${6 - stringIndex}th)`,
+      note: noteAtPosition,
+      fret: fretLabel,
+      finger,
+      isRootNote,
+      isOpen: fret === 0,
+      isMuted: fret === -1,
+    };
+  }).filter(Boolean).reverse();
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
+        {/* Navigation Arrows */}
+        {currentIndex > 0 && (
+          <Pressable
+            style={[styles.navArrow, styles.navArrowLeft]}
+            onPress={() => navigate('prev')}
+          >
+            <MaterialIcons name="chevron-left" size={32} color={colors.text} />
+          </Pressable>
+        )}
+
+        {currentIndex < allChords.length - 1 && (
+          <Pressable
+            style={[styles.navArrow, styles.navArrowRight]}
+            onPress={() => navigate('next')}
+          >
+            <MaterialIcons name="chevron-right" size={32} color={colors.text} />
+          </Pressable>
+        )}
+
+        {/* Modal Card */}
         <GestureDetector gesture={panGesture}>
           <Animated.View style={[styles.modal, animatedStyle]}>
+            {/* Close Button */}
+            <Pressable style={styles.closeButton} onPress={onClose}>
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </Pressable>
+
             {/* Header */}
             <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.chordLetter}>
-                  <Text style={styles.chordLetterText}>{chord.name[0]}</Text>
+              <View style={styles.chordLetterBadge}>
+                <Text style={styles.chordLetter}>{rootNote}</Text>
+              </View>
+              <View style={styles.badges}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{chord.shape.toUpperCase()} CHORDS</Text>
                 </View>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.chordName}>{chord.fullName}</Text>
-                  <View style={styles.badges}>
-                    <Text style={styles.badge}>{chord.shape.toUpperCase()} CHORDS</Text>
-                    <Text style={styles.badgeSeparator}>|</Text>
-                    <Text style={styles.badge}>{chord.type.toUpperCase()}</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{chord.type.toUpperCase()}</Text>
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.chordName}>{chord.fullName}</Text>
+
+            {/* Fretboard and String Notation */}
+            <View style={styles.diagramRow}>
+              <View style={styles.fretboardContainer}>
+                {isBarreChord && <Text style={styles.fretLabel}>{startFret}fr</Text>}
+                <View style={[styles.fretboard, { width: DIAGRAM_WIDTH, height: DIAGRAM_HEIGHT }]}>
+                  {/* Top markers */}
+                  <View style={[styles.topMarkersRow, { width: DIAGRAM_WIDTH }]}>
+                    {chord.positions.map((fret, stringIndex) => (
+                      <View key={`marker-${stringIndex}`} style={[styles.topMarker, { left: stringIndex * STRING_SPACING - 10 }]}>
+                        {fret === -1 && <Text style={styles.mutedX}>×</Text>}
+                        {fret === 0 && <Text style={styles.openO}>○</Text>}
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Grid */}
+                  <View style={styles.gridArea}>
+                    {Array.from({ length: STRINGS }).map((_, i) => (
+                      <View key={`string-${i}`} style={[styles.string, { left: i * STRING_SPACING }]} />
+                    ))}
+                    {Array.from({ length: FRETS + 1 }).map((_, i) => (
+                      <View key={`fret-${i}`} style={[styles.fret, { top: i * FRET_SPACING }, i === 0 && !isBarreChord && styles.nutLine]} />
+                    ))}
+
+                    {/* Finger dots */}
+                    {chord.positions.map((fret, stringIndex) => {
+                      if (fret <= 0) return null;
+                      const displayFret = fret - startFret + 1;
+                      if (displayFret < 1 || displayFret > FRETS) return null;
+
+                      const noteAtPosition = getNoteAtPosition(stringIndex, fret);
+                      const isRootNote = normalizeNote(noteAtPosition) === normalizedRootNote;
+                      const fingerNumber = chord.fingers?.[stringIndex] || 1;
+
+                      const xPos = stringIndex * STRING_SPACING;
+                      const yPos = (displayFret - 0.5) * FRET_SPACING;
+
+                      return (
+                        <View key={`dot-${stringIndex}`} style={[styles.dotContainer, { left: xPos, top: yPos }]}>
+                          {isRootNote ? (
+                            <View style={styles.diamondDot}>
+                              <Text style={styles.diamondNumber}>{fingerNumber}</Text>
+                            </View>
+                          ) : (
+                            <View style={styles.circleDot}>
+                              <Text style={styles.circleNumber}>{fingerNumber}</Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
                 </View>
               </View>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <MaterialIcons name="close" size={24} color={colors.textMuted} />
+
+              {/* String Notation Box */}
+              <View style={styles.stringNotationBox}>
+                {stringNotation.map((item, index) => (
+                  <View key={index} style={styles.stringNotationRow}>
+                    <Text style={styles.stringName}>{item.string}</Text>
+                    <Text style={styles.stringDash}>—</Text>
+                    <Text style={styles.fretNumber}>{item.fret}</Text>
+                    <Text style={styles.stringDash}>—</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttons}>
+              <Pressable style={styles.playButton} onPress={onPlay}>
+                <MaterialIcons name="play-arrow" size={20} color="#000" />
+                <Text style={styles.playButtonText}>Play</Text>
+              </Pressable>
+              <Pressable style={styles.editButton} onPress={onEdit}>
+                <MaterialIcons name="edit" size={18} color="#888" />
+                <Text style={styles.editButtonText}>Edit</Text>
               </Pressable>
             </View>
 
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={true}
-            >
-              {/* Fretboard Diagram */}
-              {renderFretboardDiagram()}
+            {/* Progress */}
+            <Text style={styles.progress}>
+              {currentIndex + 1}/{allChords.length}
+            </Text>
 
-              {/* Action Buttons */}
-              <View style={styles.actions}>
-                <Pressable 
-                  style={[styles.playButton, !isAdmin && styles.playButtonFull]}
-                  onPress={() => {
-                    audioService.playChordPreview(chord.name);
-                    onPlay?.();
-                  }}
-                >
-                  <MaterialIcons name="volume-up" size={18} color="#000" />
-                  <Text style={styles.playButtonText}>Play</Text>
-                </Pressable>
-
-                {isAdmin && (
-                  <Pressable 
-                    style={styles.editButton}
-                    onPress={onEdit}
-                  >
-                    <MaterialIcons name="edit" size={18} color="#888" />
-                    <Text style={styles.editButtonText}>Edit</Text>
-                  </Pressable>
-                )}
+            {/* Finger Positions */}
+            <View style={styles.fingerPositionsSection}>
+              <View style={styles.fingerPositionsHeader}>
+                <MaterialIcons name="music-note" size={16} color={colors.primary} />
+                <Text style={styles.fingerPositionsTitle}>FINGER POSITIONS</Text>
               </View>
-
-              {/* Progress */}
-              <View style={styles.progress}>
-                <Text style={styles.progressText}>{currentIndex + 1}/{allChords.length}</Text>
-              </View>
-
-              {/* Finger Positions */}
-              {renderFingerPositions()}
-            </ScrollView>
-            
-            {/* Navigation arrows */}
-            {hasPrev && (
-              <Pressable 
-                style={[styles.navArrow, styles.navArrowLeft]}
-                onPress={() => navigate('prev')}
-              >
-                <MaterialIcons name="chevron-left" size={32} color={colors.textMuted} />
-              </Pressable>
-            )}
-            {hasNext && (
-              <Pressable 
-                style={[styles.navArrow, styles.navArrowRight]}
-                onPress={() => navigate('next')}
-              >
-                <MaterialIcons name="chevron-right" size={32} color={colors.textMuted} />
-              </Pressable>
-            )}
+              
+              {fingerPositions.map((pos: any, index) => (
+                <View key={index} style={styles.fingerPositionRow}>
+                  <Text style={[
+                    styles.fingerPositionString,
+                    pos.isRootNote && styles.fingerPositionStringRoot,
+                  ]}>
+                    {pos.string} {pos.isRootNote && '◆'}
+                  </Text>
+                  <Text style={[
+                    styles.fingerPositionFret,
+                    pos.isOpen && styles.fingerPositionFretOpen,
+                  ]}>
+                    {pos.fret}
+                  </Text>
+                  <Text style={styles.fingerPositionFinger}>{pos.finger}</Text>
+                </View>
+              ))}
+            </View>
           </Animated.View>
         </GestureDetector>
       </View>
@@ -413,205 +331,223 @@ export function ChordDetailModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.lg,
+  },
+  navArrow: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  navArrowLeft: {
+    left: spacing.lg,
+  },
+  navArrowRight: {
+    right: spacing.lg,
   },
   modal: {
-    width: SCREEN_WIDTH - 32,
-    maxWidth: 400,
-    maxHeight: '85%',
+    width: '90%',
+    maxWidth: 420,
     backgroundColor: '#1A1D24',
-    borderRadius: borderRadius.xxl,
-    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
     borderWidth: 2,
-    borderColor: BORDER_CYAN,
+    borderColor: '#4DB8E8',
+    padding: spacing.lg,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xl,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
-    flex: 1,
+    marginBottom: spacing.sm,
   },
-  chordLetter: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    backgroundColor: '#0F1117',
+  chordLetterBadge: {
+    width: 48,
+    height: 48,
+    backgroundColor: '#4DB8E8',
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: BORDER_CYAN,
   },
-  chordLetterText: {
+  chordLetter: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  titleContainer: {
-    flex: 1,
-  },
-  chordName: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#000',
   },
   badges: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.xs,
+    flex: 1,
   },
   badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 4,
+  },
+  badgeText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#888',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
   },
-  badgeSeparator: {
-    fontSize: 10,
-    color: '#444',
-    marginHorizontal: 2,
+  chordName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.lg,
   },
-  closeButton: {
-    padding: spacing.xs,
-  },
-  fretboardContainer: {
+  diagramRow: {
     flexDirection: 'row',
     gap: spacing.md,
     marginBottom: spacing.lg,
   },
+  fretboardContainer: {
+    position: 'relative',
+    flex: 1,
+  },
+  fretLabel: {
+    position: 'absolute',
+    left: -20,
+    top: 50,
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '600',
+  },
   fretboard: {
-    backgroundColor: FRETBOARD_BG,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
     position: 'relative',
   },
-  topMarkers: {
+  topMarkersRow: {
     position: 'absolute',
-    top: 4,
-    left: spacing.lg,
-    height: 20,
+    top: -22,
+    height: 18,
   },
-  markerContainer: {
+  topMarker: {
     position: 'absolute',
     width: 16,
-    height: 20,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   mutedX: {
     fontSize: 16,
-    color: '#888',
+    color: '#666',
     fontWeight: '700',
   },
   openO: {
     fontSize: 16,
-    color: '#AAA',
+    color: '#999',
     fontWeight: '400',
   },
-  gridContainer: {
+  gridArea: {
     position: 'relative',
-    marginTop: 24,
+    width: '100%',
+    height: '100%',
   },
   string: {
     position: 'absolute',
     width: 2,
     height: '100%',
-    backgroundColor: '#444',
+    backgroundColor: '#666',
   },
   fret: {
     position: 'absolute',
     height: 2,
     width: '100%',
-    backgroundColor: '#555',
+    backgroundColor: '#666',
   },
   nutLine: {
     height: 6,
-    backgroundColor: '#CCC',
+    backgroundColor: '#FFF',
     borderRadius: 1,
   },
-  fingerDotContainer: {
+  dotContainer: {
     position: 'absolute',
-    width: 32,
-    height: 32,
-    marginLeft: -16,
-    marginTop: -16,
+    width: 28,
+    height: 28,
+    marginLeft: -14,
+    marginTop: -14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fingerDot: {
+  circleDot: {
     width: 28,
     height: 28,
     borderRadius: 14,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fingerNumber: {
+  diamondDot: {
+    width: 24,
+    height: 24,
+    backgroundColor: '#4DB8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '45deg' }],
+  },
+  circleNumber: {
     color: '#000',
     fontSize: 16,
     fontWeight: '700',
   },
-  rootNoteDiamond: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    transform: [{ rotate: '45deg' }],
-    top: -2,
-    left: -2,
-  },
-  rootNoteDiamondInner: {
-    width: 12,
-    height: 12,
-    backgroundColor: ROOT_NOTE_COLOR,
-  },
-  fretLabel: {
-    position: 'absolute',
-    left: -8,
-    top: 36,
-    fontSize: 11,
-    color: '#AAA',
-    fontWeight: '600',
+  diamondNumber: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+    transform: [{ rotate: '-45deg' }],
   },
   stringNotationBox: {
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
-    justifyContent: 'space-between',
-    minWidth: 100,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: 85,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  notationRow: {
+  stringNotationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 3,
   },
-  notationString: {
-    color: '#000',
+  stringName: {
     fontSize: 13,
     fontWeight: '700',
-    width: 16,
+    color: '#000',
+    width: 14,
   },
-  notationSeparator: {
-    color: '#666',
-    fontSize: 12,
+  stringDash: {
+    fontSize: 11,
+    color: '#888',
     marginHorizontal: 3,
   },
-  notationFret: {
-    color: '#000',
+  fretNumber: {
     fontSize: 13,
     fontWeight: '600',
-    minWidth: 16,
+    color: '#000',
+    minWidth: 18,
     textAlign: 'center',
   },
-  actions: {
+  buttons: {
     flexDirection: 'row',
     gap: spacing.md,
     marginBottom: spacing.md,
@@ -622,17 +558,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.md,
-    backgroundColor: BUTTON_GOLD,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
   },
-  playButtonFull: {
-    width: '100%',
-  },
   playButtonText: {
-    color: '#000',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
+    color: '#000',
   },
   editButton: {
     flex: 1,
@@ -640,106 +573,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.md,
-    backgroundColor: '#2A2D35',
+    paddingVertical: spacing.sm,
+    backgroundColor: '#2A2A2A',
     borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#3A3D45',
   },
   editButtonText: {
-    color: '#888',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
+    color: '#888',
   },
   progress: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  progressText: {
-    color: '#888',
+    textAlign: 'center',
     fontSize: 12,
+    color: '#888',
+    marginBottom: spacing.md,
   },
-  fingerPositions: {
-    marginTop: spacing.md,
+  fingerPositionsSection: {
+    backgroundColor: '#0F0F0F',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
   },
-  fingerHeader: {
+  fingerPositionsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  fingerTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#888',
+  fingerPositionsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
     letterSpacing: 1,
-    textTransform: 'uppercase',
   },
-  fingerRow: {
+  fingerPositionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2D35',
+    borderBottomColor: '#2A2A2A',
   },
-  fingerRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1.5,
-  },
-  fingerString: {
-    color: '#AAA',
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  fingerStringMuted: {
-    color: '#666',
-  },
-  fingerStringRoot: {
-    color: ROOT_NOTE_COLOR,
-    fontWeight: '600',
-  },
-  rootDotIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: ROOT_NOTE_COLOR,
-  },
-  fingerFret: {
-    color: '#AAA',
-    fontSize: 14,
-    fontWeight: '400',
+  fingerPositionString: {
+    fontSize: 13,
+    color: colors.text,
     flex: 1,
   },
-  fingerFretOpen: {
-    color: OPEN_STRING_COLOR,
+  fingerPositionStringRoot: {
+    color: '#4DB8E8',
+    fontWeight: '700',
+  },
+  fingerPositionFret: {
+    fontSize: 13,
+    color: colors.text,
+    width: 80,
+  },
+  fingerPositionFretOpen: {
+    color: '#10B981',
     fontWeight: '600',
   },
-  fingerFretMuted: {
-    color: '#666',
-  },
-  fingerName: {
+  fingerPositionFinger: {
+    fontSize: 13,
     color: '#888',
-    fontSize: 14,
-    flex: 1,
+    width: 60,
     textAlign: 'right',
-  },
-  navArrow: {
-    position: 'absolute',
-    top: '50%',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(26, 29, 36, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -20,
-  },
-  navArrowLeft: {
-    left: -20,
-  },
-  navArrowRight: {
-    right: -20,
   },
 });
