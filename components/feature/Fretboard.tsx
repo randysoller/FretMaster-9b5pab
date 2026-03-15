@@ -58,6 +58,25 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   // Realistic string thickness: low E (thickest) → high e (thinnest)
   const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7];
 
+  // Calculate root note for diamond detection
+  const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  
+  const normalizeNote = (note: string) => {
+    return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
+      .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
+  };
+  
+  const getNoteAtPosition = (stringIndex: number, fret: number): string => {
+    if (fret < 0) return '';
+    const openNote = STANDARD_TUNING[stringIndex];
+    const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
+    const noteIndex = (openNoteIndex + fret) % 12;
+    return NOTES[noteIndex];
+  };
+  
+  const normalizedRootNote = normalizeNote(rootNote);
+
   // Detect and render barre chords
   const detectBarres = () => {
     const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
@@ -94,55 +113,6 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
     for (let si = barre.fromString; si <= barre.toString; si++) {
       if (chord.positions[si] === barre.fret) {
         barreRenderedStrings.add(`${si}-${barre.fret}`);
-      }
-    }
-  });
-
-  // Calculate root note for diamond detection
-  const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  
-  const normalizeNote = (note: string) => {
-    return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
-      .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
-  };
-  
-  const getNoteAtPosition = (stringIndex: number, fret: number): string => {
-    if (fret < 0) return '';
-    const openNote = STANDARD_TUNING[stringIndex];
-    const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
-    const noteIndex = (openNoteIndex + fret) % 12;
-    return NOTES[noteIndex];
-  };
-  
-  const normalizedRootNote = normalizeNote(rootNote);
-
-  // Build a set of (stringIndex-fret) that are rendered by barre
-  const barreRenderedStrings = new Set<string>();
-  
-  // Calculate barre positions (not part of original chord data, infer from finger positions)
-  const barres: number[] = [];
-  const fingerGroups = new Map<number, number[]>();
-  
-  chord.fingers.forEach((finger, idx) => {
-    if (finger > 0 && chord.positions[idx] > 0) {
-      if (!fingerGroups.has(finger)) {
-        fingerGroups.set(finger, []);
-      }
-      fingerGroups.get(finger)!.push(idx);
-    }
-  });
-
-  // Detect barre: same finger on 3+ strings at same fret
-  fingerGroups.forEach((stringIndices, finger) => {
-    if (stringIndices.length >= 3) {
-      const frets = stringIndices.map(si => chord.positions[si]);
-      const uniqueFrets = [...new Set(frets)];
-      if (uniqueFrets.length === 1) {
-        barres.push(uniqueFrets[0]);
-        stringIndices.forEach(si => {
-          barreRenderedStrings.add(`${si}-${chord.positions[si]}`);
-        });
       }
     }
   });
@@ -236,7 +206,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         />
       )}
 
-      {/* Barre indicators - connecting lines */}
+      {/* Barre indicators */}
       {barres.map((barre, idx) => {
         const relFret = barre.fret - baseFret + 1;
         if (relFret < 1 || relFret > numFrets) return null;
@@ -246,40 +216,9 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         const x2 = getStringX(barre.toString);
         const barHeight = config.dotRadius * 1.5;
 
-        return (
-          <Rect
-            key={`barre-line-${idx}`}
-            x={x1}
-            y={y - barHeight / 2}
-            width={x2 - x1}
-            height={barHeight}
-            fill={OTHER_NOTE_COLOR}
-            rx={barHeight / 2}
-          />
-        );
-      })}
-
-      {/* OLD Barre indicators - KEEP FOR DOTS */}
-      {barres.map((barreFret, idx) => {
-        const relFret = barreFret - baseFret + 1;
-        if (relFret < 1 || relFret > numFrets) return null;
-
-        const barreStrings = chord.positions
-          .map((f, sidx) => (f >= barreFret ? sidx : -1))
-          .filter((sidx) => sidx >= 0);
-
-        if (barreStrings.length < 2) return null;
-
-        const fromString = barreStrings[0];
-        const toString = barreStrings[barreStrings.length - 1];
-        const y = getFretY(relFret) - fretSpacing / 2;
-
-        const barreFingerNum = chord.fingers[fromString];
-        const barHeight = config.dotRadius * 0.38;
-
         const contactStrings: number[] = [];
-        for (let si = fromString; si <= toString; si++) {
-          if (chord.positions[si] === barreFret) {
+        for (let si = barre.fromString; si <= barre.toString; si++) {
+          if (chord.positions[si] === barre.fret) {
             contactStrings.push(si);
           }
         }
@@ -288,28 +227,26 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
           <React.Fragment key={`barre-${idx}`}>
             {contactStrings.length >= 2 && (
               <Rect
-                x={getStringX(fromString)}
+                x={x1}
                 y={y - barHeight / 2}
-                width={getStringX(toString) - getStringX(fromString)}
+                width={x2 - x1}
                 height={barHeight}
                 fill={OTHER_NOTE_COLOR}
                 rx={barHeight / 2}
               />
             )}
             {contactStrings.map((si) => {
-              const isRoot = si === chord.positions.findIndex(f => {
-                const note = getNoteAtPosition(si, f);
-                return normalizeNote(note) === normalizedRootNote;
-              });
+              const noteAtPosition = getNoteAtPosition(si, barre.fret);
+              const isRoot = normalizeNote(noteAtPosition) === normalizedRootNote;
               
               return (
                 <React.Fragment key={`barre-dot-${si}`}>
                   {isRoot ? (
-                    <RootDiamond x={getStringX(si)} y={y} r={config.dotRadius} fingerNum={barreFingerNum} fontSize={config.fontSize} />
+                    <RootDiamond x={getStringX(si)} y={y} r={config.dotRadius} fingerNum={barre.finger} fontSize={config.fontSize} />
                   ) : (
                     <>
                       <Circle cx={getStringX(si)} cy={y} r={config.dotRadius} fill={OTHER_NOTE_COLOR} />
-                      {barreFingerNum > 0 && (
+                      {barre.finger > 0 && (
                         <SvgText
                           x={getStringX(si)}
                           y={y + config.fontSize * 0.35}
@@ -318,7 +255,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
                           fill={colors.background}
                           textAnchor="middle"
                         >
-                          {barreFingerNum}
+                          {barre.finger}
                         </SvgText>
                       )}
                     </>
@@ -328,7 +265,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
             })}
           </React.Fragment>
         );
-      })} {/* Removed extra '}' here */}
+      })}
 
       {/* Open and muted string indicators */}
       {chord.positions.map((fret, i) => {
@@ -356,7 +293,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         }
         
         return null;
-      })} {/* Removed extra '}' here */}
+      })}
 
       {/* Finger dots (non-barre) - KEEP EXISTING LOGIC */}
       {chord.positions.map((fret, i) => {
