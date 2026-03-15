@@ -1359,7 +1359,10 @@ export default function ChordManagerScreen() {
               setNewPresetName('');
             }}
           >
-            <View style={styles.modalContent}>
+            <Pressable 
+              style={styles.modalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
               <Text style={styles.modalTitle}>Save Chord to Preset</Text>
               
               {presets.length > 0 && (
@@ -1368,7 +1371,8 @@ export default function ChordManagerScreen() {
                   {presets.map((preset) => (
                     <Pressable
                       key={preset.id}
-                      onPress={() => {
+                      onPress={(e) => {
+                        e.stopPropagation();
                         if (editingChord?.id) {
                           const updatedChordIds = [...preset.chordIds];
                           if (!updatedChordIds.includes(editingChord.id)) {
@@ -1400,7 +1404,8 @@ export default function ChordManagerScreen() {
                 placeholderTextColor={colors.textMuted}
               />
               <Pressable 
-                onPress={async () => {
+                onPress={async (e) => {
+                  e.stopPropagation();
                   if (newPresetName.trim() && editingChord?.id) {
                     await addPreset(newPresetName.trim(), [editingChord.id]);
                     Alert.alert('Success', `Created preset "${newPresetName.trim()}"`);
@@ -1417,7 +1422,8 @@ export default function ChordManagerScreen() {
               </Pressable>
 
               <Pressable 
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
                   setShowPresetModal(false);
                   setNewPresetName('');
                 }} 
@@ -1425,7 +1431,7 @@ export default function ChordManagerScreen() {
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </Pressable>
-            </View>
+            </Pressable>
           </Pressable>
         </Modal>
       </View>
