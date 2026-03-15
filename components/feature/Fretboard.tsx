@@ -11,9 +11,9 @@ interface FretboardProps {
 }
 
 const SIZES = {
-  sm: { width: 100, height: 130, dotRadius: 7, fontSize: 14, topY: 18, fretLabelSize: 9 },
-  md: { width: 140, height: 175, dotRadius: 9.5, fontSize: 18, topY: 22, fretLabelSize: 11 },
-  lg: { width: 200, height: 250, dotRadius: 13, fontSize: 24, topY: 30, fretLabelSize: 14 },
+  sm: { width: 100, height: 130, dotRadius: 5, fontSize: 12, topY: 18, fretLabelSize: 9 }, // Reduced dotRadius from 7 to 5 (4pts smaller), fontSize from 14 to 12
+  md: { width: 140, height: 175, dotRadius: 7.5, fontSize: 16, topY: 22, fretLabelSize: 11 }, // Reduced dotRadius from 9.5 to 7.5, fontSize from 18 to 16
+  lg: { width: 200, height: 250, dotRadius: 11, fontSize: 22, topY: 30, fretLabelSize: 14 }, // Reduced dotRadius from 13 to 11, fontSize from 24 to 22
 };
 
 const FRET_LABEL_PAD = { sm: 10, md: 14, lg: 20 };

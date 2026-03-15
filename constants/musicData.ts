@@ -170,7 +170,7 @@ CHORDS.forEach((chord, index) => {
   (chord as any).id = `chord-${index}`;
 });
 
-export const CHORD_DATA: ChordData[] = [ // Added '[' here
+export const CHORD_DATA: ChordData[] = [
   // ========== MAJOR CHORDS ==========
   // Open Major
   { name: 'C', fullName: 'C Major', positions: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], shape: 'open', type: 'major', baseFret: 1 },
@@ -254,7 +254,12 @@ export const CHORD_DATA: ChordData[] = [ // Added '[' here
   { name: 'C/G', fullName: 'C over G', positions: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], shape: 'open', type: 'slash', baseFret: 1 },
   { name: 'D/F#', fullName: 'D over F#', positions: [2, -1, 0, 2, 3, 2], fingers: [1, 0, 0, 2, 4, 3], shape: 'open', type: 'slash', baseFret: 1 },
   { name: 'G/B', fullName: 'G over B', positions: [-1, 2, 0, 0, 0, 3], fingers: [0, 2, 0, 0, 0, 4], shape: 'open', type: 'slash', baseFret: 1 },
-]; // Added ']' here
+];
+
+// Add unique IDs to CHORD_DATA as well
+CHORD_DATA.forEach((chord, index) => {
+  (chord as any).id = `chord-${index}`;
+});
 
 export interface ScaleData {
   name: string;

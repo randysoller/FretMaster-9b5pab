@@ -307,44 +307,44 @@ const styles = StyleSheet.create({
   },
   dotContainer: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    marginLeft: -10,
-    marginTop: -10,
+    width: 16, // Reduced from 20 to match smaller dots
+    height: 16,
+    marginLeft: -8, // Adjusted from -10
+    marginTop: -8, // Adjusted from -10
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16, // Reduced from 20 (4pts smaller)
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.primary, // #D4952A orange
     alignItems: 'center',
     justifyContent: 'center',
   },
   diamondDot: {
-    width: 18,
-    height: 18,
+    width: 14, // Reduced from 18 (4pts smaller)
+    height: 14,
     backgroundColor: '#4DB8E8', // Root note blue
     transform: [{ rotate: '45deg' }],
     position: 'absolute',
   },
   circleNumber: {
     color: '#000',
-    fontSize: 12,
+    fontSize: 10, // Reduced from 12 for smaller circle
     fontWeight: '700',
   },
   diamondNumber: {
     color: '#000',
-    fontSize: 12,
+    fontSize: 10, // Reduced from 12 for smaller diamond
     fontWeight: '700',
     textAlign: 'center',
     textAlignVertical: 'center',
     includeFontPadding: false,
     position: 'absolute',
-    width: 18,
-    height: 18,
-    lineHeight: 18,
+    width: 14, // Reduced from 18 to match smaller diamond
+    height: 14,
+    lineHeight: 14,
     // NO rotation - stays vertical!
   },
 
