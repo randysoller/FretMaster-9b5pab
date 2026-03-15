@@ -44,11 +44,11 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
   const renderFretboard = () => {
     const STRINGS = 6;
     const FRETS = 5; // Match detail page
-    const DIAGRAM_WIDTH = 66; // Scaled proportionally
+    const DIAGRAM_WIDTH = 70; // Increased from 66 to ensure all strings visible
     const DIAGRAM_HEIGHT = 88; // Scaled proportionally to match 5 frets
-    const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1);
+    const STRING_SPACING = DIAGRAM_WIDTH / (STRINGS - 1); // Now 14px spacing
     const FRET_SPACING = DIAGRAM_HEIGHT / FRETS;
-    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness
+    const STRING_WIDTHS = [2.8, 2.3, 1.9, 1.5, 1.1, 0.7]; // Realistic guitar string thickness - increased for visibility
 
     return (
       <View style={styles.fretboardContainer}>

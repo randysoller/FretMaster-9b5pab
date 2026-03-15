@@ -55,8 +55,9 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   const getStringX = (i: number) => padLeft + i * stringSpacing;
   const getFretY = (f: number) => padTop + f * fretSpacing;
 
-  // Realistic string thickness: low E (thickest) → high e (thinnest)
-  const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7];
+  // Realistic guitar string thickness: low E (thickest) → high e (thinnest)
+  // Increased values for better visibility and guitar neck appearance
+  const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
   // Calculate root note for diamond detection
   const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';

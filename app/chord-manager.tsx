@@ -570,11 +570,11 @@ export default function ChordManagerScreen() {
     if (!editingChord) return null;
 
     const STRINGS = 6;
-    const STRING_SPACING = 36;
+    const STRING_SPACING = 40; // Increased from 36 to 40 for better spacing
     const FRET_SPACING = 50;
     const PREVIEW_FRETS = 5;
-    const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
-    const PREVIEW_STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness - thickest to thinnest
+    const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1); // Now 200px (40 * 5)
+    const PREVIEW_STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8]; // Increased thickness for better visibility - low E (thickest) to high e (thinnest)
 
     return (
       <View style={styles.previewFretboardGrid}>
@@ -699,10 +699,10 @@ export default function ChordManagerScreen() {
     if (!editingChord) return null;
 
     const STRINGS = 6;
-    const STRING_SPACING = 36;
+    const STRING_SPACING = 40; // Increased from 36 to 40 for better spacing
     const FRET_SPACING = 50;
-    const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
-    const STRING_WIDTHS = [2.6, 2.2, 1.8, 1.4, 1.0, 0.7]; // Realistic guitar string thickness - low E (thickest) to high e (thinnest)
+    const FRET_WIDTH = STRING_SPACING * (STRINGS - 1); // Now 200px (40 * 5)
+    const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8]; // Increased thickness for better visibility - low E (thickest) to high e (thinnest)
 
     return (
       <View style={styles.fretboardEditor}>
@@ -719,7 +719,7 @@ export default function ChordManagerScreen() {
         </Text>
 
         {/* String labels - clickable E A D G B E */}
-        <View style={[styles.stringLabels, { width: 260, marginLeft: 0, alignSelf: 'center' }]}>
+        <View style={[styles.stringLabels, { width: 300, marginLeft: 0, alignSelf: 'center' }]}>
           {STANDARD_TUNING.map((note, i) => (
             <Pressable 
               key={i} 
@@ -1810,7 +1810,7 @@ const styles = StyleSheet.create({
   },
   fretboardGrid: {
     position: 'relative',
-    width: 260, // Increased from 216 to ensure all 6 strings are visible
+    width: 300, // Increased to 300 to ensure all 6 strings (including B and high e) are fully visible
     height: 300,
     marginVertical: spacing.lg,
     alignSelf: 'center',
@@ -1965,7 +1965,7 @@ const styles = StyleSheet.create({
   },
   previewFretboardGrid: {
     position: 'relative',
-    width: 260, // Increased from 216 to ensure all 6 strings are visible
+    width: 300, // Increased to 300 to ensure all 6 strings (including B and high e) are fully visible
     height: 250,
     alignSelf: 'center',
   },
