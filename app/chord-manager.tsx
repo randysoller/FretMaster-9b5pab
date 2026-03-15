@@ -594,6 +594,12 @@ export default function ChordManagerScreen() {
     const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
     const PREVIEW_STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
+    // Helper to determine if a position is a root note
+    const isRootNotePreview = (stringIndex: number) => {
+      const thisShape = dotShapes[stringIndex];
+      return thisShape === 'diamond';
+    };
+
     return (
       <View style={styles.previewFretboardGrid}>
         {/* Fret marker inlays */}
@@ -712,7 +718,8 @@ export default function ChordManagerScreen() {
 
           return editingChord.positions.map((fret, stringIndex) => {
             if (fret < 0) return null;
-            if (barreRenderedStrings.has(stringIndex)) return null;
+            // Skip only if it's in a barre AND it's not a root note (diamond)
+            if (barreRenderedStrings.has(stringIndex) && !isRootNotePreview(stringIndex)) return null;
             const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
             if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
 
@@ -761,6 +768,13 @@ export default function ChordManagerScreen() {
         })()}
       </View>
     );
+  };
+
+  // Helper to determine if a position is a root note
+  const isRootNote = (stringIndex: number) => {
+    if (!editingChord) return false;
+    const thisShape = dotShapes[stringIndex];
+    return thisShape === 'diamond';
   };
 
   // Render Interactive Fretboard
@@ -888,7 +902,8 @@ export default function ChordManagerScreen() {
 
             return editingChord.positions.map((fret, stringIndex) => {
               if (fret < 0) return null;
-              if (barreRenderedStrings.has(stringIndex)) return null;
+              // Skip only if it's in a barre AND it's not a root note (diamond)
+              if (barreRenderedStrings.has(stringIndex) && !isRootNote(stringIndex)) return null;
               const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
               if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
 
