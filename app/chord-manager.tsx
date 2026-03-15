@@ -316,6 +316,12 @@ export default function ChordManagerScreen() {
     // Step 2: User tapped - show finger selection modal with current shape
     setPendingDotPosition({ stringIndex, fretIndex });
     setModalSelectedShape(dotShape); // Use current shape as default
+    // Set default color based on shape when opening modal
+    if (dotShape === 'diamond') {
+      setDotColor('#4DB8E8'); // Cyan for diamond
+    } else {
+      setDotColor('#D4952A'); // Orange for circle
+    }
     setShowFingerModal(true);
   };
 
@@ -551,6 +557,88 @@ export default function ChordManagerScreen() {
       />
     </View>
   );
+
+  // Render Custom Preview Fretboard - EXACT MATCH to interactive editor
+  const renderCustomPreviewFretboard = () => {
+    if (!editingChord) return null;
+
+    const STRINGS = 6;
+    const STRING_SPACING = 36;
+    const FRET_SPACING = 50;
+    const PREVIEW_FRETS = 5;
+
+    return (
+      <View style={styles.previewFretboardGrid}>
+        {/* Fret lines */}
+        {Array.from({ length: PREVIEW_FRETS + 1 }).map((_, i) => (
+          <View 
+            key={`preview-fret-${i}`}
+            style={[
+              styles.previewFretLine,
+              { top: i * FRET_SPACING },
+              i === 0 && baseFret === 1 && styles.previewNutLine,
+            ]}
+          />
+        ))}
+
+        {/* String lines */}
+        {Array.from({ length: STRINGS }).map((_, i) => (
+          <View 
+            key={`preview-string-${i}`}
+            style={[styles.previewStringLine, { left: i * STRING_SPACING }]}
+          />
+        ))}
+
+        {/* Dots - USE STORED SHAPE AND COLOR FOR EACH DOT */}
+        {editingChord.positions.map((fret, stringIndex) => {
+          if (fret <= 0) return null;
+          const fretIndex = fret - baseFret + 1;
+          if (fretIndex < 1 || fretIndex > PREVIEW_FRETS) return null;
+
+          const x = stringIndex * STRING_SPACING;
+          const y = (fretIndex - 0.5) * FRET_SPACING;
+          const fingerNum = editingChord.fingers[stringIndex];
+          const thisShape = dotShapes[stringIndex]; // Use stored shape
+          const thisColor = dotColors[stringIndex]; // Use stored color
+
+          return (
+            <View
+              key={`preview-dot-${stringIndex}`}
+              style={[
+                styles.previewFretDot,
+                { left: x - 16, top: y - 16 },
+              ]}
+            >
+              {thisShape === 'circle' ? (
+                <View style={[styles.previewDotCircle, { backgroundColor: thisColor }]}>
+                  {fingerNum > 0 && (
+                    <Text style={styles.previewDotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                  )}
+                </View>
+              ) : (
+                <>
+                  <View style={[styles.previewDotDiamond, { backgroundColor: thisColor }]} />
+                  {fingerNum > 0 && (
+                    <Text style={styles.previewDiamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                  )}
+                </>
+              )}
+            </View>
+          );
+        })}
+
+        {/* Top markers (open/mute) */}
+        <View style={[styles.previewTopMarkersRow, { width: 216 }]}>
+          {editingChord.positions.map((fret, stringIndex) => (
+            <View key={`preview-marker-${stringIndex}`} style={[styles.previewTopMarker, { left: stringIndex * STRING_SPACING - 10 }]}>
+              {fret === -1 && <Text style={styles.previewMutedX}>×</Text>}
+              {fret === 0 && <Text style={styles.previewOpenO}>○</Text>}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   // Render Interactive Fretboard
   const renderInteractiveFretboard = () => {
@@ -941,7 +1029,7 @@ export default function ChordManagerScreen() {
           )}
         </View>
 
-        {/* Live Preview */}
+        {/* Live Preview - Custom Rendering */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>LIVE PREVIEW</Text>
           <View style={styles.previewContainer}>
@@ -949,12 +1037,10 @@ export default function ChordManagerScreen() {
               <Text style={styles.previewSymbol}>{editingChord.name}</Text>
               <Text style={styles.previewName}>{editingChord.fullName}</Text>
             </View>
-            <View style={styles.fretboardWrapper}>
-              <Fretboard 
-                key={`${JSON.stringify(editingChord.positions)}-${JSON.stringify(editingChord.fingers)}`}
-                chord={editingChord} 
-                size="lg" 
-              />
+            
+            {/* Custom Preview Fretboard - matches interactive editor exactly */}
+            <View style={styles.previewFretboardContainer}>
+              {renderCustomPreviewFretboard()}
             </View>
           </View>
         </View>
@@ -1024,7 +1110,16 @@ export default function ChordManagerScreen() {
                   {SHAPE_OPTIONS.map((option) => (
                     <Pressable
                       key={option.value}
-                      onPress={() => setModalSelectedShape(option.value as 'circle' | 'diamond')}
+                      onPress={() => {
+                        const shape = option.value as 'circle' | 'diamond';
+                        setModalSelectedShape(shape);
+                        // Auto-set color when shape changes in modal
+                        if (shape === 'diamond') {
+                          setDotColor('#4DB8E8'); // Cyan for diamond
+                        } else {
+                          setDotColor('#D4952A'); // Orange for circle
+                        }
+                      }}
                       style={[
                         styles.modalShapeButton,
                         modalSelectedShape === option.value && styles.modalShapeButtonActive,
@@ -1775,6 +1870,94 @@ const styles = StyleSheet.create({
   },
   fretboardWrapper: {
     marginVertical: spacing.md,
+  },
+  // Preview Fretboard Styles - EXACT MATCH to interactive
+  previewFretboardContainer: {
+    marginTop: spacing.md,
+  },
+  previewFretboardGrid: {
+    position: 'relative',
+    width: 216,
+    height: 250,
+    alignSelf: 'center',
+  },
+  previewFretLine: {
+    position: 'absolute',
+    width: '100%',
+    height: 2,
+    backgroundColor: '#666',
+  },
+  previewNutLine: {
+    height: 6,
+    backgroundColor: '#FFF',
+  },
+  previewStringLine: {
+    position: 'absolute',
+    height: '100%',
+    width: 2,
+    backgroundColor: '#888',
+  },
+  previewFretDot: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewDotCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewDotDiamond: {
+    width: 24,
+    height: 24,
+    transform: [{ rotate: '45deg' }],
+    position: 'absolute',
+  },
+  previewDotNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  previewDiamondNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    lineHeight: 32,
+  },
+  previewTopMarkersRow: {
+    position: 'absolute',
+    top: -26,
+    height: 20,
+  },
+  previewTopMarker: {
+    position: 'absolute',
+    width: 18,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewMutedX: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '700',
+  },
+  previewOpenO: {
+    fontSize: 18,
+    color: '#999',
+    fontWeight: '400',
   },
   modalOverlay: {
     flex: 1,
