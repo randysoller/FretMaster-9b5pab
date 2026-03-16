@@ -53,78 +53,126 @@ class AudioService {
   }
 
   /**
-   * Play a realistic guitar string with harmonics and proper envelope
+   * Play ultra-realistic guitar string using advanced physical modeling
+   * Features:
+   * - Inharmonicity (real strings aren't perfectly harmonic)
+   * - String-specific decay rates
+   * - Body resonance peaks (guitar soundhole/body modes)
+   * - Sympathetic resonance (other strings vibrating)
+   * - Realistic pluck transient
+   * - Stereo width for fullness
    */
   playGuitarString(frequency: number, duration: number = 1500, velocity: number = 0.8, stringIndex: number = 0): void {
     try {
       const ctx = this.getAudioContext();
       const now = ctx.currentTime;
       
-      // String-specific characteristics
-      const stringDamping = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95][stringIndex] || 0.8;
-      const stringBrightness = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85][stringIndex] || 0.7;
-      
-      // Create harmonic overtones for realistic guitar sound
-      const harmonics = [
-        { ratio: 1.0, amplitude: 1.0 },      // Fundamental
-        { ratio: 2.0, amplitude: 0.7 },      // 2nd harmonic (octave)
-        { ratio: 3.0, amplitude: 0.5 },      // 3rd harmonic
-        { ratio: 4.0, amplitude: 0.3 },      // 4th harmonic
-        { ratio: 5.0, amplitude: 0.2 },      // 5th harmonic
-        { ratio: 6.0, amplitude: 0.15 },     // 6th harmonic
-        { ratio: 7.0, amplitude: 0.1 },      // 7th harmonic
+      // **Physical String Properties** (based on real guitar strings)
+      const stringProps = [
+        { mass: 1.0, tension: 0.7, inharmonicity: 0.0008, brightness: 0.55 },  // E (low)
+        { mass: 0.85, tension: 0.75, inharmonicity: 0.0007, brightness: 0.60 }, // A
+        { mass: 0.70, tension: 0.80, inharmonicity: 0.0006, brightness: 0.65 }, // D
+        { mass: 0.55, tension: 0.85, inharmonicity: 0.0004, brightness: 0.72 }, // G
+        { mass: 0.40, tension: 0.90, inharmonicity: 0.0003, brightness: 0.78 }, // B
+        { mass: 0.30, tension: 0.95, inharmonicity: 0.0002, brightness: 0.85 }, // E (high)
       ];
+      const props = stringProps[stringIndex] || stringProps[2];
       
-      // Master envelope for this string
+      // **Enhanced Harmonic Series with Inharmonicity**
+      // Real strings have slightly sharp harmonics due to stiffness
+      const harmonics = [];
+      for (let n = 1; n <= 12; n++) {
+        const inharmonicRatio = n * (1 + props.inharmonicity * n * n);
+        const amplitude = Math.pow(0.75, n - 1) * (1 / n); // Natural decay
+        harmonics.push({ ratio: inharmonicRatio, amplitude });
+      }
+      
+      // **Master Gain with Stereo Panning**
       const masterGain = ctx.createGain();
-      masterGain.connect(this.masterGain!);
+      const panner = ctx.createStereoPanner();
       
-      // Guitar-like ADSR envelope
-      const attack = 0.005;  // Very fast attack (pluck)
-      const decay = 0.08;    // Quick decay
-      const sustain = 0.4 * velocity * stringDamping;  // Lower sustain for realistic decay
-      const release = duration / 1000;
+      // Subtle stereo spread (strings spread across soundstage)
+      panner.pan.value = (stringIndex - 2.5) * 0.15; // -0.375 to +0.375
+      
+      masterGain.connect(panner);
+      panner.connect(this.masterGain!);
+      
+      // **Dynamic ADSR Envelope** (varies by string and velocity)
+      const attack = 0.003 + (1 - velocity) * 0.002;  // Softer = slower attack
+      const decay = 0.06 + props.mass * 0.04;         // Heavier strings = longer decay
+      const sustain = 0.35 * velocity * props.tension;
+      const release = (duration / 1000) * (0.8 + props.mass * 0.4);
       
       masterGain.gain.setValueAtTime(0, now);
-      masterGain.gain.linearRampToValueAtTime(velocity, now + attack);
+      masterGain.gain.linearRampToValueAtTime(velocity * 0.85, now + attack);
       masterGain.gain.exponentialRampToValueAtTime(sustain, now + attack + decay);
       masterGain.gain.exponentialRampToValueAtTime(0.001, now + release);
       
-      // Create each harmonic oscillator
+      // **Guitar Body Resonance** (soundhole/body modes)
+      const bodyResonance = ctx.createBiquadFilter();
+      bodyResonance.type = 'peaking';
+      bodyResonance.frequency.value = 120; // Body resonance around 100-150Hz
+      bodyResonance.Q.value = 2.5;
+      bodyResonance.gain.value = 4; // Boost low frequencies
+      
+      // **Main Tone Filter** (brightness control)
+      const toneFilter = ctx.createBiquadFilter();
+      toneFilter.type = 'lowpass';
+      toneFilter.frequency.value = 2500 + (props.brightness * 3500); // 2.5kHz-6kHz
+      toneFilter.Q.value = 0.8; // Resonant peak for "woody" tone
+      
+      // **Air Absorption Filter** (high-freq rolloff)
+      const airFilter = ctx.createBiquadFilter();
+      airFilter.type = 'highshelf';
+      airFilter.frequency.value = 8000;
+      airFilter.gain.value = -6; // Gentle rolloff
+      
+      // Connect filter chain
+      const filterChain = (input: AudioNode) => {
+        input.connect(bodyResonance);
+        bodyResonance.connect(toneFilter);
+        toneFilter.connect(airFilter);
+        airFilter.connect(masterGain);
+      };
+      
+      // **Create Harmonic Oscillators with Individual Decay**
       harmonics.forEach((harmonic, index) => {
         const osc = ctx.createOscillator();
         const harmonicGain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
         
-        // Use triangle wave for warmer guitar-like tone
-        osc.type = 'triangle';
+        // Use sawtooth for richer harmonics, then filter
+        osc.type = 'sawtooth';
         osc.frequency.value = frequency * harmonic.ratio;
         
-        // Lowpass filter for warmth (guitar body resonance)
-        filter.type = 'lowpass';
-        filter.frequency.value = 3000 + (stringBrightness * 2000);
-        filter.Q.value = 0.7;
+        // Each harmonic decays at different rate (higher = faster)
+        const harmonicDecay = decay * (1 + index * 0.08);
+        const harmonicRelease = release * Math.pow(0.95, index);
         
-        // Individual harmonic amplitude
-        harmonicGain.gain.value = harmonic.amplitude * (index === 0 ? 1 : 0.5);
+        harmonicGain.gain.setValueAtTime(0, now);
+        harmonicGain.gain.linearRampToValueAtTime(harmonic.amplitude, now + attack);
+        harmonicGain.gain.exponentialRampToValueAtTime(harmonic.amplitude * 0.3, now + attack + harmonicDecay);
+        harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + harmonicRelease);
         
-        osc.connect(filter);
-        filter.connect(harmonicGain);
-        harmonicGain.connect(masterGain);
+        osc.connect(harmonicGain);
+        filterChain(harmonicGain);
         
         osc.start(now);
-        osc.stop(now + release);
+        osc.stop(now + harmonicRelease);
         
         this.activeOscillators.push(osc);
       });
       
-      // Add pluck noise for attack realism
-      this.addPluckNoise(masterGain, now, velocity * 0.3);
+      // **Enhanced Pluck Transient** (realistic pick/finger sound)
+      this.addRealisticPluck(masterGain, now, velocity, props.brightness);
+      
+      // **Subtle Sympathetic Resonance** (other strings vibrating)
+      if (velocity > 0.5) {
+        this.addSympatheticResonance(masterGain, now, frequency, velocity * 0.15, release);
+      }
       
       setTimeout(() => {
         this.activeOscillators = this.activeOscillators.filter(osc => {
           try {
-            // Check if oscillator is still playing
             return true;
           } catch {
             return false;
@@ -137,40 +185,126 @@ class AudioService {
   }
   
   /**
-   * Add pluck noise for realistic guitar attack
+   * Ultra-realistic pluck transient with pick scrape and string impact
    */
-  private addPluckNoise(destination: AudioNode, startTime: number, volume: number): void {
+  private addRealisticPluck(destination: AudioNode, startTime: number, volume: number, brightness: number): void {
     try {
       const ctx = this.getAudioContext();
-      const bufferSize = ctx.sampleRate * 0.05; // 50ms of noise
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const data = buffer.getChannelData(0);
       
-      // Generate filtered noise for pluck
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / bufferSize * 10);
+      // **1. Pick Scrape** (very brief high-frequency click)
+      const scrapeSize = ctx.sampleRate * 0.008; // 8ms
+      const scrapeBuffer = ctx.createBuffer(1, scrapeSize, ctx.sampleRate);
+      const scrapeData = scrapeBuffer.getChannelData(0);
+      
+      for (let i = 0; i < scrapeSize; i++) {
+        const decay = Math.exp(-i / scrapeSize * 20);
+        scrapeData[i] = (Math.random() * 2 - 1) * decay;
       }
       
-      const noise = ctx.createBufferSource();
-      const noiseGain = ctx.createGain();
-      const noiseFilter = ctx.createBiquadFilter();
+      const scrape = ctx.createBufferSource();
+      const scrapeGain = ctx.createGain();
+      const scrapeFilter = ctx.createBiquadFilter();
       
-      noise.buffer = buffer;
+      scrape.buffer = scrapeBuffer;
+      scrapeFilter.type = 'highpass';
+      scrapeFilter.frequency.value = 3000 + brightness * 2000; // Brighter strings = higher scrape
+      scrapeGain.gain.value = volume * 0.4;
       
-      // Highpass filter for pluck brightness
-      noiseFilter.type = 'highpass';
-      noiseFilter.frequency.value = 800;
+      scrape.connect(scrapeFilter);
+      scrapeFilter.connect(scrapeGain);
+      scrapeGain.connect(destination);
       
-      noiseGain.gain.value = volume;
+      scrape.start(startTime);
+      scrape.stop(startTime + 0.008);
       
-      noise.connect(noiseFilter);
-      noiseFilter.connect(noiseGain);
-      noiseGain.connect(destination);
+      // **2. String Impact** (mid-frequency thump)
+      const impactSize = ctx.sampleRate * 0.03; // 30ms
+      const impactBuffer = ctx.createBuffer(1, impactSize, ctx.sampleRate);
+      const impactData = impactBuffer.getChannelData(0);
       
-      noise.start(startTime);
-      noise.stop(startTime + 0.05);
+      for (let i = 0; i < impactSize; i++) {
+        const decay = Math.exp(-i / impactSize * 8);
+        impactData[i] = (Math.random() * 2 - 1) * decay;
+      }
+      
+      const impact = ctx.createBufferSource();
+      const impactGain = ctx.createGain();
+      const impactFilter = ctx.createBiquadFilter();
+      
+      impact.buffer = impactBuffer;
+      impactFilter.type = 'bandpass';
+      impactFilter.frequency.value = 1200;
+      impactFilter.Q.value = 2;
+      impactGain.gain.value = volume * 0.25;
+      
+      impact.connect(impactFilter);
+      impactFilter.connect(impactGain);
+      impactGain.connect(destination);
+      
+      impact.start(startTime + 0.002);
+      impact.stop(startTime + 0.032);
+      
+      // **3. Body Knock** (low-frequency thump from string hitting fretboard)
+      const knockOsc = ctx.createOscillator();
+      const knockGain = ctx.createGain();
+      
+      knockOsc.type = 'sine';
+      knockOsc.frequency.value = 80; // Deep body thump
+      
+      knockGain.gain.setValueAtTime(0, startTime);
+      knockGain.gain.linearRampToValueAtTime(volume * 0.15, startTime + 0.005);
+      knockGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.04);
+      
+      knockOsc.connect(knockGain);
+      knockGain.connect(destination);
+      
+      knockOsc.start(startTime);
+      knockOsc.stop(startTime + 0.04);
     } catch (error) {
-      // Noise is optional, fail silently
+      // Pluck is optional, fail silently
+    }
+  }
+  
+  /**
+   * Simulate sympathetic resonance from other strings
+   */
+  private addSympatheticResonance(destination: AudioNode, startTime: number, fundamental: number, volume: number, duration: number): void {
+    try {
+      const ctx = this.getAudioContext();
+      
+      // Add subtle overtones at musically related frequencies
+      const sympatheticFreqs = [
+        fundamental * 0.5,   // Octave below
+        fundamental * 1.5,   // Perfect fifth
+        fundamental * 2.0,   // Octave above
+      ];
+      
+      sympatheticFreqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+        
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        
+        // Very subtle, delayed onset
+        const delay = 0.05 + i * 0.02;
+        gain.gain.setValueAtTime(0, startTime + delay);
+        gain.gain.linearRampToValueAtTime(volume * 0.1, startTime + delay + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
+        
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        
+        osc.start(startTime + delay);
+        osc.stop(startTime + duration * 0.7);
+      });
+    } catch (error) {
+      // Optional enhancement
     }
   }
   
