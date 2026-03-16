@@ -1,1020 +1,1032 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Alert } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
 import { Screen } from '@/components';
-import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import { ChordData, CHORDS } from '@/constants/musicData';
+import { Fretboard } from '@/components/feature/Fretboard';
+import { colors, spacing, borderRadius, typography } from '@/constants/theme';
+import { ChordData, CHORD_DATA } from '@/constants/musicData';
+import { usePresets } from '@/contexts/PresetContext';
 import { audioService } from '@/services/audioService';
-import { pitchDetectionService, PitchDetectionResult, ChordDetectionResult } from '@/services/pitchDetectionService';
-import { chordDetectionService } from '@/services/chordDetectionService';
-import { mobileAudioDetectionService } from '@/services/mobileAudioDetectionService';
-import { Platform } from 'react-native';
+import { recordChordPractice, formatDuration } from '@/services/practiceStatsService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+type PracticeMode = 'free' | 'timed' | 'quiz';
+type PracticeSource = 'all' | 'preset' | 'selection';
+
+const STORAGE_KEY = 'fretmaster-chord-manager-edits';
 
 export default function ChordPracticeScreen() {
   const router = useRouter();
-  const [currentChord, setCurrentChord] = useState<ChordData>(CHORDS[0]);
-  const [isListening, setIsListening] = useState(false);
-  const [micSensitivity, setMicSensitivity] = useState(60);
-  const [detectedPitch, setDetectedPitch] = useState<PitchDetectionResult | null>(null);
-  const [chordDetection, setChordDetection] = useState<ChordDetectionResult | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [chordDiagram, setChordDiagram] = useState(true);
-  const [beatSyncEnabled, setBeatSyncEnabled] = useState(false);
-  const [score, setScore] = useState(0);
-  const [attempts, setAttempts] = useState(0);
-  const [currentDetectionId, setCurrentDetectionId] = useState<string | undefined>();
-  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-  const [personalizedSettings, setPersonalizedSettings] = useState<any>(null);
+  const params = useLocalSearchParams();
+  const { presets } = usePresets();
 
+  // State
+  const [phase, setPhase] = useState<'setup' | 'practice' | 'results'>('setup');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('free');
+  const [practiceSource, setPracticeSource] = useState<PracticeSource>('all');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [chordPool, setChordPool] = useState<ChordData[]>([]);
+  const [currentChordIndex, setCurrentChordIndex] = useState(0);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+  const [chordStartTime, setChordStartTime] = useState<number | null>(null);
+  const [completedChords, setCompletedChords] = useState<string[]>([]);
+  const [showChordName, setShowChordName] = useState(true);
+  const [timePerChord, setTimePerChord] = useState(30); // seconds
+  const [remainingTime, setRemainingTime] = useState(30);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
+  const [allChords, setAllChords] = useState<ChordData[]>(CHORD_DATA);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load edited chords from AsyncStorage
   useEffect(() => {
-    // Load personalized settings
-    loadPersonalizedSettings();
-
-    // Clean up on unmount
-    return () => {
-      if (isListening) {
-        pitchDetectionService.stopDetection();
-      }
-      audioService.stopAll();
-    };
+    loadChords();
   }, []);
 
-  const loadPersonalizedSettings = async () => {
-    const settings = await chordDetectionService.getPersonalizedSettings();
-    if (settings) {
-      setPersonalizedSettings(settings);
-      console.log('Loaded personalized settings:', settings);
+  const loadChords = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const editedChords = JSON.parse(stored);
+        if (Array.isArray(editedChords)) {
+          const mergedChords = [...CHORD_DATA].map(originalChord => {
+            const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
+            return editedChord || originalChord;
+          });
+          const newChords = editedChords.filter((c: ChordData) => 
+            !CHORD_DATA.some(original => original.id === c.id)
+          );
+          setAllChords([...mergedChords, ...newChords]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load chords:', error);
     }
   };
 
-  const startListening = async () => {
-    const hasAccess = await pitchDetectionService.requestMicrophoneAccess();
+  // Timer effect for timed mode
+  useEffect(() => {
+    if (phase === 'practice' && practiceMode === 'timed' && !isPaused && remainingTime > 0) {
+      timerRef.current = setInterval(() => {
+        setRemainingTime(prev => {
+          if (prev <= 1) {
+            handleNextChord(true);
+            return timePerChord;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+      };
+    }
+  }, [phase, practiceMode, isPaused, remainingTime]);
+
+  // Parse initial selection from params
+  useEffect(() => {
+    if (params.chords && params.source) {
+      try {
+        const selectedChords = JSON.parse(params.chords as string);
+        setChordPool(selectedChords);
+        setPracticeSource('selection');
+        setPhase('setup');
+      } catch (error) {
+        console.error('Failed to parse chord selection:', error);
+      }
+    }
+  }, [params]);
+
+  const currentChord = chordPool[currentChordIndex];
+
+  const handleStartPractice = () => {
+    if (chordPool.length === 0) {
+      Alert.alert('No Chords Selected', 'Please select chords to practice');
+      return;
+    }
+
+    // Shuffle chords for variety
+    const shuffled = [...chordPool].sort(() => Math.random() - 0.5);
+    setChordPool(shuffled);
+    setCurrentChordIndex(0);
+    setSessionStartTime(Date.now());
+    setChordStartTime(Date.now());
+    setCompletedChords([]);
+    setRemainingTime(timePerChord);
+    setPhase('practice');
     
-    if (hasAccess) {
-      setIsListening(true);
-      pitchDetectionService.startDetection((result) => {
-        setDetectedPitch(result);
-      }, micSensitivity / 100);
-    } else {
-      alert('Microphone access is required for chord detection');
+    // Auto-play first chord in free mode
+    if (practiceMode === 'free') {
+      setTimeout(() => {
+        audioService.playChordPreview(shuffled[0].name);
+      }, 500);
     }
   };
 
-  const detectChord = async () => {
-    setIsDetecting(true);
-    setChordDetection(null);
-    setShowFeedbackPrompt(false);
+  const handleSourceChange = (source: PracticeSource) => {
+    setPracticeSource(source);
     
-    let result;
-    
-    if (Platform.OS === 'web') {
-      // Web: Use smart detection with personalized settings
-      result = await chordDetectionService.detectChordSmart(
-        {
-          name: currentChord.name,
-          positions: currentChord.positions,
-          notes: currentChord.notes || [],
-        },
-        2000
-      );
-    } else {
-      // Mobile: Use API-based detection
-      result = await mobileAudioDetectionService.detectChord(
-        {
-          name: currentChord.name,
-          positions: currentChord.positions,
-          notes: currentChord.notes || [],
-        },
-        2000
-      );
+    if (source === 'all') {
+      setChordPool(allChords);
+    } else if (source === 'preset') {
+      setShowPresetModal(true);
     }
-    
-    setChordDetection(result);
-    setCurrentDetectionId(result.detectionId);
-    setIsDetecting(false);
-    
-    // Show feedback prompt after detection
-    setShowFeedbackPrompt(true);
-    
-    if (result.isCorrect) {
-      setScore(score + 1);
-      audioService.playSuccess();
-    } else {
-      audioService.playError();
-    }
+    // 'selection' handled by params
   };
 
-  const submitFeedback = async (wasCorrect: boolean, correctedChord?: string) => {
-    if (!currentDetectionId) return;
-
-    await chordDetectionService.submitFeedback(
-      currentDetectionId,
-      wasCorrect,
-      correctedChord
-    );
-
-    setShowFeedbackPrompt(false);
-
-    // Reload personalized settings to reflect feedback
-    await loadPersonalizedSettings();
-
-    // Show toast or feedback confirmation
-    console.log('Feedback submitted:', wasCorrect ? 'Correct' : 'Incorrect');
-  };
-
-  const stopListening = () => {
-    setIsListening(false);
-    pitchDetectionService.stopDetection();
-    setDetectedPitch(null);
-  };
-
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
+  const handlePresetSelect = (presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (preset) {
+      const presetChords = allChords.filter(c => preset.chordIds.includes(c.id!));
+      setChordPool(presetChords);
+      setSelectedPresetId(presetId);
+      setShowPresetModal(false);
     }
   };
 
   const handlePlayChord = () => {
-    audioService.playChordPreview(currentChord.name);
+    if (currentChord) {
+      audioService.playChordPreview(currentChord.name);
+    }
   };
 
-  const handleNextChord = () => {
-    const nextIndex = (CHORDS.indexOf(currentChord) + 1) % CHORDS.length;
-    setCurrentChord(CHORDS[nextIndex]);
-    setAttempts(attempts + 1);
+  const handleToggleChordName = () => {
+    setShowChordName(!showChordName);
   };
 
-  const renderFretboardDiagram = () => {
-    const minFret = Math.min(...currentChord.positions.filter(p => p > 0));
-    const maxFret = Math.max(...currentChord.positions.filter(p => p > 0));
-    const startFret = Math.max(1, minFret - 1);
-    const numFrets = Math.min(5, maxFret - startFret + 2);
+  const handleNextChord = async (autoAdvance: boolean = false) => {
+    // Record practice stats for current chord
+    if (currentChord && chordStartTime) {
+      const durationSeconds = Math.floor((Date.now() - chordStartTime) / 1000);
+      await recordChordPractice(
+        currentChord.id!,
+        currentChord.fullName,
+        durationSeconds
+      );
+      setCompletedChords(prev => [...prev, currentChord.id!]);
+    }
 
-    return (
-      <View style={styles.fretboardContainer}>
-        <View style={styles.fretboard}>
-          {currentChord.positions.map((fret, stringIndex) => (
-            <View key={stringIndex} style={styles.string}>
-              {Array.from({ length: numFrets }).map((_, fretIndex) => {
-                const currentFret = startFret + fretIndex;
-                const shouldShowDot = fret > 0 && fret === currentFret;
-                const fingerNumber = shouldShowDot ? currentChord.fingers[stringIndex] : 0;
+    // Check if finished
+    if (currentChordIndex >= chordPool.length - 1) {
+      handleFinishPractice();
+      return;
+    }
 
-                return (
-                  <View key={fretIndex} style={styles.fretCell}>
-                    <View style={styles.stringLine} />
-                    {shouldShowDot && (
-                      <View style={styles.fingerDot}>
-                        <Text style={styles.fingerNumber}>{fingerNumber}</Text>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          ))}
+    // Move to next chord
+    setCurrentChordIndex(prev => prev + 1);
+    setChordStartTime(Date.now());
+    setRemainingTime(timePerChord);
+    
+    // Auto-play next chord in free mode
+    if (practiceMode === 'free' && !autoAdvance) {
+      setTimeout(() => {
+        audioService.playChordPreview(chordPool[currentChordIndex + 1].name);
+      }, 300);
+    }
+  };
 
-          <View style={styles.fretLines}>
-            {Array.from({ length: numFrets + 1 }).map((_, i) => (
-              <View key={i} style={styles.fretLine} />
-            ))}
-          </View>
+  const handlePreviousChord = () => {
+    if (currentChordIndex > 0) {
+      setCurrentChordIndex(prev => prev - 1);
+      setChordStartTime(Date.now());
+      setRemainingTime(timePerChord);
+    }
+  };
 
-          {startFret === 1 && <View style={styles.nut} />}
+  const handlePauseResume = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const handleFinishPractice = () => {
+    audioService.playSuccess();
+    setPhase('results');
+  };
+
+  const handleRestartPractice = () => {
+    setPhase('setup');
+    setCurrentChordIndex(0);
+    setCompletedChords([]);
+    setSessionStartTime(null);
+    setChordStartTime(null);
+  };
+
+  const getTotalSessionTime = () => {
+    if (!sessionStartTime) return 0;
+    return Math.floor((Date.now() - sessionStartTime) / 1000);
+  };
+
+  // Setup Screen
+  const renderSetupScreen = () => (
+    <ScrollView style={styles.setupContainer} contentContainerStyle={styles.setupContent}>
+      <View style={styles.setupHeader}>
+        <MaterialIcons name="school" size={48} color={colors.primary} />
+        <Text style={styles.setupTitle}>Chord Practice</Text>
+        <Text style={styles.setupSubtitle}>
+          Master chords with flashcard-style practice, audio playback, and progress tracking
+        </Text>
+      </View>
+
+      {/* Practice Mode */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>PRACTICE MODE</Text>
+        <View style={styles.optionGrid}>
+          <Pressable
+            onPress={() => setPracticeMode('free')}
+            style={[styles.optionCard, practiceMode === 'free' && styles.optionCardActive]}
+          >
+            <MaterialIcons 
+              name="explore" 
+              size={32} 
+              color={practiceMode === 'free' ? colors.primary : colors.textMuted} 
+            />
+            <Text style={[styles.optionTitle, practiceMode === 'free' && styles.optionTitleActive]}>
+              Free Practice
+            </Text>
+            <Text style={styles.optionDescription}>
+              No timer, practice at your own pace
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setPracticeMode('timed')}
+            style={[styles.optionCard, practiceMode === 'timed' && styles.optionCardActive]}
+          >
+            <MaterialIcons 
+              name="timer" 
+              size={32} 
+              color={practiceMode === 'timed' ? colors.primary : colors.textMuted} 
+            />
+            <Text style={[styles.optionTitle, practiceMode === 'timed' && styles.optionTitleActive]}>
+              Timed Practice
+            </Text>
+            <Text style={styles.optionDescription}>
+              {timePerChord}s per chord challenge
+            </Text>
+          </Pressable>
         </View>
 
-        {/* Tuning reference */}
-        <View style={styles.tuningReference}>
-          {['E', 'A', 'D', 'G', 'B', 'E'].map((note, index) => {
-            const fret = currentChord.positions[index];
-            return (
-              <View key={index} style={styles.tuningRow}>
-                <Text style={styles.tuningString}>{note}</Text>
-                <Text style={styles.tuningSeparator}>-</Text>
-                <Text style={styles.tuningFret}>{fret === -1 ? 'x' : fret}</Text>
+        {practiceMode === 'timed' && (
+          <View style={styles.timerSettings}>
+            <Text style={styles.timerLabel}>Time per chord:</Text>
+            <View style={styles.timerButtons}>
+              {[15, 30, 45, 60].map(seconds => (
+                <Pressable
+                  key={seconds}
+                  onPress={() => setTimePerChord(seconds)}
+                  style={[
+                    styles.timerButton,
+                    timePerChord === seconds && styles.timerButtonActive,
+                  ]}
+                >
+                  <Text style={[
+                    styles.timerButtonText,
+                    timePerChord === seconds && styles.timerButtonTextActive,
+                  ]}>
+                    {seconds}s
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Chord Source */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>CHORD SELECTION</Text>
+        <View style={styles.sourceButtons}>
+          <Pressable
+            onPress={() => handleSourceChange('all')}
+            style={[styles.sourceButton, practiceSource === 'all' && styles.sourceButtonActive]}
+          >
+            <MaterialIcons name="library-music" size={20} color={colors.text} />
+            <Text style={styles.sourceButtonText}>All Chords ({allChords.length})</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => handleSourceChange('preset')}
+            style={[styles.sourceButton, practiceSource === 'preset' && styles.sourceButtonActive]}
+          >
+            <MaterialIcons name="bookmark" size={20} color={colors.text} />
+            <Text style={styles.sourceButtonText}>
+              {selectedPresetId 
+                ? presets.find(p => p.id === selectedPresetId)?.name || 'From Preset'
+                : 'From Preset'}
+              {selectedPresetId && ` (${chordPool.length})`}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Start Button */}
+      <Pressable
+        onPress={handleStartPractice}
+        style={[styles.startButton, chordPool.length === 0 && styles.startButtonDisabled]}
+        disabled={chordPool.length === 0}
+      >
+        <MaterialIcons name="play-arrow" size={24} color="#000" />
+        <Text style={styles.startButtonText}>
+          Start Practice ({chordPool.length} chords)
+        </Text>
+      </Pressable>
+    </ScrollView>
+  );
+
+  // Practice Screen
+  const renderPracticeScreen = () => {
+    if (!currentChord) return null;
+
+    const progress = ((currentChordIndex + 1) / chordPool.length) * 100;
+
+    return (
+      <View style={styles.practiceContainer}>
+        {/* Header */}
+        <View style={styles.practiceHeader}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+          </Pressable>
+          <View style={styles.progressInfo}>
+            <Text style={styles.progressText}>
+              {currentChordIndex + 1} / {chordPool.length}
+            </Text>
+            {practiceMode === 'timed' && (
+              <View style={styles.timerDisplay}>
+                <MaterialIcons name="timer" size={16} color={remainingTime <= 5 ? colors.error : colors.primary} />
+                <Text style={[
+                  styles.timerText,
+                  remainingTime <= 5 && styles.timerTextWarning,
+                ]}>
+                  {remainingTime}s
+                </Text>
               </View>
-            );
-          })}
+            )}
+          </View>
+          <Pressable onPress={handlePauseResume} style={styles.pauseButton}>
+            <MaterialIcons name={isPaused ? "play-arrow" : "pause"} size={24} color={colors.text} />
+          </Pressable>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+        </View>
+
+        {/* Chord Display */}
+        <ScrollView 
+          style={styles.chordDisplay}
+          contentContainerStyle={styles.chordDisplayContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Chord Name */}
+          <View style={styles.chordNameSection}>
+            {showChordName ? (
+              <>
+                <Text style={styles.chordSymbol}>{currentChord.name}</Text>
+                <Text style={styles.chordFullName}>{currentChord.fullName}</Text>
+              </>
+            ) : (
+              <View style={styles.hiddenName}>
+                <MaterialIcons name="visibility-off" size={32} color={colors.textMuted} />
+                <Text style={styles.hiddenNameText}>Chord name hidden</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Fretboard */}
+          <View style={styles.fretboardDisplay}>
+            <Fretboard chord={currentChord} size="lg" />
+          </View>
+
+          {/* Chord Tags */}
+          <View style={styles.chordTags}>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{currentChord.shape.toUpperCase()}</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{currentChord.type.toUpperCase()}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Controls */}
+        <View style={styles.practiceControls}>
+          <Pressable onPress={handlePlayChord} style={styles.playButton}>
+            <MaterialIcons name="volume-up" size={32} color="#000" />
+            <Text style={styles.playButtonText}>Play Audio</Text>
+          </Pressable>
+
+          <Pressable onPress={handleToggleChordName} style={styles.toggleButton}>
+            <MaterialIcons 
+              name={showChordName ? "visibility" : "visibility-off"} 
+              size={24} 
+              color={colors.text} 
+            />
+            <Text style={styles.toggleButtonText}>
+              {showChordName ? 'Hide' : 'Show'} Name
+            </Text>
+          </Pressable>
+
+          <View style={styles.navigationButtons}>
+            <Pressable
+              onPress={handlePreviousChord}
+              style={[styles.navButton, currentChordIndex === 0 && styles.navButtonDisabled]}
+              disabled={currentChordIndex === 0}
+            >
+              <MaterialIcons name="chevron-left" size={32} color={colors.text} />
+            </Pressable>
+
+            <Pressable onPress={() => handleNextChord(false)} style={styles.nextButton}>
+              <Text style={styles.nextButtonText}>
+                {currentChordIndex >= chordPool.length - 1 ? 'Finish' : 'Next'}
+              </Text>
+              <MaterialIcons name="chevron-right" size={24} color="#000" />
+            </Pressable>
+
+            <Pressable
+              onPress={() => handleNextChord(false)}
+              style={styles.navButton}
+            >
+              <MaterialIcons name="chevron-right" size={32} color={colors.text} />
+            </Pressable>
+          </View>
         </View>
       </View>
     );
   };
 
+  // Results Screen
+  const renderResultsScreen = () => {
+    const totalTime = getTotalSessionTime();
+    const avgTimePerChord = completedChords.length > 0 ? totalTime / completedChords.length : 0;
+
+    return (
+      <ScrollView style={styles.resultsContainer} contentContainerStyle={styles.resultsContent}>
+        <View style={styles.resultsHeader}>
+          <View style={styles.successIcon}>
+            <MaterialIcons name="check-circle" size={64} color={colors.success} />
+          </View>
+          <Text style={styles.resultsTitle}>Practice Complete!</Text>
+          <Text style={styles.resultsSubtitle}>Great job practicing {completedChords.length} chords</Text>
+        </View>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <MaterialIcons name="timer" size={32} color={colors.primary} />
+            <Text style={styles.statValue}>{formatDuration(totalTime)}</Text>
+            <Text style={styles.statLabel}>Total Time</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <MaterialIcons name="music-note" size={32} color={colors.accent} />
+            <Text style={styles.statValue}>{completedChords.length}</Text>
+            <Text style={styles.statLabel}>Chords Practiced</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <MaterialIcons name="speed" size={32} color={colors.secondary} />
+            <Text style={styles.statValue}>{Math.round(avgTimePerChord)}s</Text>
+            <Text style={styles.statLabel}>Avg Per Chord</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.resultsActions}>
+          <Pressable onPress={handleRestartPractice} style={styles.restartButton}>
+            <MaterialIcons name="refresh" size={24} color={colors.primary} />
+            <Text style={styles.restartButtonText}>Practice Again</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/stats' as any)} style={styles.statsButton}>
+            <MaterialIcons name="bar-chart" size={24} color={colors.text} />
+            <Text style={styles.statsButtonText}>View All Stats</Text>
+          </Pressable>
+
+          <Pressable onPress={() => router.back()} style={styles.doneButton}>
+            <Text style={styles.doneButtonText}>Done</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    );
+  };
+
   return (
-    <>
-      <Stack.Screen 
-        options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerTitle: 'Chord Practice',
-          headerRight: () => (
-            <Pressable onPress={() => router.back()} style={{ marginRight: spacing.md }}>
-              <MaterialIcons name="close" size={24} color={colors.text} />
-            </Pressable>
-          ),
-        }} 
-      />
-      <Screen edges={['bottom']}>
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-          {/* Controls Bar */}
-          <View style={styles.controlsBar}>
-            <Pressable 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <MaterialIcons name="arrow-back" size={20} color={colors.text} />
-              <Text style={styles.backText}>Back</Text>
-            </Pressable>
+    <Screen edges={['top']}>
+      <View style={styles.container}>
+        {phase === 'setup' && renderSetupScreen()}
+        {phase === 'practice' && renderPracticeScreen()}
+        {phase === 'results' && renderResultsScreen()}
 
-            <Pressable 
-              style={[styles.listeningButton, isListening && styles.listeningButtonActive]}
-              onPress={toggleListening}
-            >
-              <MaterialIcons 
-                name={isListening ? 'mic' : 'mic-off'} 
-                size={16} 
-                color={isListening ? colors.success : colors.text} 
-              />
-              <Text style={[
-                styles.listeningText,
-                isListening && styles.listeningTextActive,
-              ]}>
-                {isListening ? 'Listening - play the chord' : 'Chord Diagram On'}
-              </Text>
-              {isListening && (
-                <View style={styles.pulseIndicator}>
-                  <MaterialIcons name="fiber-manual-record" size={8} color={colors.success} />
-                </View>
-              )}
-            </Pressable>
-
-            <Pressable style={styles.volumeButton}>
-              <MaterialIcons name="volume-up" size={20} color={colors.textSecondary} />
-            </Pressable>
-
-            <Pressable style={styles.settingsButton}>
-              <MaterialIcons name="more-vert" size={20} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-
-          {/* Mic Sensitivity */}
-          <View style={styles.sensitivitySection}>
-            <View style={styles.sensitivityHeader}>
-              <MaterialIcons name="mic" size={16} color={colors.primary} />
-              <Text style={styles.sectionLabel}>MIC SENSITIVITY</Text>
-              <Text style={styles.sensitivityValue}>{micSensitivity}</Text>
-              <Pressable style={styles.stopButton}>
-                <Text style={styles.stopButtonText}>Sensitive</Text>
-              </Pressable>
-            </View>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={100}
-              value={micSensitivity}
-              onValueChange={setMicSensitivity}
-              minimumTrackTintColor={colors.primary}
-              maximumTrackTintColor={colors.surface}
-              thumbTintColor={colors.primary}
-            />
-          </View>
-
-          {/* Advanced Detection */}
-          <View style={styles.advancedSection}>
-            <View style={styles.advancedHeader}>
-              <MaterialIcons name="tune" size={16} color={colors.textSecondary} />
-              <Text style={styles.sectionLabel}>ADVANCED DETECTION</Text>
-              <Pressable style={styles.settingsIconButton}>
-                <MaterialIcons name="settings" size={16} color={colors.textSecondary} />
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Beat Sync */}
-          <View style={styles.beatSyncSection}>
-            <View style={styles.beatSyncHeader}>
-              <MaterialIcons name="graphic-eq" size={16} color={colors.textSecondary} />
-              <Text style={styles.sectionLabel}>BEAT SYNC</Text>
-              <Pressable 
-                style={styles.startButton}
-                onPress={() => setBeatSyncEnabled(!beatSyncEnabled)}
-              >
-                <MaterialIcons 
-                  name={beatSyncEnabled ? 'pause' : 'play-arrow'} 
-                  size={16} 
-                  color={colors.primary} 
-                />
-                <Text style={styles.startButtonText}>
-                  {beatSyncEnabled ? 'Stop' : 'Start'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Chord Display */}
-          <View style={styles.chordDisplay}>
-            <Text style={styles.chordName}>{currentChord.name}</Text>
-            <Text style={styles.chordType}>D Augmented 7th</Text>
-          </View>
-
-          {/* Fretboard Diagram */}
-          {chordDiagram && renderFretboardDiagram()}
-
-          {/* Personalized Settings Info */}
-          {personalizedSettings && (
-            <View style={styles.personalizedSettingsCard}>
-              <View style={styles.settingsHeader}>
-                <MaterialIcons name="auto-awesome" size={16} color={colors.primary} />
-                <Text style={styles.settingsTitle}>PERSONALIZED DETECTION</Text>
-              </View>
-              <View style={styles.settingsMetrics}>
-                <View style={styles.settingMetric}>
-                  <Text style={styles.settingLabel}>Success Rate</Text>
-                  <Text style={styles.settingValue}>
-                    {Math.round(personalizedSettings.success_rate * 100)}%
-                  </Text>
-                </View>
-                <View style={styles.settingMetric}>
-                  <Text style={styles.settingLabel}>Threshold</Text>
-                  <Text style={styles.settingValue}>
-                    {Math.round(personalizedSettings.confidence_threshold * 100)}%
-                  </Text>
-                </View>
-                <View style={styles.settingMetric}>
-                  <Text style={styles.settingLabel}>ML Fallback</Text>
-                  <MaterialIcons 
-                    name={personalizedSettings.use_ml_fallback ? 'check-circle' : 'cancel'} 
-                    size={20} 
-                    color={personalizedSettings.use_ml_fallback ? colors.success : colors.textMuted} 
-                  />
-                </View>
-              </View>
-              {personalizedSettings.recommend_calibration && (
-                <Pressable 
-                  style={styles.calibrationPrompt}
-                  onPress={() => router.push('/calibration')}
-                >
-                  <MaterialIcons name="warning" size={16} color={colors.warning} />
-                  <Text style={styles.calibrationPromptText}>
-                    Low confidence detected - calibration recommended
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-
-          {/* Chord Recognition Feedback */}
-          {chordDetection && (
-            <View style={styles.chordFeedbackSection}>
-              {/* Detection Method Badge */}
-              <View style={styles.methodBadge}>
-                <MaterialIcons 
-                  name={chordDetection.method === 'ml-enhanced' ? 'cloud' : 'devices'} 
-                  size={14} 
-                  color={chordDetection.method === 'ml-enhanced' ? colors.info : colors.primary} 
-                />
-                <Text style={styles.methodBadgeText}>
-                  {chordDetection.method === 'ml-enhanced' ? 'ML Enhanced' : 'Local Detection'}
-                </Text>
-              </View>
-              <View style={styles.accuracyHeader}>
-                <MaterialIcons 
-                  name={chordDetection.isCorrect ? 'check-circle' : 'cancel'} 
-                  size={32} 
-                  color={chordDetection.isCorrect ? colors.success : colors.error} 
-                />
-                <Text style={[styles.accuracyText, chordDetection.isCorrect && styles.accuracyTextSuccess]}>
-                  {Math.round(chordDetection.accuracy)}% Accuracy
-                </Text>
-              </View>
-
-              {/* String-by-String Feedback */}
-              <View style={styles.stringsFeedback}>
-                <Text style={styles.stringsFeedbackTitle}>STRING FEEDBACK</Text>
-                {chordDetection.stringFeedback.map((feedback, index) => (
-                  feedback.expectedFret >= 0 && (
-                    <View key={index} style={styles.stringFeedbackRow}>
-                      <Text style={styles.stringNumber}>{['E', 'A', 'D', 'G', 'B', 'E'][feedback.stringNumber]}</Text>
-                      <View style={styles.stringFeedbackContent}>
-                        <Text style={styles.stringTarget}>Target: {feedback.targetNote}</Text>
-                        <Text style={[styles.stringDetected, feedback.isCorrect && styles.stringDetectedCorrect]}>
-                          {feedback.detectedNote || 'Not detected'}
-                        </Text>
-                      </View>
-                      <MaterialIcons 
-                        name={feedback.isCorrect ? 'check' : 'close'} 
-                        size={20} 
-                        color={feedback.isCorrect ? colors.success : colors.error} 
-                      />
+        {/* Preset Selection Modal */}
+        <Modal
+          visible={showPresetModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPresetModal(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setShowPresetModal(false)}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Select Preset</Text>
+              
+              <ScrollView style={styles.presetList}>
+                {presets.map(preset => (
+                  <Pressable
+                    key={preset.id}
+                    onPress={() => handlePresetSelect(preset.id)}
+                    style={styles.presetItem}
+                  >
+                    <MaterialIcons name="bookmark" size={20} color={colors.primary} />
+                    <View style={styles.presetInfo}>
+                      <Text style={styles.presetName}>{preset.name}</Text>
+                      <Text style={styles.presetCount}>{preset.chordIds.length} chords</Text>
                     </View>
-                  )
+                    <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+                  </Pressable>
                 ))}
-              </View>
+              </ScrollView>
 
-              {/* User Feedback Prompt */}
-              {showFeedbackPrompt && (
-                <View style={styles.feedbackPrompt}>
-                  <Text style={styles.feedbackPromptTitle}>Was this detection accurate?</Text>
-                  <View style={styles.feedbackButtons}>
-                    <Pressable 
-                      style={[styles.feedbackButton, styles.feedbackButtonYes]}
-                      onPress={() => submitFeedback(true)}
-                    >
-                      <MaterialIcons name="thumb-up" size={20} color={colors.success} />
-                      <Text style={styles.feedbackButtonText}>Yes, correct</Text>
-                    </Pressable>
-                    <Pressable 
-                      style={[styles.feedbackButton, styles.feedbackButtonNo]}
-                      onPress={() => submitFeedback(false)}
-                    >
-                      <MaterialIcons name="thumb-down" size={20} color={colors.error} />
-                      <Text style={styles.feedbackButtonText}>No, wrong</Text>
-                    </Pressable>
-                  </View>
-                  <Text style={styles.feedbackPromptNote}>
-                    Your feedback helps improve detection accuracy over time
-                  </Text>
-                </View>
-              )}
+              <Pressable onPress={() => setShowPresetModal(false)} style={styles.modalCancelButton}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
             </View>
-          )}
-
-          {/* Detection Feedback */}
-          {isListening && detectedPitch && (
-            <View style={styles.feedbackSection}>
-              <Text style={styles.feedbackText}>
-                Detected: {detectedPitch.note} ({detectedPitch.frequency.toFixed(1)} Hz)
-              </Text>
-              <Text style={styles.feedbackCents}>
-                {detectedPitch.cents > 0 ? '+' : ''}{detectedPitch.cents} cents
-              </Text>
-            </View>
-          )}
-
-          {/* Practice Stats */}
-          <View style={styles.statsSection}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{score}</Text>
-              <Text style={styles.statLabel}>Correct</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{attempts}</Text>
-              <Text style={styles.statLabel}>Attempts</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {attempts > 0 ? Math.round((score / attempts) * 100) : 0}%
-              </Text>
-              <Text style={styles.statLabel}>Accuracy</Text>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            <Pressable style={styles.playButton} onPress={handlePlayChord}>
-              <MaterialIcons name="play-arrow" size={24} color="#000" />
-              <Text style={styles.playButtonText}>Play Chord</Text>
-            </Pressable>
-
-            <Pressable 
-              style={[styles.detectButton, isDetecting && styles.detectButtonActive]} 
-              onPress={detectChord}
-              disabled={isDetecting}
-            >
-              {isDetecting ? (
-                <>
-                  <MaterialIcons name="hearing" size={24} color={colors.text} />
-                  <Text style={styles.detectButtonText}>Listening...</Text>
-                </>
-              ) : (
-                <>
-                  <MaterialIcons name="mic" size={24} color={colors.text} />
-                  <Text style={styles.detectButtonText}>Detect My Chord</Text>
-                </>
-              )}
-            </Pressable>
-
-            <Pressable style={styles.nextButton} onPress={handleNextChord}>
-              <Text style={styles.nextButtonText}>Next Chord</Text>
-              <MaterialIcons name="arrow-forward" size={20} color={colors.text} />
-            </Pressable>
-          </View>
-        </ScrollView>
-      </Screen>
-    </>
+          </Pressable>
+        </Modal>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
-  controlsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    gap: spacing.sm,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  backText: {
-    color: colors.text,
-    fontSize: 14,
-  },
-  listeningButton: {
+
+  // Setup Screen
+  setupContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.card,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
   },
-  listeningButtonActive: {
-    backgroundColor: 'rgba(0, 200, 83, 0.1)',
-  },
-  listeningText: {
-    color: colors.text,
-    fontSize: 12,
-  },
-  listeningTextActive: {
-    color: colors.success,
-  },
-  pulseIndicator: {
-    marginLeft: 'auto',
-  },
-  volumeButton: {
-    padding: spacing.xs,
-  },
-  settingsButton: {
-    padding: spacing.xs,
-  },
-  sensitivitySection: {
+  setupContent: {
     padding: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: 100,
   },
-  sensitivityHeader: {
-    flexDirection: 'row',
+  setupHeader: {
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  setupTitle: {
+    ...typography.h1,
+    fontSize: 32,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  setupSubtitle: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 300,
+  },
+  section: {
+    marginBottom: spacing.xl,
   },
   sectionLabel: {
-    flex: 1,
-    color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  sensitivityValue: {
-    color: colors.text,
-    fontSize: 14,
     fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
   },
-  stopButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
+  optionGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
-  stopButtonText: {
+  optionCard: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  optionCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  optionTitleActive: {
     color: colors.primary,
+  },
+  optionDescription: {
     fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  timerSettings: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+  },
+  timerLabel: {
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  timerButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  timerButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  timerButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '20',
+  },
+  timerButtonText: {
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.textMuted,
   },
-  slider: {
-    width: '100%',
-    height: 40,
+  timerButtonTextActive: {
+    color: colors.primary,
   },
-  advancedSection: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+  sourceButtons: {
+    gap: spacing.sm,
   },
-  advancedHeader: {
+  sourceButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    backgroundColor: colors.card,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  settingsIconButton: {
-    marginLeft: 'auto',
+  sourceButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '10',
   },
-  beatSyncSection: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  beatSyncHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  sourceButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
   },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    marginLeft: 'auto',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.lg,
+  },
+  startButtonDisabled: {
+    opacity: 0.5,
   },
   startButtonText: {
-    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+
+  // Practice Screen
+  practiceContainer: {
+    flex: 1,
+  },
+  practiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressInfo: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  timerDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timerText: {
     fontSize: 14,
     fontWeight: '600',
+    color: colors.primary,
+  },
+  timerTextWarning: {
+    color: colors.error,
+  },
+  pauseButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: colors.surface,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
   },
   chordDisplay: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
+    flex: 1,
   },
-  chordName: {
+  chordDisplayContent: {
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  chordNameSection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    minHeight: 80,
+    justifyContent: 'center',
+  },
+  chordSymbol: {
     fontSize: 64,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.text,
     marginBottom: spacing.xs,
   },
-  chordType: {
+  chordFullName: {
+    fontSize: 18,
     color: colors.textSecondary,
+  },
+  hiddenName: {
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  hiddenNameText: {
     fontSize: 16,
-  },
-  fretboardContainer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  fretboard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    position: 'relative',
-  },
-  string: {
-    flexDirection: 'row',
-    height: 32,
-  },
-  fretCell: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  stringLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: colors.string,
-  },
-  fingerDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
-  fingerNumber: {
-    color: '#000',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  fretLines: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    top: spacing.md,
-    bottom: spacing.md,
-    flexDirection: 'row',
-  },
-  fretLine: {
-    flex: 1,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.fret,
-  },
-  nut: {
-    position: 'absolute',
-    left: spacing.md,
-    top: spacing.md,
-    bottom: spacing.md,
-    width: 3,
-    backgroundColor: colors.text,
-  },
-  tuningReference: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    justifyContent: 'space-between',
-  },
-  tuningRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tuningString: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
-    width: 16,
-  },
-  tuningSeparator: {
     color: colors.textMuted,
-    fontSize: 10,
-    marginHorizontal: 4,
   },
-  tuningFret: {
-    color: colors.textSecondary,
-    fontSize: 12,
+  fretboardDisplay: {
+    marginVertical: spacing.xl,
   },
-  feedbackSection: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+  chordTags: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  tag: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
     borderRadius: borderRadius.md,
   },
-  feedbackText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  feedbackCents: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-  statsSection: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statValue: {
-    fontSize: 24,
+  tagText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.textMuted,
+    letterSpacing: 0.5,
   },
-  statLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: spacing.xs,
-  },
-  actions: {
-    paddingHorizontal: spacing.lg,
+  practiceControls: {
+    padding: spacing.lg,
     gap: spacing.md,
-    marginBottom: spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   playButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
     backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
   },
   playButtonText: {
-    color: '#000',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
+    color: '#000',
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  navButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
   },
   nextButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   nextButtonText: {
-    color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000',
   },
-  chordFeedbackSection: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
+
+  // Results Screen
+  resultsContainer: {
+    flex: 1,
+  },
+  resultsContent: {
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  resultsHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  successIcon: {
+    marginBottom: spacing.md,
+  },
+  resultsTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  resultsSubtitle: {
+    fontSize: 16,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  statCard: {
+    flex: 1,
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  methodBadge: {
-    flexDirection: 'row',
+    padding: spacing.lg,
     alignItems: 'center',
     gap: spacing.xs,
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.md,
   },
-  methodBadgeText: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  accuracyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  accuracyText: {
+  statValue: {
     fontSize: 24,
-    fontWeight: '700',
-    color: colors.error,
+    fontWeight: '800',
+    color: colors.text,
   },
-  accuracyTextSuccess: {
-    color: colors.success,
-  },
-  stringsFeedback: {
-    gap: spacing.sm,
-  },
-  stringsFeedbackTitle: {
-    color: colors.textSecondary,
+  statLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
-  stringFeedbackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+  resultsActions: {
+    width: '100%',
     gap: spacing.md,
   },
-  stringNumber: {
-    width: 24,
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  stringFeedbackContent: {
-    flex: 1,
-  },
-  stringTarget: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-  stringDetected: {
-    color: colors.error,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stringDetectedCorrect: {
-    color: colors.success,
-  },
-  detectButton: {
+  restartButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
     backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 2,
-    borderColor: colors.info,
-  },
-  detectButtonActive: {
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-  },
-  detectButtonText: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  personalizedSettingsCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: 'rgba(255, 140, 0, 0.1)',
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
     borderColor: colors.primary,
   },
-  settingsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  settingsTitle: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  settingsMetrics: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: spacing.sm,
-  },
-  settingMetric: {
-    alignItems: 'center',
-  },
-  settingLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginBottom: 4,
-  },
-  settingValue: {
+  restartButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.primary,
   },
-  calibrationPrompt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 140, 0, 0.3)',
-  },
-  calibrationPromptText: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.warning,
-  },
-  feedbackPrompt: {
-    marginTop: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  feedbackPromptTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  feedbackButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  feedbackButton: {
-    flex: 1,
+  statsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
+    borderRadius: borderRadius.lg,
   },
-  feedbackButtonYes: {
-    borderColor: colors.success,
-    backgroundColor: 'rgba(0, 200, 83, 0.1)',
-  },
-  feedbackButtonNo: {
-    borderColor: colors.error,
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-  },
-  feedbackButtonText: {
+  statsButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
-  feedbackPromptNote: {
-    fontSize: 11,
+  doneButton: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textMuted,
-    textAlign: 'center',
-    fontStyle: 'italic',
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.md,
+  },
+  presetList: {
+    maxHeight: 400,
+  },
+  presetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border + '20',
+  },
+  presetInfo: {
+    flex: 1,
+  },
+  presetName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  presetCount: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  modalCancelButton: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
 });

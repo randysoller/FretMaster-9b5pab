@@ -20,9 +20,9 @@ const PRACTICE_MODES: PracticeModeCard[] = [
   {
     id: 'chords',
     title: 'Chords',
-    description: 'Study individual chords with timed reveals, audio playback, and real-time microphone detection. Filter by category, type, and root string.',
+    description: 'Master individual chords with flashcard-style practice, audio playback, and timer challenges. Track your progress and build muscle memory.',
     icon: 'album',
-    route: '/chords',
+    route: '/chord-practice',
     accentColor: colors.accent,
   },
   {
