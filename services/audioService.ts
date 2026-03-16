@@ -53,182 +53,100 @@ class AudioService {
   }
 
   /**
-   * Nylon string acoustic guitar synthesis
-   * Warm, mellow tone with soft attack and natural decay
+   * Create realistic plucked guitar string sound
+   * Based on the working web implementation
+   */
+  private createPluck(
+    ctx: AudioContext,
+    frequency: number,
+    startTime: number,
+    duration: number,
+    volume: number,
+    masterGain: GainNode
+  ): OscillatorNode[] {
+    // Main tone — triangle gives a warm, muted guitar-like timbre
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(frequency, startTime);
+
+    // Harmonic layer — very quiet sine an octave up for brightness
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(frequency * 2, startTime);
+
+    // Sub harmonic for body
+    const osc3 = ctx.createOscillator();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(frequency * 0.5, startTime);
+
+    // Gain envelopes — guitar pluck: fast attack, quick decay, gentle sustain
+    const mainGain = ctx.createGain();
+    mainGain.gain.setValueAtTime(0, startTime);
+    mainGain.gain.linearRampToValueAtTime(volume * 0.45, startTime + 0.008);
+    mainGain.gain.exponentialRampToValueAtTime(volume * 0.18, startTime + 0.12);
+    mainGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+    const harmonicGain = ctx.createGain();
+    harmonicGain.gain.setValueAtTime(0, startTime);
+    harmonicGain.gain.linearRampToValueAtTime(volume * 0.08, startTime + 0.005);
+    harmonicGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.5);
+
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0, startTime);
+    subGain.gain.linearRampToValueAtTime(volume * 0.12, startTime + 0.01);
+    subGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
+
+    // Low-pass filter to soften the tone
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(Math.min(frequency * 6, 5000), startTime);
+    filter.frequency.exponentialRampToValueAtTime(Math.min(frequency * 2, 2000), startTime + duration * 0.4);
+    filter.Q.setValueAtTime(1.2, startTime);
+
+    // Routing — through filter to master gain
+    osc1.connect(mainGain);
+    osc2.connect(harmonicGain);
+    osc3.connect(subGain);
+
+    mainGain.connect(filter);
+    harmonicGain.connect(filter);
+    subGain.connect(filter);
+
+    filter.connect(masterGain);
+
+    osc1.start(startTime);
+    osc2.start(startTime);
+    osc3.start(startTime);
+    osc1.stop(startTime + duration + 0.05);
+    osc2.stop(startTime + duration + 0.05);
+    osc3.stop(startTime + duration + 0.05);
+
+    return [osc1, osc2, osc3];
+  }
+
+  /**
+   * Play a guitar string with realistic pluck sound
    */
   playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): void {
     try {
       const ctx = this.getAudioContext();
-      const now = ctx.currentTime;
+      const now = ctx.currentTime + 0.05;
+      const durationSec = duration / 1000;
       
-      // Nylon strings have a warmer, mellower tone - use sine + triangle blend
-      const fundamental = ctx.createOscillator();
-      fundamental.type = 'sine'; // Pure, warm fundamental
-      fundamental.frequency.value = frequency;
+      // Slight volume variation: bass strings a tad louder
+      const vol = 0.3 - stringIndex * 0.015;
       
-      // Second harmonic for body and mids
-      const harmonic1 = ctx.createOscillator();
-      harmonic1.type = 'triangle';
-      harmonic1.frequency.value = frequency * 2;
-      
-      // Third harmonic for warmth
-      const harmonic2 = ctx.createOscillator();
-      harmonic2.type = 'sine';
-      harmonic2.frequency.value = frequency * 3;
-      
-      // Gain nodes for mixing harmonics - boosted for more mids
-      const fundamentalGain = ctx.createGain();
-      fundamentalGain.gain.value = 1.0; // Full fundamental
-      
-      const harmonic1Gain = ctx.createGain();
-      harmonic1Gain.gain.value = 0.45; // Increased second harmonic for more body/mids
-      
-      const harmonic2Gain = ctx.createGain();
-      harmonic2Gain.gain.value = 0.2; // Slightly increased third harmonic
-      
-      // Lowpass filter for nylon string mellowness
-      const lowpass = ctx.createBiquadFilter();
-      lowpass.type = 'lowpass';
-      // Slightly brighter for more presence
-      lowpass.frequency.value = 1000 + (5 - stringIndex) * 350; // 1000Hz - 2.75kHz
-      lowpass.Q.value = 0.7; // Gentle rolloff
-      
-      // Mid-range boost for guitar body resonance (500-800Hz sweet spot)
-      const midBoost = ctx.createBiquadFilter();
-      midBoost.type = 'peaking';
-      midBoost.frequency.value = 650; // Classic acoustic guitar body resonance
-      midBoost.Q.value = 1.5; // Focused boost
-      midBoost.gain.value = 4; // +4dB boost in mids
-      
-      // Presence boost for clarity (2-3kHz)
-      const presence = ctx.createBiquadFilter();
-      presence.type = 'peaking';
-      presence.frequency.value = 2500;
-      presence.Q.value = 1.0;
-      presence.gain.value = 2; // +2dB for air and clarity
-      
-      // Pick attack envelope - sharp transient for picked nylon string
-      const envelope = ctx.createGain();
-      const attackTime = 0.003; // Fast pick attack (3ms)
-      const decayTime = 0.18; // Slightly longer decay
-      const sustainLevel = velocity * 0.45; // Increased sustain level
-      const releaseTime = duration / 1000;
-      
-      // Sharp pick attack curve
-      envelope.gain.setValueAtTime(0, now);
-      envelope.gain.linearRampToValueAtTime(velocity * 0.55, now + attackTime); // Stronger peak for pick punch
-      // Gentle decay to sustained note
-      envelope.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
-      // Extended natural fade (500ms longer)
-      envelope.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
-      
-      // Pick transient - subtle high-frequency click simulating pick hitting string
-      const pickTransient = ctx.createOscillator();
-      const pickGain = ctx.createGain();
-      const pickFilter = ctx.createBiquadFilter();
-      
-      pickTransient.type = 'square'; // Bright, percussive
-      pickTransient.frequency.value = frequency * 8; // High harmonic
-      
-      pickFilter.type = 'bandpass';
-      pickFilter.frequency.value = 3000 + frequency; // Bright click
-      pickFilter.Q.value = 3;
-      
-      pickTransient.connect(pickFilter);
-      pickFilter.connect(pickGain);
-      pickGain.connect(panner);
-      
-      // Very short, sharp transient
-      pickGain.gain.setValueAtTime(velocity * 0.15, now);
-      pickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008); // 8ms click
-      
-      pickTransient.start(now);
-      pickTransient.stop(now + 0.01);
-      
-      // Clean up pick transient
-      setTimeout(() => {
-        try {
-          pickTransient.disconnect();
-          pickFilter.disconnect();
-          pickGain.disconnect();
-        } catch (e) {
-          // Already disconnected
-        }
-      }, 50);
-      
-      // Enhanced room ambience for acoustic character
-      const reverb = ctx.createConvolver();
-      const reverbGain = ctx.createGain();
-      reverbGain.gain.value = 0.18; // Slightly more reverb for space
-      
-      // Create warm reverb impulse response
-      const reverbLength = ctx.sampleRate * 0.7; // Longer 0.7 second reverb
-      const reverbBuffer = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
-      for (let channel = 0; channel < 2; channel++) {
-        const channelData = reverbBuffer.getChannelData(channel);
-        for (let i = 0; i < reverbLength; i++) {
-          // Exponentially decaying noise with warmer character
-          const decay = Math.exp(-i / (reverbLength * 0.25));
-          channelData[i] = (Math.random() * 2 - 1) * decay;
-        }
-      }
-      reverb.buffer = reverbBuffer;
-      
-      // Stereo positioning
-      const panner = ctx.createStereoPanner();
-      panner.pan.value = (stringIndex - 2.5) * 0.12; // Slightly wider stereo spread
-      
-      // Connect audio graph:
-      // Oscillators -> Harmonic gains -> Lowpass -> Mid boost -> Presence -> Envelope -> Split (dry + reverb) -> Output
-      fundamental.connect(fundamentalGain);
-      harmonic1.connect(harmonic1Gain);
-      harmonic2.connect(harmonic2Gain);
-      
-      fundamentalGain.connect(lowpass);
-      harmonic1Gain.connect(lowpass);
-      harmonic2Gain.connect(lowpass);
-      
-      lowpass.connect(midBoost);
-      midBoost.connect(presence);
-      presence.connect(envelope);
-      
-      // Dry signal
-      envelope.connect(panner);
-      panner.connect(this.masterGain!);
-      
-      // Wet signal (reverb)
-      envelope.connect(reverb);
-      reverb.connect(reverbGain);
-      reverbGain.connect(this.masterGain!);
-      
-      // Start playback
-      fundamental.start(now);
-      harmonic1.start(now);
-      harmonic2.start(now);
-      
-      fundamental.stop(now + releaseTime);
-      harmonic1.stop(now + releaseTime);
-      harmonic2.stop(now + releaseTime);
+      const oscillators = this.createPluck(ctx, frequency, now, durationSec, vol * velocity, this.masterGain!);
+      this.activeOscillators.push(...oscillators);
       
       // Clean up after playback
       setTimeout(() => {
-        try {
-          fundamental.disconnect();
-          harmonic1.disconnect();
-          harmonic2.disconnect();
-          fundamentalGain.disconnect();
-          harmonic1Gain.disconnect();
-          harmonic2Gain.disconnect();
-          lowpass.disconnect();
-          midBoost.disconnect();
-          presence.disconnect();
-          envelope.disconnect();
-          panner.disconnect();
-          reverb.disconnect();
-          reverbGain.disconnect();
-        } catch (e) {
-          // Already disconnected
-        }
+        oscillators.forEach(osc => {
+          const index = this.activeOscillators.indexOf(osc);
+          if (index > -1) {
+            this.activeOscillators.splice(index, 1);
+          }
+        });
       }, duration + 100);
       
     } catch (error) {
@@ -246,28 +164,43 @@ class AudioService {
 
   /**
    * Play a guitar chord with realistic strumming
+   * Uses the proven web implementation approach
    */
   playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): void {
-    if (strum) {
-      // Realistic strum - play from low to high strings with slight randomization
-      const strumDelay = 25; // ms between strings
-      const velocityVariation = 0.15; // Natural velocity variation
+    try {
+      const ctx = this.getAudioContext();
+      const now = ctx.currentTime + 0.05;
+      const strumDelay = 0.035; // 35ms between strings — natural strum speed
+      const noteDuration = 2.5; // ring out for 2.5 seconds
       
-      notes.forEach((note, index) => {
-        const delay = index * strumDelay + (Math.random() - 0.5) * 5; // Add slight randomness
-        const velocity = 0.6 + (Math.random() - 0.5) * velocityVariation;
-        const frequency = this.getNoteFrequency(note, octave);
-        
-        setTimeout(() => {
-          this.playGuitarString(frequency, duration, velocity, index);
-        }, delay);
-      });
-    } else {
-      // Play all notes simultaneously (less realistic)
-      notes.forEach((note, index) => {
-        const frequency = this.getNoteFrequency(note, octave);
-        this.playGuitarString(frequency, duration, 0.5, index);
-      });
+      if (strum) {
+        // Realistic strum - play from low to high strings
+        notes.forEach((note, index) => {
+          const frequency = this.getNoteFrequency(note, octave);
+          const startTime = now + index * strumDelay;
+          const vol = 0.3 - index * 0.015; // Bass strings slightly louder
+          
+          const oscillators = this.createPluck(ctx, frequency, startTime, noteDuration, vol, this.masterGain!);
+          this.activeOscillators.push(...oscillators);
+        });
+      } else {
+        // Play all notes simultaneously
+        notes.forEach((note, index) => {
+          const frequency = this.getNoteFrequency(note, octave);
+          const vol = 0.3 - index * 0.015;
+          
+          const oscillators = this.createPluck(ctx, frequency, now, noteDuration, vol, this.masterGain!);
+          this.activeOscillators.push(...oscillators);
+        });
+      }
+      
+      // Clean up after playback
+      setTimeout(() => {
+        this.activeOscillators = [];
+      }, (noteDuration * 1000) + 100);
+      
+    } catch (error) {
+      console.log('Chord playback not available:', error);
     }
   }
 
