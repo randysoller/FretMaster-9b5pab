@@ -152,7 +152,7 @@ class AudioService {
       // Generate filtered noise (simulates pick scraping string)
       for (let i = 0; i < bufferSize; i++) {
         const envelope = Math.exp(-i / (bufferSize * 0.3)); // Quick decay
-        data[i] = (Math.random() * 2 - 1) * envelope * 0.15; // Subtle noise
+        data[i] = (Math.random() * 2 - 1) * envelope * 0.1; // Subtle noise
       }
       
       const noise = ctx.createBufferSource();
@@ -254,7 +254,7 @@ class AudioService {
         // === PICK ATTACK NOISE ===
         const pickNoise = this.createPickNoise(ctx, startTime, stringIndex);
         const pickGain = ctx.createGain();
-        pickGain.gain.value = 0.3;
+        pickGain.gain.value = 0.12; // Reduced for subtlety
 
         // === STRING ENVELOPE ===
         const stringGain = ctx.createGain();
