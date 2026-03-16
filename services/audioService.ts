@@ -613,7 +613,7 @@ class AudioService {
       console.log(`🎸 Generating audio for ${playableStrings} strings...`);
       
       // Generate WAV in memory with professional synthesis
-      const wavDataUri = this.generateGuitarWAV(chord, 2.5);
+      const wavDataUri = this.generateGuitarWAV(chord, 2.9);
       
       const generationTime = Date.now() - startTime;
       console.log(`📱 Audio generated in ${generationTime}ms, loading and playing...`);
@@ -631,7 +631,7 @@ class AudioService {
       setTimeout(async () => {
         await sound.unloadAsync();
         console.log('🧹 Audio cleanup complete');
-      }, 2700);
+      }, 3100);
     } catch (error) {
       console.error('❌ Native audio generation failed:', error);
       throw error;
@@ -670,7 +670,7 @@ class AudioService {
         console.log('🎵 Initializing web audio context...');
         const ctx = await this.getAudioContext();
         console.log('✅ Audio context ready, state:', ctx.state);
-        await this.playChordSynthesis(chordInput, 2500);
+        await this.playChordSynthesis(chordInput, 2900);
       }
       
       console.log('✅ Chord playback completed successfully');
