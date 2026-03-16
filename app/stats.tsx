@@ -1,312 +1,358 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Screen } from '@/components';
+import { PracticeStatsChart } from '@/components/feature/PracticeStatsChart';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import { storageService } from '@/services/storageService';
-import { practiceTrackingService, ACHIEVEMENTS } from '@/services/practiceTrackingService';
-
-const { width } = Dimensions.get('window');
-const CHART_WIDTH = width - spacing.lg * 2;
-const CHART_HEIGHT = 200;
+import { useAuth } from '@/hooks/useAuth';
+import {
+  loadPracticeStats,
+  getPracticeSummary,
+  getTopPracticedChords,
+  getMostTimeSpentChords,
+  getRecentSessions,
+  formatDuration,
+  clearAllStats,
+  ChordPracticeStats,
+  PracticeSession,
+} from '@/services/practiceStatsService';
 
 export default function StatsScreen() {
   const router = useRouter();
-  const [stats, setStats] = useState<any>({});
-  const [weeklyData, setWeeklyData] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
-  const [currentStreak, setCurrentStreak] = useState(0);
+  const { profile } = useAuth();
+  
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<any>(null);
+  const [topChords, setTopChords] = useState<ChordPracticeStats[]>([]);
+  const [timeChords, setTimeChords] = useState<ChordPracticeStats[]>([]);
+  const [recentSessions, setRecentSessions] = useState<PracticeSession[]>([]);
 
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
-    const userStats = await storageService.getStats();
-    const weekly = await practiceTrackingService.getWeeklyStats();
-    const allSessions = await storageService.getPracticeSessions();
-    const unlockedAchievements = await storageService.getAchievements();
-
-    setStats(userStats);
-    setWeeklyData(weekly);
-    setSessions(allSessions.slice(-10).reverse()); // Last 10 sessions
-    setAchievements(unlockedAchievements);
-    setCurrentStreak(userStats.currentStreak || 0);
-  };
-
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    setLoading(true);
+    try {
+      const [summaryData, topChordsData, timeChordsData, sessionsData] = await Promise.all([
+        getPracticeSummary(),
+        getTopPracticedChords(5),
+        getMostTimeSpentChords(5),
+        getRecentSessions(10),
+      ]);
+      
+      setSummary(summaryData);
+      setTopChords(topChordsData);
+      setTimeChords(timeChordsData);
+      setRecentSessions(sessionsData);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderWeeklyChart = () => {
-    if (weeklyData.length === 0) return null;
-
-    const maxDuration = Math.max(...weeklyData.map(d => d.duration), 1);
-    const barWidth = CHART_WIDTH / weeklyData.length - spacing.xs * 2;
-
-    return (
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>WEEKLY PRACTICE TIME</Text>
-        <View style={styles.chart}>
-          <View style={styles.chartBars}>
-            {weeklyData.map((day, index) => {
-              const barHeight = (day.duration / maxDuration) * (CHART_HEIGHT - 40);
-              const date = new Date(day.date);
-              const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-
-              return (
-                <View key={index} style={styles.barContainer}>
-                  <View style={styles.barWrapper}>
-                    <View style={[styles.bar, { height: Math.max(barHeight, 2) }]}>
-                      {day.duration > 0 && (
-                        <Text style={styles.barLabel}>{Math.round(day.duration / 60)}m</Text>
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.barDay}>{dayName[0]}</Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      </View>
+  const handleClearStats = () => {
+    Alert.alert(
+      'Clear All Statistics',
+      'Are you sure you want to delete all practice statistics? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllStats();
+            await loadStats();
+            Alert.alert('Success', 'All statistics have been cleared');
+          },
+        },
+      ]
     );
   };
 
-  const renderAccuracyTrend = () => {
-    if (!stats.accuracyHistory || stats.accuracyHistory.length === 0) return null;
-
-    const recentAccuracy = stats.accuracyHistory.slice(-7);
-    const avgAccuracy = recentAccuracy.reduce((sum: number, item: any) => sum + item.accuracy, 0) / recentAccuracy.length;
-
+  if (loading) {
     return (
-      <View style={styles.trendCard}>
-        <View style={styles.trendHeader}>
-          <MaterialIcons name="trending-up" size={24} color={colors.success} />
-          <Text style={styles.trendTitle}>Accuracy Trend</Text>
+      <Screen edges={['top']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading statistics...</Text>
         </View>
-        <Text style={styles.trendValue}>{Math.round(avgAccuracy)}%</Text>
-        <Text style={styles.trendSubtext}>Average accuracy over last 7 sessions</Text>
-      </View>
+      </Screen>
     );
-  };
+  }
+
+  const stats = [
+    { 
+      label: 'Total Practice Time', 
+      value: summary?.totalPracticeTimeFormatted || '0s', 
+      icon: 'timer' as const 
+    },
+    { 
+      label: 'Chords Practiced', 
+      value: summary?.totalChordsPracticed.toString() || '0', 
+      icon: 'music-note' as const 
+    },
+    { 
+      label: 'Current Streak', 
+      value: summary?.currentStreak ? `${summary.currentStreak} day${summary.currentStreak > 1 ? 's' : ''}` : '0 days', 
+      icon: 'local-fire-department' as const 
+    },
+    { 
+      label: 'Practice Days', 
+      value: summary?.practiceDaysCount.toString() || '0', 
+      icon: 'calendar-today' as const 
+    },
+  ];
 
   return (
     <>
       <Stack.Screen 
         options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerTitle: 'Practice Stats',
+          headerShown: false,
         }} 
       />
-      <Screen edges={['bottom']}>
+      <Screen edges={['top']}>
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-          {/* Overview Stats */}
-          <View style={styles.overviewSection}>
-            <Text style={styles.sectionTitle}>OVERVIEW</Text>
-            
-            {/* Streak Card */}
-            {currentStreak > 0 && (
-              <View style={styles.streakCard}>
-                <MaterialIcons name="local-fire-department" size={32} color={colors.warning} />
-                <View style={styles.streakInfo}>
-                  <Text style={styles.streakValue}>{currentStreak} Day Streak!</Text>
-                  <Text style={styles.streakLabel}>Keep practicing to maintain your streak</Text>
-                </View>
-              </View>
-            )}
-            
+          {/* Back Button */}
+          <View style={styles.backBar}>
+            <Pressable onPress={() => router.back()} style={styles.backButton}>
+              <MaterialIcons name="arrow-back" size={24} color={colors.text} />
+            </Pressable>
+          </View>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Practice Statistics</Text>
+            <Text style={styles.subtitle}>Track your progress and achievements</Text>
+            <Pressable onPress={handleClearStats} style={styles.clearButton}>
+              <MaterialIcons name="delete-outline" size={16} color={colors.error} />
+              <Text style={styles.clearButtonText}>Clear Stats</Text>
+            </Pressable>
+          </View>
+
+          {/* Overview Stats Grid */}
+          <View style={styles.section}>
             <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <MaterialIcons name="timer" size={32} color={colors.primary} />
-                <Text style={styles.statValue}>
-                  {formatTime(stats.totalPracticeTime || 0)}
-                </Text>
-                <Text style={styles.statLabel}>Total Practice</Text>
-              </View>
+              {stats.map((stat, index) => (
+                <View key={index} style={styles.statCard}>
+                  <MaterialIcons name={stat.icon} size={28} color={colors.primary} />
+                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
-              <View style={styles.statCard}>
-                <MaterialIcons name="music-note" size={32} color={colors.accent} />
-                <Text style={styles.statValue}>
-                  {(stats.chordsMastered || []).length}
-                </Text>
-                <Text style={styles.statLabel}>Chords Mastered</Text>
+          {/* Practice Streaks */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Practice Streaks</Text>
+            <View style={styles.streaksContainer}>
+              <View style={styles.streakCard}>
+                <MaterialIcons name="local-fire-department" size={32} color={colors.primary} />
+                <Text style={styles.streakValue}>{summary?.currentStreak || 0}</Text>
+                <Text style={styles.streakLabel}>Current Streak</Text>
               </View>
-
-              <View style={styles.statCard}>
-                <MaterialIcons name="show-chart" size={32} color={colors.info} />
-                <Text style={styles.statValue}>
-                  {(stats.scalesMastered || []).length}
-                </Text>
-                <Text style={styles.statLabel}>Scales Mastered</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <MaterialIcons name="trending-up" size={32} color={colors.secondary} />
-                <Text style={styles.statValue}>
-                  {(stats.progressionsMastered || []).length}
-                </Text>
-                <Text style={styles.statLabel}>Progressions</Text>
+              <View style={styles.streakCard}>
+                <MaterialIcons name="emoji-events" size={32} color={colors.success} />
+                <Text style={styles.streakValue}>{summary?.longestStreak || 0}</Text>
+                <Text style={styles.streakLabel}>Longest Streak</Text>
               </View>
             </View>
           </View>
 
-          {/* Weekly Chart */}
-          {renderWeeklyChart()}
+          {/* Most Practiced Chords */}
+          {topChords.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Most Practiced Chords</Text>
+              <Text style={styles.sectionSubtitle}>Sorted by practice count</Text>
+              <PracticeStatsChart
+                data={topChords.map(chord => ({
+                  label: chord.chordName,
+                  value: chord.practiceCount,
+                  color: colors.primary,
+                }))}
+                type="bar"
+                unit="x"
+              />
+            </View>
+          )}
 
-          {/* Accuracy Trend */}
-          {renderAccuracyTrend()}
+          {/* Time Spent on Chords */}
+          {timeChords.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Time Investment</Text>
+              <Text style={styles.sectionSubtitle}>Total practice time per chord</Text>
+              <PracticeStatsChart
+                data={timeChords.map(chord => ({
+                  label: chord.chordName,
+                  value: Math.round(chord.totalTimeSeconds / 60),
+                  color: colors.success,
+                }))}
+                type="bar"
+                unit="m"
+              />
+            </View>
+          )}
 
-          {/* Achievements */}
-          <View style={styles.achievementsSection}>
-            <Text style={styles.sectionTitle}>ACHIEVEMENTS</Text>
-            <View style={styles.achievementsGrid}>
-              {ACHIEVEMENTS.map((achievement) => {
-                const unlocked = achievements.some(a => a.id === achievement.id);
+          {/* Accuracy Progress */}
+          {topChords.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Accuracy Progress</Text>
+              <Text style={styles.sectionSubtitle}>Average accuracy for top chords</Text>
+              <PracticeStatsChart
+                data={topChords
+                  .filter(chord => chord.averageAccuracy > 0)
+                  .slice(0, 5)
+                  .map(chord => ({
+                    label: chord.chordName,
+                    value: chord.averageAccuracy,
+                    color: chord.averageAccuracy >= 80 ? colors.success : 
+                           chord.averageAccuracy >= 60 ? colors.primary : colors.error,
+                  }))}
+                type="progress"
+                maxValue={100}
+                showPercentage
+              />
+            </View>
+          )}
+
+          {/* Recent Sessions */}
+          {recentSessions.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recent Sessions</Text>
+              {recentSessions.slice(0, 5).map((session, index) => {
+                const date = new Date(session.endTime);
+                const timeAgo = getTimeAgo(date);
                 return (
-                  <View 
-                    key={achievement.id} 
-                    style={[styles.achievementCard, !unlocked && styles.achievementCardLocked]}
-                  >
-                    <MaterialIcons 
-                      name={achievement.icon as any} 
-                      size={32} 
-                      color={unlocked ? colors.primary : colors.textMuted} 
-                    />
-                    <Text style={[styles.achievementTitle, !unlocked && styles.achievementTitleLocked]}>
-                      {achievement.title}
-                    </Text>
-                    <Text style={styles.achievementDescription}>
-                      {achievement.description}
-                    </Text>
-                    {unlocked && (
-                      <View style={styles.achievementBadge}>
-                        <MaterialIcons name="check" size={12} color="#000" />
-                      </View>
-                    )}
+                  <View key={session.id} style={styles.sessionCard}>
+                    <View style={styles.sessionHeader}>
+                      <MaterialIcons name="timer" size={16} color={colors.primary} />
+                      <Text style={styles.sessionTime}>{timeAgo}</Text>
+                    </View>
+                    <View style={styles.sessionDetails}>
+                      <Text style={styles.sessionDuration}>
+                        {formatDuration(session.durationSeconds)}
+                      </Text>
+                      {session.chordsCompleted && (
+                        <Text style={styles.sessionChords}>
+                          {session.chordsCompleted} chord{session.chordsCompleted > 1 ? 's' : ''}
+                        </Text>
+                      )}
+                      {session.accuracyScore !== undefined && (
+                        <Text style={styles.sessionAccuracy}>
+                          {Math.round(session.accuracyScore)}% accuracy
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 );
               })}
             </View>
-          </View>
+          )}
 
-          {/* Recent Sessions */}
-          <View style={styles.sessionsSection}>
-            <Text style={styles.sectionTitle}>RECENT SESSIONS</Text>
-            {sessions.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="inbox" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyText}>No practice sessions yet</Text>
-                <Text style={styles.emptySubtext}>Start practicing to see your progress here</Text>
-              </View>
-            ) : (
-              sessions.map((session, index) => (
-                <View key={session.id} style={styles.sessionCard}>
-                  <View style={styles.sessionHeader}>
-                    <MaterialIcons 
-                      name={
-                        session.type === 'chords' ? 'music-note' :
-                        session.type === 'progressions' ? 'trending-up' :
-                        session.type === 'scales' ? 'show-chart' : 'headphones'
-                      } 
-                      size={20} 
-                      color={colors.primary} 
-                    />
-                    <Text style={styles.sessionType}>
-                      {session.type.charAt(0).toUpperCase() + session.type.slice(1)}
-                    </Text>
-                    <Text style={styles.sessionDate}>{formatDate(session.startTime)}</Text>
-                  </View>
-                  
-                  <View style={styles.sessionStats}>
-                    <View style={styles.sessionStat}>
-                      <MaterialIcons name="timer" size={16} color={colors.textSecondary} />
-                      <Text style={styles.sessionStatText}>{formatTime(session.duration)}</Text>
-                    </View>
-                    
-                    <View style={styles.sessionStat}>
-                      <MaterialIcons name="check-circle" size={16} color={colors.success} />
-                      <Text style={styles.sessionStatText}>{Math.round(session.accuracy)}%</Text>
-                    </View>
-                    
-                    <View style={styles.sessionStat}>
-                      <MaterialIcons name="sync" size={16} color={colors.info} />
-                      <Text style={styles.sessionStatText}>
-                        {session.correctAttempts}/{session.attempts}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
+          {/* Empty State */}
+          {topChords.length === 0 && (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="show-chart" size={64} color={colors.textMuted} />
+              <Text style={styles.emptyTitle}>No Practice Data Yet</Text>
+              <Text style={styles.emptyMessage}>
+                Start practicing chords to see your statistics and progress charts here.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </Screen>
     </>
   );
 }
 
+// Helper function to format time ago
+function getTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
-  overviewSection: {
-    padding: spacing.lg,
+  backBar: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  streakCard: {
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  clearButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.error,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+  },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  section: {
     padding: spacing.lg,
-    backgroundColor: 'rgba(255, 165, 0, 0.1)',
-    borderRadius: borderRadius.lg,
-    borderWidth: 2,
-    borderColor: colors.warning,
-    marginBottom: spacing.lg,
-  },
-  streakInfo: {
-    flex: 1,
-  },
-  streakValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.warning,
-    marginBottom: 2,
-  },
-  streakLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
-    color: colors.textSecondary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  sectionSubtitle: {
     fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    color: colors.textMuted,
     marginBottom: spacing.md,
   },
   statsGrid: {
@@ -317,7 +363,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     alignItems: 'center',
@@ -325,205 +371,91 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
-    marginVertical: spacing.sm,
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: spacing.xs,
   },
   statLabel: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  chartContainer: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-    padding: spacing.lg,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chartTitle: {
-    color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: spacing.md,
-  },
-  chart: {
-    height: CHART_HEIGHT,
-  },
-  chartBars: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    gap: spacing.xs,
-  },
-  barContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  barWrapper: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  bar: {
-    width: '80%',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.sm,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  barLabel: {
-    color: '#000',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  barDay: {
-    color: colors.textSecondary,
-    fontSize: 11,
+    color: colors.textMuted,
     marginTop: spacing.xs,
-  },
-  trendCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.xl,
-    padding: spacing.lg,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  trendHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  trendTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  trendValue: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: colors.success,
-    marginBottom: spacing.xs,
-  },
-  trendSubtext: {
-    color: colors.textSecondary,
-    fontSize: 13,
     textAlign: 'center',
   },
-  achievementsSection: {
-    padding: spacing.lg,
-  },
-  achievementsGrid: {
+  streaksContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.md,
   },
-  achievementCard: {
+  streakCard: {
     flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary,
-    position: 'relative',
-  },
-  achievementCardLocked: {
-    borderColor: colors.border,
-    opacity: 0.6,
-  },
-  achievementTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  achievementTitleLocked: {
-    color: colors.textMuted,
-  },
-  achievementDescription: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
-  achievementBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sessionsSection: {
     padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: spacing.xxl,
+  streakValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: spacing.xs,
   },
-  emptyText: {
+  streakLabel: {
+    fontSize: 12,
     color: colors.textMuted,
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: spacing.md,
-  },
-  emptySubtext: {
-    color: colors.textSecondary,
-    fontSize: 14,
     marginTop: spacing.xs,
   },
   sessionCard: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
     padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   sessionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
   },
-  sessionType: {
-    flex: 1,
+  sessionTime: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  sessionDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  sessionDuration: {
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.text,
-    fontSize: 16,
+  },
+  sessionChords: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  sessionAccuracy: {
+    fontSize: 13,
+    color: colors.success,
     fontWeight: '600',
   },
-  sessionDate: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  sessionStats: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-  },
-  sessionStat: {
-    flexDirection: 'row',
+  emptyState: {
     alignItems: 'center',
-    gap: spacing.xs,
+    padding: spacing.xl * 2,
   },
-  sessionStatText: {
-    color: colors.textSecondary,
-    fontSize: 13,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: spacing.lg,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    maxWidth: 280,
   },
 });

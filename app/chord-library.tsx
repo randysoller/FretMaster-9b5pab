@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -93,16 +93,22 @@ export default function ChordLibraryScreen() {
     filterTypes,
     filterBarreRoots,
     searchQuery,
+    searchHistory,
     selectedChordIds,
     activeLibraryPresetId,
     setActiveLibraryPreset,
     toggleCategory,
     toggleBarreRoot,
     setSearchQuery,
+    addToSearchHistory,
+    clearSearchHistory,
     toggleChordSelection,
     clearSelectedChords,
     clearAll,
   } = useChordLibrary();
+
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const searchInputRef = useRef<any>(null);
 
   const filteredChords = useMemo(() => {
     console.log('🔍 Recalculating filteredChords...');
@@ -167,6 +173,18 @@ export default function ChordLibraryScreen() {
         initialIndex: chordIndex.toString(),
       },
     });
+  };
+
+  const handleSearchSubmit = () => {
+    if (searchQuery.trim().length >= 2) {
+      addToSearchHistory(searchQuery);
+      setShowSearchHistory(false);
+    }
+  };
+
+  const handleHistoryItemPress = (query: string) => {
+    setSearchQuery(query);
+    setShowSearchHistory(false);
   };
 
   // Combined loading state
@@ -243,19 +261,48 @@ export default function ChordLibraryScreen() {
 
       {/* Search & Type Filter */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <MaterialIcons name="search" size={20} color="#666" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search chords..."
-            placeholderTextColor="#666"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <MaterialIcons name="close" size={18} color="#666" />
-            </Pressable>
+        <View style={styles.searchBarWrapper}>
+          <View style={styles.searchBar}>
+            <MaterialIcons name="search" size={20} color="#666" />
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              placeholder="Search chords..."
+              placeholderTextColor="#666"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setShowSearchHistory(true)}
+              onSubmitEditing={handleSearchSubmit}
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')}>
+                <MaterialIcons name="close" size={18} color="#666" />
+              </Pressable>
+            )}
+          </View>
+          
+          {/* Search History Dropdown */}
+          {showSearchHistory && searchHistory.length > 0 && (
+            <View style={styles.searchHistoryDropdown}>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyTitle}>Recent Searches</Text>
+                <Pressable onPress={clearSearchHistory} style={styles.clearHistoryButton}>
+                  <Text style={styles.clearHistoryText}>Clear</Text>
+                </Pressable>
+              </View>
+              {searchHistory.map((query, index) => (
+                <Pressable
+                  key={`${query}-${index}`}
+                  onPress={() => handleHistoryItemPress(query)}
+                  style={styles.historyItem}
+                >
+                  <MaterialIcons name="history" size={16} color={colors.textMuted} />
+                  <Text style={styles.historyItemText}>{query}</Text>
+                  <MaterialIcons name="arrow-forward" size={14} color={colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
           )}
         </View>
         <TypeFilterDropdown />
@@ -466,9 +513,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     gap: spacing.sm,
+    zIndex: 100,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    position: 'relative',
   },
   searchBar: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2A2A2A',
@@ -647,5 +698,61 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.textMuted,
+  },
+  searchHistoryDropdown: {
+    position: 'absolute',
+    top: 48,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  historyTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  clearHistoryButton: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  clearHistoryText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.error,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border + '20',
+  },
+  historyItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
   },
 });

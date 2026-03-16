@@ -13,6 +13,7 @@ interface ChordLibraryContextType {
   filterTypes: ChordType[];
   filterBarreRoots: BarreRoot[];
   searchQuery: string;
+  searchHistory: string[];
   activeLibraryPresetId: string | null;
   selectedChordIds: string[];
 
@@ -25,6 +26,8 @@ interface ChordLibraryContextType {
   toggleBarreRoot: (root: BarreRoot) => void;
   clearBarreRoots: () => void;
   setSearchQuery: (q: string) => void;
+  addToSearchHistory: (query: string) => void;
+  clearSearchHistory: () => void;
   setActiveLibraryPreset: (id: string | null) => void;
   toggleChordSelection: (id: string) => void;
   setSelectedChordIds: (ids: string[]) => void;
@@ -43,6 +46,7 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
   const [filterTypes, setFilterTypes] = useState<ChordType[]>([]);
   const [filterBarreRoots, setFilterBarreRoots] = useState<BarreRoot[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [activeLibraryPresetId, setActiveLibraryPresetId] = useState<string | null>(null);
   const [selectedChordIds, setSelectedChordIds] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -57,7 +61,7 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
     if (isInitialized) {
       saveState();
     }
-  }, [filterCategories, filterTypes, filterBarreRoots, searchQuery, activeLibraryPresetId, selectedChordIds, isInitialized]);
+  }, [filterCategories, filterTypes, filterBarreRoots, searchQuery, searchHistory, activeLibraryPresetId, selectedChordIds, isInitialized]);
 
   const loadState = async () => {
     setIsLoading(true);
@@ -75,6 +79,7 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
           setFilterTypes(Array.isArray(data.filterTypes) ? data.filterTypes : []);
           setFilterBarreRoots(Array.isArray(data.filterBarreRoots) ? data.filterBarreRoots : []);
           setSearchQuery(typeof data.searchQuery === 'string' ? data.searchQuery : '');
+          setSearchHistory(Array.isArray(data.searchHistory) ? data.searchHistory.slice(0, 10) : []);
           setActiveLibraryPresetId(typeof data.activeLibraryPresetId === 'string' ? data.activeLibraryPresetId : null);
           setSelectedChordIds(Array.isArray(data.selectedChordIds) ? data.selectedChordIds : []);
           
@@ -104,6 +109,7 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
         filterTypes,
         filterBarreRoots,
         searchQuery,
+        searchHistory,
         activeLibraryPresetId,
         selectedChordIds,
       };
@@ -169,6 +175,20 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
 
   const clearSelectedChords = () => setSelectedChordIds([]);
 
+  const addToSearchHistory = (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
+    
+    setSearchHistory(prev => {
+      // Remove if already exists
+      const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase());
+      // Add to front, keep max 10
+      return [trimmed, ...filtered].slice(0, 10);
+    });
+  };
+
+  const clearSearchHistory = () => setSearchHistory([]);
+
   const clearAll = () => {
     setFilterCategories([]);
     setFilterTypes([]);
@@ -186,6 +206,7 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
         filterTypes,
         filterBarreRoots,
         searchQuery,
+        searchHistory,
         activeLibraryPresetId,
         selectedChordIds,
         toggleCategory,
@@ -196,6 +217,8 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
         toggleBarreRoot,
         clearBarreRoots,
         setSearchQuery,
+        addToSearchHistory,
+        clearSearchHistory,
         setActiveLibraryPreset,
         toggleChordSelection,
         setSelectedChordIds,

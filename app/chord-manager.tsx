@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Screen } from '@/components';
 import { Fretboard } from '@/components/feature/Fretboard';
+import { ChordManagerList } from '@/components/feature/ChordManagerList';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { usePresets } from '@/contexts/PresetContext';
@@ -260,7 +261,7 @@ export default function ChordManagerScreen() {
     return null;
   }
 
-  // Filter chords
+  // Filter chords (now used by both list view component and modal logic)
   const filteredChords = chords.filter(chord => {
     const matchesSearch = chord.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          chord.fullName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -689,8 +690,9 @@ export default function ChordManagerScreen() {
     setDotColors(['#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A', '#D4952A']);
   };
 
-  // Render List View
-  const renderListView = () => (
+  // List view is now handled by ChordManagerList component
+  // Keeping this comment for reference - old renderListView removed
+  const renderListView_REMOVED = () => (
     <View style={styles.listContainer}>
       {/* Search and Filter */}
       <View style={styles.searchSection}>
@@ -1571,7 +1573,24 @@ export default function ChordManagerScreen() {
         )}
 
         {/* Content */}
-        {viewMode === 'list' ? renderListView() : renderVisualEditor()}
+        {viewMode === 'list' ? (
+          <ChordManagerList
+            chords={filteredChords}
+            selectedChords={selectedChords}
+            searchQuery={searchQuery}
+            filterShape={filterShape}
+            filterType={filterType}
+            onSearchChange={setSearchQuery}
+            onFilterShapeChange={setFilterShape}
+            onFilterTypeChange={setFilterType}
+            onSelectChord={handleSelectChord}
+            onSelectAll={handleSelectAll}
+            onEditChord={handleEditChord}
+            onDeleteSelected={handleDeleteSelected}
+            onBulkEdit={() => setShowBulkMenu(true)}
+            onSaveToPreset={() => setShowPresetModal(true)}
+          />
+        ) : renderVisualEditor()}
 
         {/* Finger & Shape Selection Modal */}
         <Modal
