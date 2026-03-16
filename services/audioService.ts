@@ -56,7 +56,7 @@ class AudioService {
    * Nylon string acoustic guitar synthesis
    * Warm, mellow tone with soft attack and natural decay
    */
-  playGuitarString(frequency: number, duration: number = 1500, velocity: number = 0.8, stringIndex: number = 0): void {
+  playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): void {
     try {
       const ctx = this.getAudioContext();
       const now = ctx.currentTime;
@@ -66,7 +66,7 @@ class AudioService {
       fundamental.type = 'sine'; // Pure, warm fundamental
       fundamental.frequency.value = frequency;
       
-      // Second harmonic for body
+      // Second harmonic for body and mids
       const harmonic1 = ctx.createOscillator();
       harmonic1.type = 'triangle';
       harmonic1.frequency.value = frequency * 2;
@@ -76,70 +76,87 @@ class AudioService {
       harmonic2.type = 'sine';
       harmonic2.frequency.value = frequency * 3;
       
-      // Gain nodes for mixing harmonics
+      // Gain nodes for mixing harmonics - boosted for more mids
       const fundamentalGain = ctx.createGain();
       fundamentalGain.gain.value = 1.0; // Full fundamental
       
       const harmonic1Gain = ctx.createGain();
-      harmonic1Gain.gain.value = 0.3; // Subtle second harmonic
+      harmonic1Gain.gain.value = 0.45; // Increased second harmonic for more body/mids
       
       const harmonic2Gain = ctx.createGain();
-      harmonic2Gain.gain.value = 0.15; // Very subtle third harmonic
+      harmonic2Gain.gain.value = 0.2; // Slightly increased third harmonic
       
       // Lowpass filter for nylon string mellowness
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      // Nylon strings are much warmer/darker than steel
-      filter.frequency.value = 800 + (5 - stringIndex) * 300; // 800Hz - 2.3kHz (much darker)
-      filter.Q.value = 0.8; // Gentle rolloff
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      // Slightly brighter for more presence
+      lowpass.frequency.value = 1000 + (5 - stringIndex) * 350; // 1000Hz - 2.75kHz
+      lowpass.Q.value = 0.7; // Gentle rolloff
       
-      // Soft pluck envelope - nylon strings have gentler attack than steel
+      // Mid-range boost for guitar body resonance (500-800Hz sweet spot)
+      const midBoost = ctx.createBiquadFilter();
+      midBoost.type = 'peaking';
+      midBoost.frequency.value = 650; // Classic acoustic guitar body resonance
+      midBoost.Q.value = 1.5; // Focused boost
+      midBoost.gain.value = 4; // +4dB boost in mids
+      
+      // Presence boost for clarity (2-3kHz)
+      const presence = ctx.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = 2500;
+      presence.Q.value = 1.0;
+      presence.gain.value = 2; // +2dB for air and clarity
+      
+      // Soft pluck envelope - extended for longer sustain
       const envelope = ctx.createGain();
-      const attackTime = 0.008; // Slower attack for soft nylon pluck (8ms)
-      const decayTime = 0.15; // Gradual decay
-      const sustainLevel = velocity * 0.35; // Moderate sustain
+      const attackTime = 0.008; // Soft nylon pluck (8ms)
+      const decayTime = 0.18; // Slightly longer decay
+      const sustainLevel = velocity * 0.45; // Increased sustain level
       const releaseTime = duration / 1000;
       
       // Soft attack curve
       envelope.gain.setValueAtTime(0, now);
-      envelope.gain.linearRampToValueAtTime(velocity * 0.4, now + attackTime); // Softer peak
-      // Gentle decay
+      envelope.gain.linearRampToValueAtTime(velocity * 0.45, now + attackTime); // Slightly louder peak
+      // Gentle decay to sustained note
       envelope.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
-      // Natural fade
+      // Extended natural fade (500ms longer)
       envelope.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
       
-      // Subtle room ambience for acoustic character
+      // Enhanced room ambience for acoustic character
       const reverb = ctx.createConvolver();
       const reverbGain = ctx.createGain();
-      reverbGain.gain.value = 0.15; // Very subtle reverb
+      reverbGain.gain.value = 0.18; // Slightly more reverb for space
       
-      // Create simple reverb impulse response
-      const reverbLength = ctx.sampleRate * 0.5; // 0.5 second reverb
+      // Create warm reverb impulse response
+      const reverbLength = ctx.sampleRate * 0.7; // Longer 0.7 second reverb
       const reverbBuffer = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
       for (let channel = 0; channel < 2; channel++) {
         const channelData = reverbBuffer.getChannelData(channel);
         for (let i = 0; i < reverbLength; i++) {
-          // Exponentially decaying noise
-          channelData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (reverbLength * 0.2));
+          // Exponentially decaying noise with warmer character
+          const decay = Math.exp(-i / (reverbLength * 0.25));
+          channelData[i] = (Math.random() * 2 - 1) * decay;
         }
       }
       reverb.buffer = reverbBuffer;
       
       // Stereo positioning
       const panner = ctx.createStereoPanner();
-      panner.pan.value = (stringIndex - 2.5) * 0.1; // Subtle stereo spread
+      panner.pan.value = (stringIndex - 2.5) * 0.12; // Slightly wider stereo spread
       
       // Connect audio graph:
-      // Oscillators -> Harmonic gains -> Filter -> Envelope -> Split (dry + reverb) -> Output
+      // Oscillators -> Harmonic gains -> Lowpass -> Mid boost -> Presence -> Envelope -> Split (dry + reverb) -> Output
       fundamental.connect(fundamentalGain);
       harmonic1.connect(harmonic1Gain);
       harmonic2.connect(harmonic2Gain);
       
-      fundamentalGain.connect(filter);
-      harmonic1Gain.connect(filter);
-      harmonic2Gain.connect(filter);
+      fundamentalGain.connect(lowpass);
+      harmonic1Gain.connect(lowpass);
+      harmonic2Gain.connect(lowpass);
       
-      filter.connect(envelope);
+      lowpass.connect(midBoost);
+      midBoost.connect(presence);
+      presence.connect(envelope);
       
       // Dry signal
       envelope.connect(panner);
@@ -168,7 +185,9 @@ class AudioService {
           fundamentalGain.disconnect();
           harmonic1Gain.disconnect();
           harmonic2Gain.disconnect();
-          filter.disconnect();
+          lowpass.disconnect();
+          midBoost.disconnect();
+          presence.disconnect();
           envelope.disconnect();
           panner.disconnect();
           reverb.disconnect();
@@ -194,7 +213,7 @@ class AudioService {
   /**
    * Play a guitar chord with realistic strumming
    */
-  playChord(notes: string[], duration: number = 1000, octave: number = 3, strum: boolean = true): void {
+  playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): void {
     if (strum) {
       // Realistic strum - play from low to high strings with slight randomization
       const strumDelay = 25; // ms between strings
@@ -493,8 +512,8 @@ class AudioService {
       }
     }
 
-    // Play with realistic strum
-    this.playChord(notes, 1800, 3, true);
+    // Play with realistic strum - extended duration
+    this.playChord(notes, 2200, 3, true);
   }
 }
 
