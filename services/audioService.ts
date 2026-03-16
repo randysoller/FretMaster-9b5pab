@@ -13,7 +13,7 @@ class AudioService {
   private metronomeInterval: NodeJS.Timeout | null = null;
   private masterGain: GainNode | null = null;
 
-  private getAudioContext(): AudioContext {
+  private async getAudioContext(): Promise<AudioContext> {
     if (!this.audioContext) {
       // @ts-ignore - Web Audio API compatibility
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -24,6 +24,17 @@ class AudioService {
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = 0.7;
     }
+    
+    // CRITICAL: Mobile browsers require AudioContext to be resumed after user interaction
+    if (this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+        console.log('AudioContext resumed successfully');
+      } catch (error) {
+        console.error('Failed to resume AudioContext:', error);
+      }
+    }
+    
     return this.audioContext;
   }
 
@@ -127,9 +138,9 @@ class AudioService {
   /**
    * Play a guitar string with realistic pluck sound
    */
-  playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): void {
+  async playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): Promise<void> {
     try {
-      const ctx = this.getAudioContext();
+      const ctx = await this.getAudioContext();
       const now = ctx.currentTime + 0.05;
       const durationSec = duration / 1000;
       
@@ -157,18 +168,18 @@ class AudioService {
   /**
    * Legacy note playback (kept for compatibility)
    */
-  playNote(note: string, duration: number = 500, octave: number = 4, volume: number = 0.3): void {
+  async playNote(note: string, duration: number = 500, octave: number = 4, volume: number = 0.3): Promise<void> {
     const frequency = this.getNoteFrequency(note, octave);
-    this.playGuitarString(frequency, duration, volume, 0);
+    await this.playGuitarString(frequency, duration, volume, 0);
   }
 
   /**
    * Play a guitar chord with realistic strumming
    * Uses the proven web implementation approach
    */
-  playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): void {
+  async playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): Promise<void> {
     try {
-      const ctx = this.getAudioContext();
+      const ctx = await this.getAudioContext();
       const now = ctx.currentTime + 0.05;
       const strumDelay = 0.035; // 35ms between strings — natural strum speed
       const noteDuration = 2.5; // ring out for 2.5 seconds
@@ -204,9 +215,9 @@ class AudioService {
     }
   }
 
-  playMetronomeClick(type: 'strong' | 'weak' = 'weak', volume: number = 0.75, sound: string = 'Click'): void {
+  async playMetronomeClick(type: 'strong' | 'weak' = 'weak', volume: number = 0.75, sound: string = 'Click'): Promise<void> {
     try {
-      const ctx = this.getAudioContext();
+      const ctx = await this.getAudioContext();
       
       if (sound === 'Wood Block') {
         this.playWoodBlock(type, volume);
@@ -225,8 +236,8 @@ class AudioService {
     }
   }
 
-  private playClickSound(type: 'strong' | 'weak', volume: number): void {
-    const ctx = this.getAudioContext();
+  private async playClickSound(type: 'strong' | 'weak', volume: number): Promise<void> {
+    const ctx = await this.getAudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
@@ -244,8 +255,8 @@ class AudioService {
     oscillator.stop(ctx.currentTime + duration);
   }
 
-  private playWoodBlock(type: 'strong' | 'weak', volume: number): void {
-    const ctx = this.getAudioContext();
+  private async playWoodBlock(type: 'strong' | 'weak', volume: number): Promise<void> {
+    const ctx = await this.getAudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
     const filter = ctx.createBiquadFilter();
@@ -269,8 +280,8 @@ class AudioService {
     oscillator.stop(ctx.currentTime + duration);
   }
 
-  private playHiHat(type: 'strong' | 'weak', volume: number): void {
-    const ctx = this.getAudioContext();
+  private async playHiHat(type: 'strong' | 'weak', volume: number): Promise<void> {
+    const ctx = await this.getAudioContext();
     const bufferSize = ctx.sampleRate * 0.1;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -300,8 +311,8 @@ class AudioService {
     noise.stop(ctx.currentTime + duration);
   }
 
-  private playSidestick(type: 'strong' | 'weak', volume: number): void {
-    const ctx = this.getAudioContext();
+  private async playSidestick(type: 'strong' | 'weak', volume: number): Promise<void> {
+    const ctx = await this.getAudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
@@ -332,7 +343,9 @@ class AudioService {
       
       if (isMainBeat || subdivision > 1) {
         const volume = isStrongBeat ? 0.75 : isMainBeat ? 0.5 : 0.3;
-        this.playMetronomeClick(isStrongBeat ? 'strong' : 'weak', volume, sound);
+        this.playMetronomeClick(isStrongBeat ? 'strong' : 'weak', volume, sound).catch(err => 
+          console.error('Metronome click failed:', err)
+        );
       }
       
       callback?.({
@@ -352,9 +365,9 @@ class AudioService {
     }
   }
 
-  playTunerTone(frequency: number, duration: number = 2000): void {
+  async playTunerTone(frequency: number, duration: number = 2000): Promise<void> {
     try {
-      const ctx = this.getAudioContext();
+      const ctx = await this.getAudioContext();
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
 
@@ -395,21 +408,21 @@ class AudioService {
     this.stopMetronome();
   }
 
-  playSuccess(): void {
-    this.playNote('C', 100, 5, 0.4);
+  async playSuccess(): Promise<void> {
+    await this.playNote('C', 100, 5, 0.4);
     setTimeout(() => this.playNote('E', 100, 5, 0.4), 100);
     setTimeout(() => this.playNote('G', 200, 5, 0.4), 200);
   }
 
-  playError(): void {
-    this.playNote('F', 150, 3, 0.4);
+  async playError(): Promise<void> {
+    await this.playNote('F', 150, 3, 0.4);
     setTimeout(() => this.playNote('E', 150, 3, 0.4), 150);
   }
 
   /**
    * Play chord preview with enhanced synthesis
    */
-  playChordPreview(chordName: string): void {
+  async playChordPreview(chordName: string): Promise<void> {
     // Enhanced chord mapping with more chords and variations
     const chordMap: { [key: string]: string[] } = {
       // Major chords
@@ -480,7 +493,7 @@ class AudioService {
     }
 
     // Play with realistic strum - extended duration
-    this.playChord(notes, 2200, 3, true);
+    await this.playChord(notes, 2200, 3, true);
   }
 }
 

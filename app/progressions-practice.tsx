@@ -73,7 +73,7 @@ export default function ProgressionsPracticeScreen() {
         // Change chord
         if (chordIndex < chords.length) {
           setCurrentChordIndex(chordIndex);
-          audioService.playChordPreview(chords[chordIndex]);
+          audioService.playChordPreview(chords[chordIndex]).catch(err => console.error('Audio failed:', err));
           
           // Transition animation
           Animated.parallel([
