@@ -1,4 +1,5 @@
 // Professional audio service using Web Audio API with realistic guitar synthesis
+import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 
 interface GuitarStringConfig {
   frequency: number;
@@ -420,76 +421,70 @@ class AudioService {
   }
 
   /**
-   * Play chord preview with enhanced synthesis
+   * Calculate actual notes from chord fret positions
+   * This ensures audio matches the visual fretboard exactly
    */
-  async playChordPreview(chordName: string): Promise<void> {
-    // Enhanced chord mapping with more chords and variations
-    const chordMap: { [key: string]: string[] } = {
-      // Major chords
-      'C': ['C', 'E', 'G', 'C', 'E'],
-      'D': ['D', 'A', 'D', 'F#'],
-      'E': ['E', 'B', 'E', 'G#', 'B', 'E'],
-      'F': ['F', 'A', 'C', 'F'],
-      'G': ['G', 'B', 'D', 'G', 'B', 'G'],
-      'A': ['A', 'E', 'A', 'C#', 'E'],
-      'B': ['B', 'F#', 'B', 'D#'],
-      
-      // Minor chords
-      'Am': ['A', 'E', 'A', 'C', 'E'],
-      'Bm': ['B', 'F#', 'B', 'D'],
-      'Cm': ['C', 'G', 'C', 'Eb', 'G'],
-      'Dm': ['D', 'A', 'D', 'F', 'A'],
-      'Em': ['E', 'B', 'E', 'G', 'B', 'E'],
-      'Fm': ['F', 'C', 'F', 'Ab', 'C'],
-      'Gm': ['G', 'D', 'G', 'Bb', 'D'],
-      
-      // Seventh chords
-      'A7': ['A', 'E', 'G', 'C#', 'E'],
-      'B7': ['B', 'F#', 'A', 'D#', 'F#'],
-      'C7': ['C', 'E', 'Bb', 'C', 'E'],
-      'D7': ['D', 'A', 'C', 'F#'],
-      'E7': ['E', 'B', 'D', 'G#', 'B', 'E'],
-      'F7': ['F', 'A', 'Eb', 'F'],
-      'G7': ['G', 'B', 'D', 'F', 'B'],
-      
-      // Augmented
-      'Caug': ['C', 'E', 'G#'],
-      'Daug': ['D', 'F#', 'A#'],
-      'Eaug': ['E', 'G#', 'B#'],
-      
-      // Diminished
-      'Cdim': ['C', 'Eb', 'Gb'],
-      'Ddim': ['D', 'F', 'Ab'],
-      'Edim': ['E', 'G', 'Bb'],
-      
-      // Suspended
-      'Csus2': ['C', 'D', 'G'],
-      'Csus4': ['C', 'F', 'G', 'C'],
-      'Dsus2': ['D', 'E', 'A'],
-      'Dsus4': ['D', 'G', 'A', 'D'],
-      'Esus4': ['E', 'A', 'B', 'E'],
-      'Asus2': ['A', 'B', 'E'],
-      'Asus4': ['A', 'D', 'E'],
+  private calculateNotesFromChord(chord: ChordData): string[] {
+    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    const normalizeNote = (note: string): string => {
+      return note
+        .replace('b', '#')
+        .replace('Db', 'C#')
+        .replace('Eb', 'D#')
+        .replace('Gb', 'F#')
+        .replace('Ab', 'G#')
+        .replace('Bb', 'A#');
+    };
+    
+    const getNoteAtPosition = (stringIndex: number, fret: number): string => {
+      if (fret < 0) return ''; // Muted string
+      const openNote = STANDARD_TUNING[stringIndex];
+      const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
+      const noteIndex = (openNoteIndex + fret) % 12;
+      return NOTES[noteIndex];
     };
 
-    // Try to find exact match or base chord
-    let notes = chordMap[chordName];
+    // Calculate notes from fret positions (same logic as visual fretboard)
+    const notes = chord.positions
+      .map((fret, index) => fret >= 0 ? getNoteAtPosition(index, fret) : null)
+      .filter(Boolean) as string[];
     
-    if (!notes) {
-      // Try to extract base note (e.g., "C#m7" -> "C#" or "C#m")
-      const baseNote = chordName.match(/^[A-G][#b]?/)?.[0] || 'C';
-      const hasMinor = chordName.toLowerCase().includes('m');
-      const hasSeventh = chordName.includes('7');
+    return notes;
+  }
+
+  /**
+   * Play chord preview - accepts ChordData object or chord name string
+   * When ChordData is provided, calculates exact notes from fret positions
+   * When string is provided, uses fallback chord mapping
+   */
+  async playChordPreview(chordInput: ChordData | string): Promise<void> {
+    let notes: string[];
+
+    // If we have full chord data, calculate exact notes from positions
+    if (typeof chordInput === 'object' && chordInput.positions) {
+      notes = this.calculateNotesFromChord(chordInput);
+      console.log(`Playing chord ${chordInput.name} with calculated notes:`, notes);
+    } else {
+      // Fallback: Use chord name with predefined mappings
+      const chordName = typeof chordInput === 'string' ? chordInput : '';
       
-      if (hasSeventh && hasMinor) {
-        notes = chordMap[baseNote + 'm7'] || chordMap[baseNote + 'm'] || chordMap[baseNote] || ['C', 'E', 'G'];
-      } else if (hasMinor) {
-        notes = chordMap[baseNote + 'm'] || chordMap[baseNote] || ['C', 'E', 'G'];
-      } else if (hasSeventh) {
-        notes = chordMap[baseNote + '7'] || chordMap[baseNote] || ['C', 'E', 'G'];
-      } else {
-        notes = chordMap[baseNote] || ['C', 'E', 'G'];
-      }
+      // Basic chord mapping for fallback when only name is available
+      const chordMap: { [key: string]: string[] } = {
+        'C': ['C', 'E', 'G', 'C', 'E'],
+        'D': ['D', 'A', 'D', 'F#'],
+        'E': ['E', 'B', 'E', 'G#', 'B', 'E'],
+        'F': ['F', 'A', 'C', 'F'],
+        'G': ['G', 'B', 'D', 'G', 'B', 'G'],
+        'A': ['A', 'E', 'A', 'C#', 'E'],
+        'B': ['B', 'F#', 'B', 'D#'],
+        'Am': ['A', 'E', 'A', 'C', 'E'],
+        'Dm': ['D', 'A', 'D', 'F', 'A'],
+        'Em': ['E', 'B', 'E', 'G', 'B', 'E'],
+      };
+
+      notes = chordMap[chordName] || ['C', 'E', 'G'];
+      console.log(`Playing chord ${chordName} with fallback notes:`, notes);
     }
 
     // Play with realistic strum - extended duration
