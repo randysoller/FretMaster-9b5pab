@@ -641,12 +641,6 @@ export default function ChordManagerScreen() {
     const PREVIEW_FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
     const PREVIEW_STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
-    // Helper to determine if a position is a root note
-    const isRootNotePreview = (stringIndex: number) => {
-      const thisShape = dotShapes[stringIndex];
-      return thisShape === 'diamond';
-    };
-
     return (
       <View style={styles.previewFretboardGrid}>
         {/* Fret marker inlays */}
@@ -727,28 +721,95 @@ export default function ChordManagerScreen() {
             const toX = barre.toString * STRING_SPACING;
             const barreWidth = toX - fromX;
 
+            // Mark strings in this barre
+            for (let si = barre.fromString; si <= barre.toString; si++) {
+              if (editingChord.positions[si] === barre.fret) {
+                barreRenderedStrings.add(si);
+              }
+            }
+
             return (
-              <View
-                key={`preview-barre-${idx}`}
-                style={{
-                  position: 'absolute',
-                  left: fromX - 9,
-                  top: y - 9,
-                  width: barreWidth + 18,
-                  height: 18,
-                  backgroundColor: '#D4952A',
-                  borderRadius: 9,
-                }}
-              />
+              <React.Fragment key={`preview-barre-${idx}`}>
+                {/* Barre bar - thinner */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: fromX - 8,
+                    top: y - 8,
+                    width: barreWidth + 16,
+                    height: 16,
+                    backgroundColor: '#D4952A',
+                    borderRadius: 8,
+                  }}
+                />
+                {/* Individual dots on top of barre */}
+                {Array.from({ length: barre.toString - barre.fromString + 1 }).map((_, offset) => {
+                  const si = barre.fromString + offset;
+                  if (editingChord.positions[si] !== barre.fret) return null;
+
+                  const dotX = si * STRING_SPACING;
+                  const thisShape = dotShapes[si];
+                  const thisColor = dotColors[si];
+                  const fingerNum = editingChord.fingers[si];
+
+                  return (
+                    <View
+                      key={`preview-barre-dot-${si}`}
+                      style={{
+                        position: 'absolute',
+                        left: dotX - 16,
+                        top: y - 16,
+                        width: 32,
+                        height: 32,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {thisShape === 'circle' ? (
+                        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: thisColor, alignItems: 'center', justifyContent: 'center' }}>
+                          {fingerNum > 0 && (
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: '#000', textAlign: 'center' }}>
+                              {fingerNum === 5 ? 'T' : fingerNum}
+                            </Text>
+                          )}
+                        </View>
+                      ) : (
+                        <>
+                          <View style={{ width: 24, height: 24, transform: [{ rotate: '45deg' }], backgroundColor: thisColor, position: 'absolute' }} />
+                          {fingerNum > 0 && (
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: '#000', textAlign: 'center', position: 'absolute', width: 32, height: 32, lineHeight: 32 }}>
+                              {fingerNum === 5 ? 'T' : fingerNum}
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </React.Fragment>
             );
           });
         })()}
 
-        {/* Dots */}
-        {editingChord.positions.map((fret, stringIndex) => {
-          if (fret < 0) return null;
-          const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
-          if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
+        {/* Dots (non-barre) */}
+        {(() => {
+          const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+          const barreRenderedStrings = new Set<number>();
+          detectedBarres.forEach(barre => {
+            for (let si = barre.fromString; si <= barre.toString; si++) {
+              if (editingChord.positions[si] === barre.fret) {
+                barreRenderedStrings.add(si);
+              }
+            }
+          });
+
+          return editingChord.positions.map((fret, stringIndex) => {
+            if (fret < 0) return null;
+            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+            if (fret > 0 && (fretIndex < 1 || fretIndex > PREVIEW_FRETS)) return null;
+
+            // Skip if already rendered as part of barre
+            if (barreRenderedStrings.has(stringIndex)) return null;
 
             const x = stringIndex * STRING_SPACING;
             const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
@@ -791,16 +852,10 @@ export default function ChordManagerScreen() {
                 )}
               </View>
             );
-        })}
+          });
+        })()}
       </View>
     );
-  };
-
-  // Helper to determine if a position is a root note
-  const isRootNote = (stringIndex: number) => {
-    if (!editingChord) return false;
-    const thisShape = dotShapes[stringIndex];
-    return thisShape === 'diamond';
   };
 
   // Render Interactive Fretboard
@@ -890,28 +945,91 @@ export default function ChordManagerScreen() {
               const toX = barre.toString * STRING_SPACING;
               const barreWidth = toX - fromX;
 
+              // Mark strings in this barre
+              for (let si = barre.fromString; si <= barre.toString; si++) {
+                if (editingChord.positions[si] === barre.fret) {
+                  barreRenderedStrings.add(si);
+                }
+              }
+
               return (
-                <View
-                  key={`barre-${idx}`}
-                  style={{
-                    position: 'absolute',
-                    left: fromX - 9,
-                    top: y - 9,
-                    width: barreWidth + 18,
-                    height: 18,
-                    backgroundColor: '#D4952A',
-                    borderRadius: 9,
-                  }}
-                />
+                <React.Fragment key={`barre-${idx}`}>
+                  {/* Barre bar - thinner */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: fromX - 8,
+                      top: y - 8,
+                      width: barreWidth + 16,
+                      height: 16,
+                      backgroundColor: '#D4952A',
+                      borderRadius: 8,
+                    }}
+                  />
+                  {/* Individual dots on top of barre */}
+                  {Array.from({ length: barre.toString - barre.fromString + 1 }).map((_, offset) => {
+                    const si = barre.fromString + offset;
+                    if (editingChord.positions[si] !== barre.fret) return null;
+
+                    const dotX = si * STRING_SPACING;
+                    const thisShape = dotShapes[si];
+                    const thisColor = dotColors[si];
+                    const fingerNum = editingChord.fingers[si];
+
+                    return (
+                      <View
+                        key={`barre-dot-${si}`}
+                        style={{
+                          position: 'absolute',
+                          left: dotX - 16,
+                          top: y - 16,
+                          width: 32,
+                          height: 32,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {thisShape === 'circle' ? (
+                          <View style={[styles.dotCircle, { backgroundColor: thisColor }]}>
+                            {fingerNum > 0 && (
+                              <Text style={styles.dotNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                            )}
+                          </View>
+                        ) : (
+                          <>
+                            <View style={[styles.dotDiamond, { backgroundColor: thisColor }]} />
+                            {fingerNum > 0 && (
+                              <Text style={styles.diamondNumber}>{fingerNum === 5 ? 'T' : fingerNum}</Text>
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  })}
+                </React.Fragment>
               );
             });
           })()}
 
-          {/* Dots */}
-          {editingChord.positions.map((fret, stringIndex) => {
-            if (fret < 0) return null;
-            const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
-            if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
+          {/* Dots (non-barre) */}
+          {(() => {
+            const detectedBarres = detectBarres(editingChord.positions, editingChord.fingers);
+            const barreRenderedStrings = new Set<number>();
+            detectedBarres.forEach(barre => {
+              for (let si = barre.fromString; si <= barre.toString; si++) {
+                if (editingChord.positions[si] === barre.fret) {
+                  barreRenderedStrings.add(si);
+                }
+              }
+            });
+
+            return editingChord.positions.map((fret, stringIndex) => {
+              if (fret < 0) return null;
+              const fretIndex = fret === 0 ? 0.5 : fret - baseFret + 1;
+              if (fret > 0 && (fretIndex < 1 || fretIndex > visibleFrets)) return null;
+
+              // Skip if already rendered as part of barre
+              if (barreRenderedStrings.has(stringIndex)) return null;
 
               const x = stringIndex * STRING_SPACING;
               const y = fret === 0 ? -20 : (fretIndex - 0.5) * FRET_SPACING;
@@ -954,7 +1072,8 @@ export default function ChordManagerScreen() {
                   )}
                 </View>
               );
-          })}
+            });
+          })()}
 
           {/* Fret clickable areas */}
           {Array.from({ length: visibleFrets }).map((_, fretIndex) => 
