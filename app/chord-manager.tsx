@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Modal, FlatList, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -67,6 +67,8 @@ export default function ChordManagerScreen() {
 
   // State
   const [chords, setChords] = useState<ChordData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterShape, setFilterShape] = useState<ChordShape | 'all'>('all');
@@ -105,7 +107,7 @@ export default function ChordManagerScreen() {
 
   // Save chords whenever they change
   useEffect(() => {
-    if (chords.length > 0) {
+    if (chords.length > 0 && !isLoading) {
       saveChords();
     }
   }, [chords]);
@@ -122,36 +124,137 @@ export default function ChordManagerScreen() {
   }, [isAdmin]);
 
   const loadChords = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      
       if (stored) {
-        const editedChords = JSON.parse(stored);
-        // Merge edited chords with original CHORDS
-        const mergedChords = [...CHORDS].map(originalChord => {
-          const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
-          return editedChord || originalChord;
-        });
-        // Add any new chords that don't exist in CHORDS
-        const newChords = editedChords.filter((c: ChordData) => 
-          !CHORDS.some(original => original.id === c.id)
-        );
-        setChords([...mergedChords, ...newChords]);
+        try {
+          const editedChords = JSON.parse(stored);
+          
+          // Validate chord data structure
+          if (Array.isArray(editedChords)) {
+            // Validate each chord has required fields
+            const validChords = editedChords.filter((chord: any) => 
+              chord &&
+              typeof chord.id === 'string' &&
+              typeof chord.name === 'string' &&
+              typeof chord.fullName === 'string' &&
+              Array.isArray(chord.positions) &&
+              Array.isArray(chord.fingers) &&
+              typeof chord.shape === 'string' &&
+              typeof chord.type === 'string'
+            );
+            
+            // Merge edited chords with original CHORDS
+            const mergedChords = [...CHORDS].map(originalChord => {
+              const editedChord = validChords.find((c: ChordData) => c.id === originalChord.id);
+              return editedChord || originalChord;
+            });
+            
+            // Add any new chords that don't exist in CHORDS
+            const newChords = validChords.filter((c: ChordData) => 
+              !CHORDS.some(original => original.id === c.id)
+            );
+            
+            setChords([...mergedChords, ...newChords]);
+            console.log('✅ Loaded', validChords.length, 'valid chord edits from AsyncStorage');
+            
+            // Warn if some chords were invalid
+            if (validChords.length < editedChords.length) {
+              console.warn('⚠️ Skipped', editedChords.length - validChords.length, 'invalid chord edits');
+            }
+          } else {
+            console.warn('⚠️ Invalid chord data structure, using defaults');
+            setChords([...CHORDS]);
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse chord edits:', parseError);
+          setError('Corrupted chord data detected. Using defaults.');
+          setChords([...CHORDS]);
+          
+          // Clear corrupted data
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        }
       } else {
+        console.log('No stored chord edits found, using defaults');
         setChords([...CHORDS]);
       }
-    } catch (error) {
-      console.error('Failed to load chords:', error);
+    } catch (storageError) {
+      console.error('❌ Failed to access AsyncStorage:', storageError);
+      setError('Failed to load chord edits. Please check storage permissions.');
       setChords([...CHORDS]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const saveChords = async () => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(chords));
-    } catch (error) {
-      console.error('Failed to save chords:', error);
+      const dataToSave = JSON.stringify(chords);
+      
+      // Check data size (AsyncStorage has ~10MB limit on most devices)
+      if (dataToSave.length > 5000000) { // ~5MB warning
+        console.warn('⚠️ Chord data is very large:', dataToSave.length, 'bytes');
+      }
+      
+      await AsyncStorage.setItem(STORAGE_KEY, dataToSave);
+      console.log('✅ Successfully saved', chords.length, 'chords to AsyncStorage');
+      setError(null); // Clear any previous errors
+    } catch (saveError: any) {
+      console.error('❌ Failed to save chords:', saveError);
+      
+      // Check for quota exceeded error
+      if (saveError.message?.includes('quota') || saveError.message?.includes('QuotaExceeded')) {
+        setError('Storage quota exceeded. Please delete some chords.');
+        Alert.alert(
+          'Storage Full',
+          'Unable to save chord edits. Your device storage is full. Please delete some chord edits.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        setError('Failed to save chord edits. Changes may not persist.');
+        Alert.alert(
+          'Save Error',
+          'Failed to save chord edits. Your changes may not be saved.',
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
+
+  // Show loading indicator while data is being loaded
+  if (isLoading) {
+    return (
+      <Screen edges={['top']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading chord manager...</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  // Show error state with retry option
+  if (error && chords.length === 0) {
+    return (
+      <Screen edges={['top']}>
+        <View style={[styles.container, styles.centerContent]}>
+          <MaterialIcons name="error-outline" size={48} color={colors.error} />
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={loadChords} style={styles.retryButton}>
+            <MaterialIcons name="refresh" size={20} color={colors.primary} />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </Pressable>
+          <Pressable onPress={() => router.back()} style={styles.backToLibraryButton}>
+            <Text style={styles.backToLibraryButtonText}>Back to Library</Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
 
   if (!isAdmin) {
     return null;
@@ -271,23 +374,28 @@ export default function ChordManagerScreen() {
     setViewMode('editor');
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingChord) return;
 
-    if (isNewChord) {
-      setChords([...chords, editingChord]);
-      Alert.alert('Success', 'New chord created successfully');
-    } else {
-      const updatedChords = chords.map(c => 
-        c.id === editingChord.id ? editingChord : c
-      );
-      setChords(updatedChords);
-      Alert.alert('Success', 'Chord updated successfully');
+    try {
+      if (isNewChord) {
+        setChords([...chords, editingChord]);
+        Alert.alert('Success', 'New chord created successfully');
+      } else {
+        const updatedChords = chords.map(c => 
+          c.id === editingChord.id ? editingChord : c
+        );
+        setChords(updatedChords);
+        Alert.alert('Success', 'Chord updated successfully');
+      }
+      
+      setEditingChord(null);
+      setIsNewChord(false);
+      setViewMode('list');
+    } catch (err) {
+      console.error('❌ Failed to save chord edit:', err);
+      Alert.alert('Error', 'Failed to save chord. Please try again.');
     }
-    
-    setEditingChord(null);
-    setIsNewChord(false);
-    setViewMode('list');
   };
 
   const handleDeleteChord = () => {
@@ -301,12 +409,17 @@ export default function ChordManagerScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            const updatedChords = chords.filter(c => c.id !== editingChord.id);
-            setChords(updatedChords);
-            setEditingChord(null);
-            setViewMode('list');
-            Alert.alert('Success', 'Chord deleted from library');
+          onPress: async () => {
+            try {
+              const updatedChords = chords.filter(c => c.id !== editingChord.id);
+              setChords(updatedChords);
+              setEditingChord(null);
+              setViewMode('list');
+              Alert.alert('Success', 'Chord deleted from library');
+            } catch (err) {
+              console.error('❌ Failed to delete chord:', err);
+              Alert.alert('Error', 'Failed to delete chord. Please try again.');
+            }
           }
         }
       ]
@@ -1697,6 +1810,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginBottom: spacing.sm,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  backToLibraryButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+  },
+  backToLibraryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
   },
   header: {
     flexDirection: 'row',
