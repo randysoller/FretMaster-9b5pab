@@ -79,84 +79,248 @@ class AudioService {
   }
 
   /**
-   * Play chord using Web Audio API synthesis
+   * Create custom acoustic guitar waveform with specific harmonic content
+   */
+  private createGuitarWaveform(ctx: AudioContext): PeriodicWave {
+    // Acoustic guitar harmonic profile (fundamental + harmonics with specific amplitudes)
+    const real = new Float32Array([0, 1, 0.5, 0.3, 0.15, 0.08, 0.04, 0.02]); // Harmonic amplitudes
+    const imag = new Float32Array(real.length); // Phase (zeros for simplicity)
+    return ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+  }
+
+  /**
+   * Create guitar body resonance filter (simulates acoustic body)
+   */
+  private createBodyResonance(ctx: AudioContext): BiquadFilterNode {
+    const bodyFilter = ctx.createBiquadFilter();
+    bodyFilter.type = 'bandpass';
+    bodyFilter.frequency.value = 100; // Main body resonance around 100Hz
+    bodyFilter.Q.value = 8; // Resonant peak
+    return bodyFilter;
+  }
+
+  /**
+   * Create formant filters (characteristic resonances of acoustic guitar)
+   */
+  private createFormantFilters(ctx: AudioContext, frequency: number): BiquadFilterNode[] {
+    const filters: BiquadFilterNode[] = [];
+    
+    // Formant 1: Body resonance boost (80-120Hz)
+    const f1 = ctx.createBiquadFilter();
+    f1.type = 'peaking';
+    f1.frequency.value = 100;
+    f1.Q.value = 3;
+    f1.gain.value = 4; // +4dB boost
+    filters.push(f1);
+    
+    // Formant 2: Lower midrange character (200-400Hz)
+    const f2 = ctx.createBiquadFilter();
+    f2.type = 'peaking';
+    f2.frequency.value = 300;
+    f2.Q.value = 2;
+    f2.gain.value = 3; // +3dB
+    filters.push(f2);
+    
+    // Formant 3: Presence/brightness (2-4kHz)
+    const f3 = ctx.createBiquadFilter();
+    f3.type = 'peaking';
+    f3.frequency.value = 2800;
+    f3.Q.value = 1.5;
+    f3.gain.value = 5; // +5dB for clarity
+    filters.push(f3);
+    
+    // High-shelf for air/sparkle
+    const highShelf = ctx.createBiquadFilter();
+    highShelf.type = 'highshelf';
+    highShelf.frequency.value = 6000;
+    highShelf.gain.value = 2; // +2dB above 6kHz
+    filters.push(highShelf);
+    
+    return filters;
+  }
+
+  /**
+   * Create pick attack noise (transient for realism)
+   */
+  private createPickNoise(ctx: AudioContext, startTime: number, stringIndex: number): AudioBufferSourceNode | null {
+    try {
+      // Create short noise burst
+      const bufferSize = ctx.sampleRate * 0.01; // 10ms
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      
+      // Generate filtered noise (simulates pick scraping string)
+      for (let i = 0; i < bufferSize; i++) {
+        const envelope = Math.exp(-i / (bufferSize * 0.3)); // Quick decay
+        data[i] = (Math.random() * 2 - 1) * envelope * 0.15; // Subtle noise
+      }
+      
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      
+      // Filter noise to match string frequency range
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 2000 + (stringIndex * 500); // Higher for higher strings
+      noiseFilter.Q.value = 2;
+      
+      noise.connect(noiseFilter);
+      return noise;
+    } catch (error) {
+      console.warn('Pick noise creation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create simple reverb effect (room ambience)
+   */
+  private createReverb(ctx: AudioContext): ConvolverNode | null {
+    try {
+      // Create impulse response for small room reverb
+      const reverbTime = 0.8; // 800ms reverb tail
+      const sampleRate = ctx.sampleRate;
+      const length = sampleRate * reverbTime;
+      const impulse = ctx.createBuffer(2, length, sampleRate);
+      
+      for (let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+          // Exponentially decaying random noise
+          const decay = Math.exp(-i / (length * 0.3));
+          channelData[i] = (Math.random() * 2 - 1) * decay;
+        }
+      }
+      
+      const convolver = ctx.createConvolver();
+      convolver.buffer = impulse;
+      return convolver;
+    } catch (error) {
+      console.warn('Reverb creation failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Play chord using professional acoustic guitar synthesis
    * Calculates exact frequencies from chord fret positions
    */
-  private async playChordSynthesis(chord: ChordData, duration: number = 2200): Promise<void> {
+  private async playChordSynthesis(chord: ChordData, duration: number = 2500): Promise<void> {
     try {
       const ctx = await this.getAudioContext();
       const now = ctx.currentTime;
       const durationSec = duration / 1000;
 
-      // Calculate which strings to play based on chord positions
-      const stringsToPlay: Array<{ stringIndex: number; frequency: number }> = [];
+      // Create custom guitar waveform
+      const guitarWave = this.createGuitarWaveform(ctx);
       
+      // Create reverb (wet/dry mix)
+      const reverb = this.createReverb(ctx);
+      const reverbGain = ctx.createGain();
+      reverbGain.gain.value = 0.25; // 25% wet signal
+      const dryGain = ctx.createGain();
+      dryGain.gain.value = 0.75; // 75% dry signal
+
+      // Calculate which strings to play
+      const stringsToPlay: Array<{ stringIndex: number; frequency: number }> = [];
       chord.positions.forEach((fret, stringIndex) => {
-        if (fret >= 0) { // -1 means don't play this string
+        if (fret >= 0) {
           const frequency = this.calculateStringFrequency(stringIndex, fret);
           stringsToPlay.push({ stringIndex, frequency });
         }
       });
 
-      console.log(`Playing ${chord.name}:`, stringsToPlay.map(s => `String ${s.stringIndex + 1}: ${s.frequency.toFixed(1)}Hz`));
+      console.log(`🎸 Professional synthesis: ${chord.name}`);
 
-      // Play each string
-      stringsToPlay.forEach(({ stringIndex, frequency }) => {
-        // Create oscillator with sawtooth wave (natural harmonics)
+      // Play each string with advanced synthesis
+      stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
+        // Natural strum timing (downstroke from bass to treble)
+        const strumDelay = arrayIndex * 0.012; // 12ms between strings
+        const startTime = now + strumDelay;
+        
+        // Slight detuning for natural chorus effect
+        const detune = (Math.random() - 0.5) * 4; // ±2 cents
+        
+        // Velocity variation (softer on first/last strings)
+        const velocityCurve = arrayIndex === 0 || arrayIndex === stringsToPlay.length - 1 ? 0.85 : 1.0;
+        const baseVolume = (stringIndex > 3 ? 0.28 : 0.24) * velocityCurve;
+
+        // === MAIN OSCILLATOR ===
         const osc = ctx.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(frequency, now);
+        osc.setPeriodicWave(guitarWave); // Custom guitar waveform
+        osc.frequency.setValueAtTime(frequency, startTime);
+        osc.detune.setValueAtTime(detune, startTime);
 
-        // Create gain envelope for this string
-        const gain = ctx.createGain();
-        
-        // String-specific timing: high strings attack slightly earlier
-        const attackDelay = stringIndex > 3 ? 0 : 0.005; // High strings 5ms earlier
-        const startTime = now + attackDelay;
-        
-        // Base volume for this string (higher strings slightly louder)
-        const baseVolume = stringIndex > 3 ? 0.25 : 0.2;
-        
-        // ADSR envelope
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(baseVolume, startTime + 0.005); // 5ms attack
-        gain.gain.linearRampToValueAtTime(baseVolume * 0.7, startTime + 0.1); // 100ms decay
-        gain.gain.setValueAtTime(baseVolume * 0.7, startTime + 0.1); // Sustain
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec); // Release
+        // === PICK ATTACK NOISE ===
+        const pickNoise = this.createPickNoise(ctx, startTime, stringIndex);
+        const pickGain = ctx.createGain();
+        pickGain.gain.value = 0.3;
 
-        // Create lowpass filter for acoustic guitar tone
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(frequency * 8, startTime); // Initial bright tone
-        filter.frequency.exponentialRampToValueAtTime(frequency * 4, startTime + durationSec); // Darken over time
-        filter.Q.value = 1;
+        // === STRING ENVELOPE ===
+        const stringGain = ctx.createGain();
+        stringGain.gain.setValueAtTime(0, startTime);
+        stringGain.gain.linearRampToValueAtTime(baseVolume, startTime + 0.003); // 3ms attack (pick)
+        stringGain.gain.linearRampToValueAtTime(baseVolume * 0.75, startTime + 0.08); // 80ms decay
+        stringGain.gain.setValueAtTime(baseVolume * 0.75, startTime + 0.08); // Sustain
+        stringGain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec); // Natural decay
 
-        // Create stereo panner for spatial separation
+        // === FORMANT FILTERS (guitar body character) ===
+        const formants = this.createFormantFilters(ctx, frequency);
+        
+        // === MAIN LOWPASS (string tone) ===
+        const mainFilter = ctx.createBiquadFilter();
+        mainFilter.type = 'lowpass';
+        const initialCutoff = Math.min(frequency * 12, 8000); // Bright attack
+        const sustainCutoff = Math.min(frequency * 6, 4000); // Mellower sustain
+        mainFilter.frequency.setValueAtTime(initialCutoff, startTime);
+        mainFilter.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + 0.5);
+        mainFilter.Q.value = 0.7;
+
+        // === STEREO POSITIONING ===
         const panner = ctx.createStereoPanner();
-        // Bass strings (0-2) panned center-left, high strings (3-5) panned right
-        const panValue = stringIndex < 3 ? -0.15 : (stringIndex - 3) * 0.15;
+        const panValue = stringIndex < 3 ? -0.2 + (stringIndex * 0.1) : (stringIndex - 3) * 0.15;
         panner.pan.setValueAtTime(panValue, now);
 
-        // Connect: oscillator -> filter -> gain -> panner -> masterGain -> compressor -> destination
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(panner);
-        panner.connect(this.masterGain!);
+        // === SIGNAL CHAIN ===
+        // Main oscillator path: osc -> formants -> mainFilter -> stringGain -> panner
+        let lastNode: AudioNode = osc;
+        formants.forEach(filter => {
+          lastNode.connect(filter);
+          lastNode = filter;
+        });
+        lastNode.connect(mainFilter);
+        mainFilter.connect(stringGain);
+        stringGain.connect(panner);
+        
+        // Split to dry and wet (reverb)
+        panner.connect(dryGain);
+        if (reverb) {
+          panner.connect(reverb);
+          reverb.connect(reverbGain);
+          reverbGain.connect(this.masterGain!);
+        }
+        dryGain.connect(this.masterGain!);
 
-        // Start and stop
+        // Pick noise path
+        if (pickNoise) {
+          pickNoise.connect(pickGain);
+          pickGain.connect(this.masterGain!);
+          pickNoise.start(startTime);
+        }
+
+        // Start main oscillator
         osc.start(startTime);
         osc.stop(startTime + durationSec);
-        
         this.activeOscillators.push(osc);
       });
 
-      // Clean up oscillator references after playback
+      // Cleanup
       setTimeout(() => {
         this.activeOscillators = [];
-      }, duration + 100);
+      }, duration + 200);
 
     } catch (error) {
-      console.error('Chord synthesis failed:', error);
+      console.error('Professional chord synthesis failed:', error);
     }
   }
 
