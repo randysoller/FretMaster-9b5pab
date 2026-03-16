@@ -443,9 +443,10 @@ class AudioService {
           // Decay (75ms)
           envelope = baseVolume - ((t - 0.005) / 0.075) * (baseVolume * 0.25);
         } else {
-          // Sustain + Release (exponential decay)
+          // Sustain + Release (exponential decay to near-zero)
           const sustainLevel = baseVolume * 0.75;
-          envelope = sustainLevel * Math.exp(-(t - 0.08) / (duration * 0.3));
+          const decayFactor = (t - 0.08) / (duration * 0.25); // Faster decay
+          envelope = sustainLevel * Math.exp(-decayFactor * 3); // Reaches ~0.005 by end
         }
         
         // Guitar waveform with harmonics (same harmonic content as web version)
@@ -494,11 +495,12 @@ class AudioService {
       rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 0.7;
     }
     
-    // Add fade-out at the very end to prevent clicks (last 10ms)
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.01);
+    // Add smooth fade-out at the very end to prevent pops/static (last 30ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.03);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
-      const fadeFactor = 1 - fadeProgress;
+      // Use exponential curve for smoother fade (sounds more natural)
+      const fadeFactor = Math.pow(1 - fadeProgress, 2);
       leftChannel[i] *= fadeFactor;
       rightChannel[i] *= fadeFactor;
     }
