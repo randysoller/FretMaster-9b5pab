@@ -91,10 +91,11 @@ class AudioService {
     osc3.type = 'sine';
     osc3.frequency.setValueAtTime(frequency * 0.5, startTime);
 
-    // Dynamic harmonic balance based on frequency
-    const isHighFreq = frequency > 300; // B string and above
-    const harmonicBoost = isHighFreq ? 1.5 : 1.0;
-    const subReduction = isHighFreq ? 0.6 : 1.0;
+    // Aggressive EQ for high frequencies - make them sparkle and cut through
+    const isHighFreq = frequency > 250; // G string and above
+    const isVeryHighFreq = frequency > 350; // B string and above
+    const harmonicBoost = isVeryHighFreq ? 2.2 : isHighFreq ? 1.8 : 1.0;
+    const subReduction = isVeryHighFreq ? 0.3 : isHighFreq ? 0.5 : 1.0; // Reduce bass for clarity
 
     // Gain envelopes — guitar pluck: fast attack, quick decay, gentle sustain
     const mainGain = ctx.createGain();
@@ -105,33 +106,53 @@ class AudioService {
 
     const harmonicGain = ctx.createGain();
     harmonicGain.gain.setValueAtTime(0, startTime);
-    harmonicGain.gain.linearRampToValueAtTime(volume * 0.10 * harmonicBoost, startTime + 0.005);
-    harmonicGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.5);
+    // More harmonic content for brightness and presence
+    harmonicGain.gain.linearRampToValueAtTime(volume * 0.14 * harmonicBoost, startTime + 0.005);
+    harmonicGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.6);
 
     const subGain = ctx.createGain();
     subGain.gain.setValueAtTime(0, startTime);
     subGain.gain.linearRampToValueAtTime(volume * 0.12 * subReduction, startTime + 0.01);
     subGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
 
-    // Low-pass filter to soften the tone (higher cutoff for high frequencies)
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    const initialCutoff = Math.min(frequency * 8, 8000); // Increased multiplier and max
-    const sustainCutoff = Math.min(frequency * 3, 3500); // Higher sustain cutoff
-    filter.frequency.setValueAtTime(initialCutoff, startTime);
-    filter.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + duration * 0.4);
-    filter.Q.setValueAtTime(1.0, startTime); // Slightly gentler Q for clearer highs
+    // High-pass for high strings to remove muddiness, low-pass for all to soften
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    if (isHighFreq) {
+      highpass.frequency.setValueAtTime(frequency * 0.5, startTime); // Remove low mud
+      highpass.Q.setValueAtTime(0.7, startTime);
+    } else {
+      highpass.frequency.setValueAtTime(60, startTime); // Minimal effect on bass
+      highpass.Q.setValueAtTime(0.5, startTime);
+    }
 
-    // Routing — through filter to master gain
+    // Low-pass filter with much higher cutoff for high frequencies
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    const initialCutoff = Math.min(frequency * 12, 12000); // Much higher for sparkle
+    const sustainCutoff = Math.min(frequency * 5, 5000); // Higher sustain
+    lowpass.frequency.setValueAtTime(initialCutoff, startTime);
+    lowpass.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + duration * 0.4);
+    lowpass.Q.setValueAtTime(0.8, startTime); // Slight resonance for presence
+
+    // High-shelf boost for very high frequencies (B and high E strings)
+    const highShelf = ctx.createBiquadFilter();
+    highShelf.type = 'highshelf';
+    highShelf.frequency.setValueAtTime(2000, startTime);
+    highShelf.gain.setValueAtTime(isVeryHighFreq ? 6 : isHighFreq ? 3 : 0, startTime); // +6dB boost for top strings
+
+    // Routing — through filters to master gain (highpass → lowpass → highshelf → master)
     osc1.connect(mainGain);
     osc2.connect(harmonicGain);
     osc3.connect(subGain);
 
-    mainGain.connect(filter);
-    harmonicGain.connect(filter);
-    subGain.connect(filter);
+    mainGain.connect(highpass);
+    harmonicGain.connect(highpass);
+    subGain.connect(highpass);
 
-    filter.connect(masterGain);
+    highpass.connect(lowpass);
+    lowpass.connect(highShelf);
+    highShelf.connect(masterGain);
 
     osc1.start(startTime);
     osc2.start(startTime);
@@ -152,9 +173,13 @@ class AudioService {
       const now = ctx.currentTime + 0.05;
       const durationSec = duration / 1000;
       
-      // Boost higher strings (B and high E) so they cut through better
+      // Aggressive boost for higher strings (G, B, high E) to make them clearly audible
       // String index: 0=low E, 1=A, 2=D, 3=G, 4=B, 5=high E
-      const vol = stringIndex >= 4 ? 0.35 : stringIndex >= 2 ? 0.3 : 0.28;
+      const vol = stringIndex >= 5 ? 0.48 : // High E - maximum boost
+                  stringIndex >= 4 ? 0.44 : // B string - very loud
+                  stringIndex >= 3 ? 0.40 : // G string - loud
+                  stringIndex >= 1 ? 0.30 : // A, D - medium
+                  0.28;                     // Low E - bass foundation
       
       const oscillators = this.createPluck(ctx, frequency, now, durationSec, vol * velocity, this.masterGain!);
       this.activeOscillators.push(...oscillators);
