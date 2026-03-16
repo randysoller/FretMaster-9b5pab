@@ -377,13 +377,77 @@ export default function ChordManagerScreen() {
   const handleSaveEdit = async () => {
     if (!editingChord) return;
 
+    // === CHORD NAME VALIDATION ===
+    const trimmedName = editingChord.name.trim();
+    const trimmedFullName = editingChord.fullName.trim();
+    
+    // Validation 1: Symbol cannot be empty
+    if (!trimmedName) {
+      Alert.alert('Invalid Chord', 'Chord symbol cannot be empty');
+      return;
+    }
+    
+    // Validation 2: Symbol max length (20 characters)
+    if (trimmedName.length > 20) {
+      Alert.alert('Symbol Too Long', 'Chord symbol must be 20 characters or less');
+      return;
+    }
+    
+    // Validation 3: Full name cannot be empty
+    if (!trimmedFullName) {
+      Alert.alert('Invalid Chord', 'Chord full name cannot be empty');
+      return;
+    }
+    
+    // Validation 4: Full name max length (50 characters)
+    if (trimmedFullName.length > 50) {
+      Alert.alert('Name Too Long', 'Chord full name must be 50 characters or less');
+      return;
+    }
+    
+    // === FRET POSITION VALIDATION ===
+    // Validation 5: Fret positions must be between -1 (muted) and 24 (max fret)
+    const invalidPositions = editingChord.positions.some(fret => fret < -1 || fret > 24);
+    if (invalidPositions) {
+      Alert.alert('Invalid Fret Positions', 'Fret positions must be between -1 (muted) and 24');
+      return;
+    }
+    
+    // Validation 6: Finger numbers must be between 0 and 5
+    const invalidFingers = editingChord.fingers.some(finger => finger < 0 || finger > 5);
+    if (invalidFingers) {
+      Alert.alert('Invalid Finger Numbers', 'Finger numbers must be between 0 and 5 (0=none, 1-4=fingers, 5=thumb)');
+      return;
+    }
+    
+    // Validation 7: Base fret must be between 1 and 24
+    if (baseFret < 1 || baseFret > 24) {
+      Alert.alert('Invalid Base Fret', 'Base fret must be between 1 and 24');
+      return;
+    }
+    
+    // Validation 8: At least one string must have a dot (not all muted)
+    const allMuted = editingChord.positions.every(fret => fret === -1);
+    if (allMuted) {
+      Alert.alert('Invalid Chord', 'At least one string must have a finger position (chord cannot be all muted strings)');
+      return;
+    }
+
     try {
+      // Apply trimmed names
+      const validatedChord = {
+        ...editingChord,
+        name: trimmedName,
+        fullName: trimmedFullName,
+        baseFret,
+      };
+      
       if (isNewChord) {
-        setChords([...chords, editingChord]);
+        setChords([...chords, validatedChord]);
         Alert.alert('Success', 'New chord created successfully');
       } else {
         const updatedChords = chords.map(c => 
-          c.id === editingChord.id ? editingChord : c
+          c.id === validatedChord.id ? validatedChord : c
         );
         setChords(updatedChords);
         Alert.alert('Success', 'Chord updated successfully');
@@ -1744,28 +1808,48 @@ export default function ChordManagerScreen() {
               <Pressable 
                 onPress={async (e) => {
                   e.stopPropagation();
-                  if (newPresetName.trim()) {
-                    // Get chord IDs based on current context
-                    let chordIds: string[] = [];
-                    if (viewMode === 'editor' && editingChord?.id) {
-                      chordIds = [editingChord.id];
-                    } else if (viewMode === 'list' && selectedChords.size > 0) {
-                      chordIds = Array.from(selectedChords);
-                    }
+                  
+                  const trimmedName = newPresetName.trim();
+                  
+                  // Validation 1: Non-empty
+                  if (!trimmedName) {
+                    Alert.alert('Invalid Name', 'Preset name cannot be empty');
+                    return;
+                  }
+                  
+                  // Validation 2: Max length (50 characters)
+                  if (trimmedName.length > 50) {
+                    Alert.alert('Name Too Long', 'Preset name must be 50 characters or less');
+                    return;
+                  }
+                  
+                  // Validation 3: No duplicates (case-insensitive)
+                  const isDuplicate = presets.some(p => p.name.toLowerCase() === trimmedName.toLowerCase());
+                  if (isDuplicate) {
+                    Alert.alert('Duplicate Name', 'A preset with this name already exists. Please choose a different name.');
+                    return;
+                  }
+                  
+                  // Get chord IDs based on current context
+                  let chordIds: string[] = [];
+                  if (viewMode === 'editor' && editingChord?.id) {
+                    chordIds = [editingChord.id];
+                  } else if (viewMode === 'list' && selectedChords.size > 0) {
+                    chordIds = Array.from(selectedChords);
+                  }
 
-                    if (chordIds.length > 0) {
-                      await addPreset(newPresetName.trim(), chordIds);
-                      Alert.alert('Success', `Created preset "${newPresetName.trim()}" with ${chordIds.length} chord${chordIds.length > 1 ? 's' : ''}`);
-                      setNewPresetName('');
-                      setShowPresetModal(false);
-                      if (viewMode === 'list') {
-                        setSelectedChords(new Set());
-                      }
-                    } else {
-                      Alert.alert('Error', 'No chords selected');
-                    }
-                  } else {
-                    Alert.alert('Error', 'Please enter a preset name');
+                  // Validation 4: At least one chord
+                  if (chordIds.length === 0) {
+                    Alert.alert('No Chords Selected', 'Please select at least one chord');
+                    return;
+                  }
+                  
+                  await addPreset(trimmedName, chordIds);
+                  Alert.alert('Success', `Created preset "${trimmedName}" with ${chordIds.length} chord${chordIds.length > 1 ? 's' : ''}`);
+                  setNewPresetName('');
+                  setShowPresetModal(false);
+                  if (viewMode === 'list') {
+                    setSelectedChords(new Set());
                   }
                 }}
                 style={[styles.modalButton, { backgroundColor: colors.primary }]}

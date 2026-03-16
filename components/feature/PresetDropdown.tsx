@@ -19,20 +19,37 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
   const { selectedChordIds, activeLibraryPresetId, setActiveLibraryPreset, setSelectedChordIds, clearSelectedChords } = useChordLibrary();
 
   const handleCreatePreset = async () => {
-    if (!newPresetName.trim()) {
-      Alert.alert('Error', 'Please enter a preset name');
+    const trimmedName = newPresetName.trim();
+    
+    // Validation 1: Non-empty
+    if (!trimmedName) {
+      Alert.alert('Invalid Name', 'Preset name cannot be empty');
+      return;
+    }
+    
+    // Validation 2: Max length (50 characters)
+    if (trimmedName.length > 50) {
+      Alert.alert('Name Too Long', 'Preset name must be 50 characters or less');
+      return;
+    }
+    
+    // Validation 3: No duplicates (case-insensitive)
+    const isDuplicate = presets.some(p => p.name.toLowerCase() === trimmedName.toLowerCase());
+    if (isDuplicate) {
+      Alert.alert('Duplicate Name', 'A preset with this name already exists. Please choose a different name.');
       return;
     }
 
+    // Validation 4: At least one chord selected
     if (selectedChordIds.length === 0) {
-      Alert.alert('Error', 'Please select at least one chord');
+      Alert.alert('No Chords Selected', 'Please select at least one chord to create a preset');
       return;
     }
 
-    await addPreset(newPresetName.trim(), selectedChordIds);
+    await addPreset(trimmedName, selectedChordIds);
     setNewPresetName('');
     clearSelectedChords();
-    Alert.alert('Success', `Preset "${newPresetName}" created!`);
+    Alert.alert('Success', `Preset "${trimmedName}" created!`);
   };
 
   const handleLoadPreset = (preset: ChordPreset) => {
@@ -71,11 +88,34 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
   };
 
   const handleSaveEdit = () => {
-    if (editingId && editingName.trim()) {
-      renamePreset(editingId, editingName.trim());
-      setEditingId(null);
-      setEditingName('');
+    const trimmedName = editingName.trim();
+    
+    if (!editingId) return;
+    
+    // Validation 1: Non-empty
+    if (!trimmedName) {
+      Alert.alert('Invalid Name', 'Preset name cannot be empty');
+      return;
     }
+    
+    // Validation 2: Max length (50 characters)
+    if (trimmedName.length > 50) {
+      Alert.alert('Name Too Long', 'Preset name must be 50 characters or less');
+      return;
+    }
+    
+    // Validation 3: No duplicates (case-insensitive, excluding current preset)
+    const isDuplicate = presets.some(p => 
+      p.id !== editingId && p.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicate) {
+      Alert.alert('Duplicate Name', 'A preset with this name already exists. Please choose a different name.');
+      return;
+    }
+    
+    renamePreset(editingId, trimmedName);
+    setEditingId(null);
+    setEditingName('');
   };
 
   const handleCancelEdit = () => {
