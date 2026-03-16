@@ -81,39 +81,46 @@ class AudioService {
     osc1.type = 'triangle';
     osc1.frequency.setValueAtTime(frequency, startTime);
 
-    // Harmonic layer — very quiet sine an octave up for brightness
+    // Harmonic layer — sine an octave up for brightness (boosted for high notes)
     const osc2 = ctx.createOscillator();
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(frequency * 2, startTime);
 
-    // Sub harmonic for body
+    // Sub harmonic for body (reduced for high frequencies)
     const osc3 = ctx.createOscillator();
     osc3.type = 'sine';
     osc3.frequency.setValueAtTime(frequency * 0.5, startTime);
 
+    // Dynamic harmonic balance based on frequency
+    const isHighFreq = frequency > 300; // B string and above
+    const harmonicBoost = isHighFreq ? 1.5 : 1.0;
+    const subReduction = isHighFreq ? 0.6 : 1.0;
+
     // Gain envelopes — guitar pluck: fast attack, quick decay, gentle sustain
     const mainGain = ctx.createGain();
     mainGain.gain.setValueAtTime(0, startTime);
-    mainGain.gain.linearRampToValueAtTime(volume * 0.45, startTime + 0.008);
-    mainGain.gain.exponentialRampToValueAtTime(volume * 0.18, startTime + 0.12);
+    mainGain.gain.linearRampToValueAtTime(volume * 0.50, startTime + 0.008);
+    mainGain.gain.exponentialRampToValueAtTime(volume * 0.20, startTime + 0.12);
     mainGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
     const harmonicGain = ctx.createGain();
     harmonicGain.gain.setValueAtTime(0, startTime);
-    harmonicGain.gain.linearRampToValueAtTime(volume * 0.08, startTime + 0.005);
+    harmonicGain.gain.linearRampToValueAtTime(volume * 0.10 * harmonicBoost, startTime + 0.005);
     harmonicGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.5);
 
     const subGain = ctx.createGain();
     subGain.gain.setValueAtTime(0, startTime);
-    subGain.gain.linearRampToValueAtTime(volume * 0.12, startTime + 0.01);
+    subGain.gain.linearRampToValueAtTime(volume * 0.12 * subReduction, startTime + 0.01);
     subGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
 
-    // Low-pass filter to soften the tone
+    // Low-pass filter to soften the tone (higher cutoff for high frequencies)
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(Math.min(frequency * 6, 5000), startTime);
-    filter.frequency.exponentialRampToValueAtTime(Math.min(frequency * 2, 2000), startTime + duration * 0.4);
-    filter.Q.setValueAtTime(1.2, startTime);
+    const initialCutoff = Math.min(frequency * 8, 8000); // Increased multiplier and max
+    const sustainCutoff = Math.min(frequency * 3, 3500); // Higher sustain cutoff
+    filter.frequency.setValueAtTime(initialCutoff, startTime);
+    filter.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + duration * 0.4);
+    filter.Q.setValueAtTime(1.0, startTime); // Slightly gentler Q for clearer highs
 
     // Routing — through filter to master gain
     osc1.connect(mainGain);
@@ -145,8 +152,9 @@ class AudioService {
       const now = ctx.currentTime + 0.05;
       const durationSec = duration / 1000;
       
-      // Slight volume variation: bass strings a tad louder
-      const vol = 0.3 - stringIndex * 0.015;
+      // Boost higher strings (B and high E) so they cut through better
+      // String index: 0=low E, 1=A, 2=D, 3=G, 4=B, 5=high E
+      const vol = stringIndex >= 4 ? 0.35 : stringIndex >= 2 ? 0.3 : 0.28;
       
       const oscillators = this.createPluck(ctx, frequency, now, durationSec, vol * velocity, this.masterGain!);
       this.activeOscillators.push(...oscillators);
