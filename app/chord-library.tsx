@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,8 +28,10 @@ const STORAGE_KEY = 'fretmaster-chord-manager-edits';
 
 export default function ChordLibraryScreen() {
   const router = useRouter();
-  const { presets } = usePresets();
+  const { presets, isLoading: presetsLoading } = usePresets();
   const [allChords, setAllChords] = useState<ChordData[]>(CHORD_DATA);
+  const [chordsLoading, setChordsLoading] = useState(true);
+  const [chordsError, setChordsError] = useState<string | null>(null);
 
   // Load edited chords from AsyncStorage
   useEffect(() => {
@@ -37,26 +39,52 @@ export default function ChordLibraryScreen() {
   }, []);
 
   const loadChords = async () => {
+    setChordsLoading(true);
+    setChordsError(null);
+    
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      
       if (stored) {
-        const editedChords = JSON.parse(stored);
-        // Merge edited chords with original CHORD_DATA
-        const mergedChords = [...CHORD_DATA].map(originalChord => {
-          const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
-          return editedChord || originalChord;
-        });
-        // Add any new chords that don't exist in CHORD_DATA
-        const newChords = editedChords.filter((c: ChordData) => 
-          !CHORD_DATA.some(original => original.id === c.id)
-        );
-        setAllChords([...mergedChords, ...newChords]);
+        try {
+          const editedChords = JSON.parse(stored);
+          
+          // Validate chord data structure
+          if (Array.isArray(editedChords)) {
+            // Merge edited chords with original CHORD_DATA
+            const mergedChords = [...CHORD_DATA].map(originalChord => {
+              const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
+              return editedChord || originalChord;
+            });
+            
+            // Add any new chords that don't exist in CHORD_DATA
+            const newChords = editedChords.filter((c: ChordData) => 
+              !CHORD_DATA.some(original => original.id === c.id)
+            );
+            
+            setAllChords([...mergedChords, ...newChords]);
+            console.log('✅ Loaded', editedChords.length, 'edited chords from AsyncStorage');
+          } else {
+            console.warn('⚠️ Invalid chord data format, using defaults');
+            setAllChords(CHORD_DATA);
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse chord edits:', parseError);
+          setChordsError('Corrupted chord data. Using defaults.');
+          setAllChords(CHORD_DATA);
+          
+          // Clear corrupted data
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        }
       } else {
         setAllChords(CHORD_DATA);
       }
-    } catch (error) {
-      console.error('Failed to load chords:', error);
+    } catch (storageError) {
+      console.error('❌ Failed to load chords:', storageError);
+      setChordsError('Failed to load chord edits.');
       setAllChords(CHORD_DATA);
+    } finally {
+      setChordsLoading(false);
     }
   };
   
@@ -140,6 +168,33 @@ export default function ChordLibraryScreen() {
       },
     });
   };
+
+  // Combined loading state
+  const isLoading = chordsLoading || presetsLoading;
+
+  // Show loading indicator while data is being loaded
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading chord library...</Text>
+      </View>
+    );
+  }
+
+  // Show error state with retry option
+  if (chordsError) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <MaterialIcons name="error-outline" size={48} color={colors.error} />
+        <Text style={styles.errorText}>{chordsError}</Text>
+        <Pressable onPress={loadChords} style={styles.retryButton}>
+          <MaterialIcons name="refresh" size={20} color={colors.primary} />
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -527,6 +582,39 @@ const styles = StyleSheet.create({
   chordListContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: 120,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+  },
+  errorText: {
+    fontSize: 16,
+    color: colors.error,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   selectionBar: {
     flexDirection: 'row',

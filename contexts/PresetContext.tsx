@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 export interface ChordPreset {
   id: string;
@@ -10,12 +11,15 @@ export interface ChordPreset {
 
 interface PresetContextType {
   presets: ChordPreset[];
+  isLoading: boolean;
+  error: string | null;
   addPreset: (name: string, chordIds: string[]) => Promise<string>;
   updatePreset: (id: string, chordIds: string[]) => void;
   removePreset: (id: string) => void;
   renamePreset: (id: string, name: string) => void;
   reorderPreset: (fromIndex: number, toIndex: number) => void;
   getPreset: (id: string) => ChordPreset | undefined;
+  retryLoad: () => Promise<void>;
 }
 
 const PresetContext = createContext<PresetContextType | undefined>(undefined);
@@ -24,7 +28,8 @@ const STORAGE_KEY = 'fretmaster-presets';
 
 export function PresetProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ChordPreset[]>([]);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Load from AsyncStorage on mount
@@ -40,29 +45,93 @@ export function PresetProvider({ children }: { children: ReactNode }) {
   }, [presets, isInitialized]);
 
   const loadPresets = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      
       if (stored) {
-        const data = JSON.parse(stored);
-        console.log('Loading presets from AsyncStorage:', data.presets?.length || 0, 'presets');
-        setPresets(data.presets || []);
+        try {
+          const data = JSON.parse(stored);
+          
+          // Validate data structure
+          if (data && Array.isArray(data.presets)) {
+            // Validate each preset has required fields
+            const validPresets = data.presets.filter((preset: any) => 
+              preset &&
+              typeof preset.id === 'string' &&
+              typeof preset.name === 'string' &&
+              Array.isArray(preset.chordIds) &&
+              typeof preset.createdAt === 'number'
+            );
+            
+            console.log('✅ Loaded', validPresets.length, 'valid presets from AsyncStorage');
+            setPresets(validPresets);
+            
+            // Warn if some presets were invalid
+            if (validPresets.length < data.presets.length) {
+              console.warn('⚠️ Skipped', data.presets.length - validPresets.length, 'invalid presets');
+            }
+          } else {
+            console.warn('⚠️ Invalid preset data structure, starting fresh');
+            setPresets([]);
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse preset data:', parseError);
+          setError('Corrupted preset data detected. Starting fresh.');
+          setPresets([]);
+          
+          // Clear corrupted data
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        }
       } else {
         console.log('No stored presets found, starting with empty array');
+        setPresets([]);
       }
-      setIsInitialized(true);
-    } catch (error) {
-      console.error('❌ Failed to load presets:', error);
+    } catch (storageError) {
+      console.error('❌ Failed to access AsyncStorage:', storageError);
+      setError('Failed to load presets. Please check storage permissions.');
+      setPresets([]);
+    } finally {
+      setIsLoading(false);
       setIsInitialized(true);
     }
   };
 
+  const retryLoad = async () => {
+    await loadPresets();
+  };
+
   const savePresets = async () => {
+    if (!isInitialized) return; // Don't save before initial load
+    
     try {
-      console.log('Saving presets to AsyncStorage:', presets.length, 'presets');
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ presets }));
+      console.log('Saving', presets.length, 'presets to AsyncStorage');
+      const dataToSave = JSON.stringify({ presets });
+      
+      // Check data size (AsyncStorage has ~10MB limit on most devices)
+      if (dataToSave.length > 5000000) { // ~5MB warning
+        console.warn('⚠️ Preset data is very large:', dataToSave.length, 'bytes');
+      }
+      
+      await AsyncStorage.setItem(STORAGE_KEY, dataToSave);
       console.log('✅ Successfully saved presets to AsyncStorage');
-    } catch (error) {
-      console.error('❌ Failed to save presets:', error);
+      setError(null); // Clear any previous errors
+    } catch (saveError: any) {
+      console.error('❌ Failed to save presets:', saveError);
+      
+      // Check for quota exceeded error
+      if (saveError.message?.includes('quota') || saveError.message?.includes('QuotaExceeded')) {
+        setError('Storage quota exceeded. Please delete some presets.');
+        Alert.alert(
+          'Storage Full',
+          'Unable to save presets. Your device storage is full. Please delete some presets.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        setError('Failed to save presets. Changes may not persist.');
+      }
     }
   };
 
@@ -120,12 +189,15 @@ export function PresetProvider({ children }: { children: ReactNode }) {
     <PresetContext.Provider
       value={{
         presets,
+        isLoading,
+        error,
         addPreset,
         updatePreset,
         removePreset,
         renamePreset,
         reorderPreset,
         getPreset,
+        retryLoad,
       }}
     >
       {children}

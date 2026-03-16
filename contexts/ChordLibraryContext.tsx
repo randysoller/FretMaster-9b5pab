@@ -1,8 +1,13 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 import { ChordShape, ChordType, BarreRoot } from '@/constants/musicData';
 
 interface ChordLibraryContextType {
+  // State
+  isLoading: boolean;
+  error: string | null;
+  
   // Filters
   filterCategories: ChordShape[];
   filterTypes: ChordType[];
@@ -32,6 +37,8 @@ const ChordLibraryContext = createContext<ChordLibraryContextType | undefined>(u
 const STORAGE_KEY = 'fretmaster-chord-library-filters';
 
 export function ChordLibraryProvider({ children }: { children: ReactNode }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterCategories, setFilterCategories] = useState<ChordShape[]>([]);
   const [filterTypes, setFilterTypes] = useState<ChordType[]>([]);
   const [filterBarreRoots, setFilterBarreRoots] = useState<BarreRoot[]>([]);
@@ -53,25 +60,44 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
   }, [filterCategories, filterTypes, filterBarreRoots, searchQuery, activeLibraryPresetId, selectedChordIds, isInitialized]);
 
   const loadState = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      
       if (stored) {
-        const data = JSON.parse(stored);
-        setFilterCategories(data.filterCategories || []);
-        setFilterTypes(data.filterTypes || []);
-        setFilterBarreRoots(data.filterBarreRoots || []);
-        setSearchQuery(data.searchQuery || '');
-        setActiveLibraryPresetId(data.activeLibraryPresetId || null);
-        setSelectedChordIds(data.selectedChordIds || []);
+        try {
+          const data = JSON.parse(stored);
+          
+          // Validate and apply filters with fallbacks
+          setFilterCategories(Array.isArray(data.filterCategories) ? data.filterCategories : []);
+          setFilterTypes(Array.isArray(data.filterTypes) ? data.filterTypes : []);
+          setFilterBarreRoots(Array.isArray(data.filterBarreRoots) ? data.filterBarreRoots : []);
+          setSearchQuery(typeof data.searchQuery === 'string' ? data.searchQuery : '');
+          setActiveLibraryPresetId(typeof data.activeLibraryPresetId === 'string' ? data.activeLibraryPresetId : null);
+          setSelectedChordIds(Array.isArray(data.selectedChordIds) ? data.selectedChordIds : []);
+          
+          console.log('✅ Loaded chord library filters from AsyncStorage');
+        } catch (parseError) {
+          console.error('❌ Failed to parse chord library state:', parseError);
+          setError('Corrupted filter data. Using defaults.');
+          // Keep default empty state
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        }
       }
-      setIsInitialized(true);
-    } catch (error) {
-      console.error('Failed to load chord library state:', error);
+    } catch (storageError) {
+      console.error('❌ Failed to access AsyncStorage:', storageError);
+      setError('Failed to load filters.');
+    } finally {
+      setIsLoading(false);
       setIsInitialized(true);
     }
   };
 
   const saveState = async () => {
+    if (!isInitialized) return;
+    
     try {
       const data = {
         filterCategories,
@@ -82,8 +108,10 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
         selectedChordIds,
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Failed to save chord library state:', error);
+      setError(null);
+    } catch (saveError) {
+      console.error('❌ Failed to save chord library state:', saveError);
+      setError('Failed to save filter settings.');
     }
   };
 
@@ -152,6 +180,8 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
   return (
     <ChordLibraryContext.Provider
       value={{
+        isLoading,
+        error,
         filterCategories,
         filterTypes,
         filterBarreRoots,
