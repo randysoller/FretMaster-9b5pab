@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { colors, spacing, borderRadius } from '@/constants/theme';
+import { detectBarres, isRootNote, getBarredStrings } from '@/services/chordUtilsService';
 
 interface InteractiveFretboardProps {
   chord: ChordData;
@@ -24,54 +25,6 @@ const FRET_SPACING = 50;
 const FRET_WIDTH = STRING_SPACING * (STRINGS - 1);
 const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
-// Root note detection helpers
-const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-const normalizeNote = (note: string) => {
-  return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
-    .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
-};
-
-const getNoteAtPosition = (stringIndex: number, fret: number): string => {
-  if (fret < 0) return '';
-  const openNote = STANDARD_TUNING[stringIndex];
-  const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
-  const noteIndex = (openNoteIndex + fret) % 12;
-  return NOTES[noteIndex];
-};
-
-const isRootNote = (stringIndex: number, fret: number, chordName: string): boolean => {
-  const rootNote = chordName.match(/^[A-G][#b]?/)?.[0] || 'C';
-  const normalizedRootNote = normalizeNote(rootNote);
-  const noteAtPosition = getNoteAtPosition(stringIndex, fret);
-  return normalizeNote(noteAtPosition) === normalizedRootNote;
-};
-
-// Barre detection
-const detectBarres = (positions: number[], fingers: number[]) => {
-  const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
-  const fretMap: { [key: string]: number[] } = {};
-
-  positions.forEach((fret, stringIndex) => {
-    if (fret > 0 && fingers[stringIndex] > 0) {
-      const key = `${fret}-${fingers[stringIndex]}`;
-      if (!fretMap[key]) fretMap[key] = [];
-      fretMap[key].push(stringIndex);
-    }
-  });
-
-  Object.entries(fretMap).forEach(([key, strings]) => {
-    if (strings.length >= 2) {
-      const [fret, finger] = key.split('-').map(Number);
-      const fromString = Math.min(...strings);
-      const toString = Math.max(...strings);
-      barres.push({ fret, fromString, toString, finger });
-    }
-  });
-
-  return barres;
-};
-
 export function InteractiveFretboard({
   chord,
   baseFret,
@@ -86,14 +39,7 @@ export function InteractiveFretboard({
   instructions = 'Tap string labels (E-A-D-G-B-E) or any fret position, then choose shape and finger from the popup. Barres appear automatically when 2+ dots share the same fret and finger.',
 }: InteractiveFretboardProps) {
   const detectedBarres = detectBarres(chord.positions, chord.fingers);
-  const barreRenderedStrings = new Set<number>();
-  detectedBarres.forEach(barre => {
-    for (let si = barre.fromString; si <= barre.toString; si++) {
-      if (chord.positions[si] === barre.fret) {
-        barreRenderedStrings.add(si);
-      }
-    }
-  });
+  const barreRenderedStrings = getBarredStrings(chord.positions, chord.fingers);
 
   return (
     <View style={styles.container}>

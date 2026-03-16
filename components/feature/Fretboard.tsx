@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Line, Circle, Rect, Polygon, Text as SvgText } from 'react-native-svg';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { colors } from '@/constants/theme';
+import { isRootNote, normalizeNote } from '@/services/chordUtilsService';
 
 interface FretboardProps {
   chord: ChordData;
@@ -11,9 +11,9 @@ interface FretboardProps {
 }
 
 const SIZES = {
-  sm: { width: 100, height: 130, dotRadius: 5, fontSize: 12, topY: 18, fretLabelSize: 9 }, // Reduced dotRadius from 7 to 5 (4pts smaller), fontSize from 14 to 12
-  md: { width: 140, height: 175, dotRadius: 7.5, fontSize: 16, topY: 22, fretLabelSize: 11 }, // Reduced dotRadius from 9.5 to 7.5, fontSize from 18 to 16
-  lg: { width: 200, height: 250, dotRadius: 11, fontSize: 22, topY: 30, fretLabelSize: 14 }, // Reduced dotRadius from 13 to 11, fontSize from 24 to 22
+  sm: { width: 100, height: 130, dotRadius: 5, fontSize: 12, topY: 18, fretLabelSize: 9 },
+  md: { width: 140, height: 175, dotRadius: 7.5, fontSize: 16, topY: 22, fretLabelSize: 11 },
+  lg: { width: 200, height: 250, dotRadius: 11, fontSize: 22, topY: 30, fretLabelSize: 14 },
 };
 
 const FRET_LABEL_PAD = { sm: 10, md: 14, lg: 20 };
@@ -55,27 +55,10 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   const getStringX = (i: number) => padLeft + i * stringSpacing;
   const getFretY = (f: number) => padTop + f * fretSpacing;
 
-  // Realistic guitar string thickness: low E (thickest) → high e (thinnest)
-  // Increased values for better visibility and guitar neck appearance
   const STRING_WIDTHS = [3.0, 2.4, 2.0, 1.6, 1.2, 0.8];
 
   // Calculate root note for diamond detection
   const rootNote = chord.name.match(/^[A-G][#b]?/)?.[0] || 'C';
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  
-  const normalizeNote = (note: string) => {
-    return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
-      .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
-  };
-  
-  const getNoteAtPosition = (stringIndex: number, fret: number): string => {
-    if (fret < 0) return '';
-    const openNote = STANDARD_TUNING[stringIndex];
-    const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
-    const noteIndex = (openNoteIndex + fret) % 12;
-    return NOTES[noteIndex];
-  };
-  
   const normalizedRootNote = normalizeNote(rootNote);
 
   // Detect and render barre chords - FIXED VERSION
@@ -212,7 +195,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         const y = getFretY(relFret) - fretSpacing / 2;
         const x1 = getStringX(barre.fromString);
         const x2 = getStringX(barre.toString);
-        const barHeight = config.dotRadius * 1.0; // Thinner bar - 2 points less than before
+        const barHeight = config.dotRadius * 1.0;
 
         const contactStrings: number[] = [];
         for (let si = barre.fromString; si <= barre.toString; si++) {
@@ -234,8 +217,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
               />
             )}
             {contactStrings.map((si) => {
-              const noteAtPosition = getNoteAtPosition(si, barre.fret);
-              const isRoot = normalizeNote(noteAtPosition) === normalizedRootNote;
+              const isRoot = isRootNote(si, barre.fret, chord.name);
               
               return (
                 <React.Fragment key={`barre-dot-${si}`}>
@@ -272,8 +254,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         const r = config.dotRadius * 0.65;
 
         if (fret === 0) {
-          const noteAtPosition = getNoteAtPosition(i, 0);
-          const isRoot = normalizeNote(noteAtPosition) === normalizedRootNote;
+          const isRoot = isRootNote(i, 0, chord.name);
           
           if (isRoot) {
             return <RootDiamond key={`open-${i}`} x={x} y={y} r={r} fingerNum={0} fontSize={config.fontSize * 0.65} />;
@@ -305,8 +286,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
 
         const x = getStringX(i);
         const y = getFretY(relFret) - fretSpacing / 2;
-        const noteAtPosition = getNoteAtPosition(i, fret);
-        const isRoot = normalizeNote(noteAtPosition) === normalizedRootNote;
+        const isRoot = isRootNote(i, fret, chord.name);
 
         return (
           <React.Fragment key={`dot-${i}`}>
