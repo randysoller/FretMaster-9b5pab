@@ -114,20 +114,54 @@ class AudioService {
       presence.Q.value = 1.0;
       presence.gain.value = 2; // +2dB for air and clarity
       
-      // Soft pluck envelope - extended for longer sustain
+      // Pick attack envelope - sharp transient for picked nylon string
       const envelope = ctx.createGain();
-      const attackTime = 0.008; // Soft nylon pluck (8ms)
+      const attackTime = 0.003; // Fast pick attack (3ms)
       const decayTime = 0.18; // Slightly longer decay
       const sustainLevel = velocity * 0.45; // Increased sustain level
       const releaseTime = duration / 1000;
       
-      // Soft attack curve
+      // Sharp pick attack curve
       envelope.gain.setValueAtTime(0, now);
-      envelope.gain.linearRampToValueAtTime(velocity * 0.45, now + attackTime); // Slightly louder peak
+      envelope.gain.linearRampToValueAtTime(velocity * 0.55, now + attackTime); // Stronger peak for pick punch
       // Gentle decay to sustained note
       envelope.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
       // Extended natural fade (500ms longer)
       envelope.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+      
+      // Pick transient - subtle high-frequency click simulating pick hitting string
+      const pickTransient = ctx.createOscillator();
+      const pickGain = ctx.createGain();
+      const pickFilter = ctx.createBiquadFilter();
+      
+      pickTransient.type = 'square'; // Bright, percussive
+      pickTransient.frequency.value = frequency * 8; // High harmonic
+      
+      pickFilter.type = 'bandpass';
+      pickFilter.frequency.value = 3000 + frequency; // Bright click
+      pickFilter.Q.value = 3;
+      
+      pickTransient.connect(pickFilter);
+      pickFilter.connect(pickGain);
+      pickGain.connect(panner);
+      
+      // Very short, sharp transient
+      pickGain.gain.setValueAtTime(velocity * 0.15, now);
+      pickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008); // 8ms click
+      
+      pickTransient.start(now);
+      pickTransient.stop(now + 0.01);
+      
+      // Clean up pick transient
+      setTimeout(() => {
+        try {
+          pickTransient.disconnect();
+          pickFilter.disconnect();
+          pickGain.disconnect();
+        } catch (e) {
+          // Already disconnected
+        }
+      }, 50);
       
       // Enhanced room ambience for acoustic character
       const reverb = ctx.createConvolver();
