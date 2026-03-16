@@ -50,7 +50,7 @@ export default function TabLayout() {
         </View>
         <Pressable 
           style={styles.statsButton}
-          onPress={() => router.push('/stats' as any)}
+          onPress={() => router.push('/(tabs)/stats' as any)}
         >
           <Text style={styles.statsButtonText}>Stats</Text>
           <MaterialIcons name="bar-chart" size={24} color={colors.primary} />
@@ -127,6 +127,127 @@ export default function TabLayout() {
               <MaterialIcons name="library-books" size={size} color={color} />
             ),
             tabBarLabel: 'Libraries',
+          }}
+        />
+
+        {/* Hidden screens - part of tabs but don't show in tab bar */}
+        <Tabs.Screen
+          name="chord-practice"
+          options={{
+            href: null,
+            title: 'Chord Practice',
+          }}
+        />
+        <Tabs.Screen
+          name="progressions"
+          options={{
+            href: null,
+            title: 'Progressions',
+          }}
+        />
+        <Tabs.Screen
+          name="progressions-practice"
+          options={{
+            href: null,
+            title: 'Progressions Practice',
+          }}
+        />
+        <Tabs.Screen
+          name="chord-library"
+          options={{
+            href: null,
+            title: 'Chord Library',
+          }}
+        />
+        <Tabs.Screen
+          name="scale-library"
+          options={{
+            href: null,
+            title: 'Scale Library',
+          }}
+        />
+        <Tabs.Screen
+          name="triad-library"
+          options={{
+            href: null,
+            title: 'Triad Library',
+          }}
+        />
+        <Tabs.Screen
+          name="chord-detail"
+          options={{
+            href: null,
+            title: 'Chord Detail',
+          }}
+        />
+        <Tabs.Screen
+          name="chord-manager"
+          options={{
+            href: null,
+            title: 'Chord Manager',
+          }}
+        />
+        <Tabs.Screen
+          name="editor"
+          options={{
+            href: null,
+            title: 'Editor',
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            href: null,
+            title: 'Profile',
+          }}
+        />
+        <Tabs.Screen
+          name="stats"
+          options={{
+            href: null,
+            title: 'Stats',
+          }}
+        />
+        <Tabs.Screen
+          name="calibration"
+          options={{
+            href: null,
+            title: 'Calibration',
+          }}
+        />
+        <Tabs.Screen
+          name="scales-practice"
+          options={{
+            href: null,
+            title: 'Scales Practice',
+          }}
+        />
+        <Tabs.Screen
+          name="scales"
+          options={{
+            href: null,
+            title: 'Scales',
+          }}
+        />
+        <Tabs.Screen
+          name="chords"
+          options={{
+            href: null,
+            title: 'Chords',
+          }}
+        />
+        <Tabs.Screen
+          name="lesson-detail"
+          options={{
+            href: null,
+            title: 'Lesson Detail',
+          }}
+        />
+        <Tabs.Screen
+          name="testing"
+          options={{
+            href: null,
+            title: 'Testing',
           }}
         />
       </Tabs>

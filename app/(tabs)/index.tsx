@@ -22,7 +22,7 @@ const PRACTICE_MODES: PracticeModeCard[] = [
     title: 'Chords',
     description: 'Master individual chords with flashcard-style practice, audio playback, and timer challenges. Track your progress and build muscle memory.',
     icon: 'album',
-    route: '/chord-practice',
+    route: '/(tabs)/chord-practice',
     accentColor: colors.accent,
   },
   {
@@ -30,7 +30,7 @@ const PRACTICE_MODES: PracticeModeCard[] = [
     title: 'Chord Progressions',
     description: 'Practice chord transitions in any key. Choose from common progressions, chord progressions by style of music, or build your own.',
     icon: 'graphic-eq',
-    route: '/progressions',
+    route: '/(tabs)/progressions',
     accentColor: colors.secondary,
   },
 ];

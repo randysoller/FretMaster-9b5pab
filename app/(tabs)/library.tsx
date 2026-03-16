@@ -14,7 +14,7 @@ export default function LibraryLandingScreen() {
       icon: 'music-note',
       count: '124 diagrams',
       color: colors.primary,
-      route: '/chord-library',
+      route: '/(tabs)/chord-library',
     },
     {
       id: 'scales',
@@ -22,7 +22,7 @@ export default function LibraryLandingScreen() {
       icon: 'show-chart',
       count: '15+ patterns',
       color: '#4DB8E8',
-      route: '/scale-library',
+      route: '/(tabs)/scale-library',
     },
     {
       id: 'triads',
@@ -30,7 +30,7 @@ export default function LibraryLandingScreen() {
       icon: 'change-history',
       count: '36 shapes',
       color: '#8B5CF6',
-      route: '/triad-library',
+      route: '/(tabs)/triad-library',
     },
   ];
 
