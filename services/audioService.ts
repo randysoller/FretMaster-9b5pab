@@ -53,88 +53,72 @@ class AudioService {
   }
 
   /**
-   * Karplus-Strong plucked string synthesis
-   * The classic algorithm for realistic guitar/plucked string sounds
-   * Much simpler and more authentic than complex oscillator-based synthesis
+   * Simple guitar string synthesis using filtered oscillators
+   * Clean, warm tone without complex physical modeling
    */
   playGuitarString(frequency: number, duration: number = 1500, velocity: number = 0.8, stringIndex: number = 0): void {
     try {
       const ctx = this.getAudioContext();
-      const sampleRate = ctx.sampleRate;
       const now = ctx.currentTime;
       
-      // Calculate delay line length from frequency
-      const delayTime = 1 / frequency;
-      const bufferSize = Math.ceil(sampleRate * delayTime);
+      // Create fundamental oscillator (triangle wave for warm tone)
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = frequency;
       
-      // Create noise burst for pluck excitation
-      const noiseBuffer = ctx.createBuffer(1, bufferSize * 2, sampleRate);
-      const noiseData = noiseBuffer.getChannelData(0);
+      // Add subtle detuning for richness
+      const detune = ctx.createOscillator();
+      detune.type = 'triangle';
+      detune.frequency.value = frequency;
+      detune.detune.value = (Math.random() - 0.5) * 8; // ±4 cents variation
       
-      // Fill with noise (the "pluck")
-      for (let i = 0; i < bufferSize * 2; i++) {
-        noiseData[i] = (Math.random() * 2 - 1) * velocity;
-      }
+      // Lowpass filter for warmth and to simulate body resonance
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      // Higher strings = brighter tone
+      filter.frequency.value = 1200 + (5 - stringIndex) * 400; // 1.2kHz - 3.2kHz
+      filter.Q.value = 1.5;
       
-      // Create the noise source
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBuffer;
+      // ADSR envelope - critical for guitar-like sound
+      const envelope = ctx.createGain();
+      const attackTime = 0.002; // Very fast attack (2ms pluck)
+      const decayTime = 0.1; // Quick initial decay
+      const sustainLevel = velocity * 0.3; // Lower sustain for natural decay
+      const releaseTime = duration / 1000;
       
-      // Create delay line (this is the "string")
-      const delay = ctx.createDelay(1.0);
-      delay.delayTime.value = delayTime;
+      // Attack: instant pluck
+      envelope.gain.setValueAtTime(0, now);
+      envelope.gain.linearRampToValueAtTime(velocity * 0.5, now + attackTime);
+      // Decay: quick drop
+      envelope.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
+      // Sustain and release: gradual fade
+      envelope.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
       
-      // Create feedback path with damping filter
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0.99; // High feedback for sustained tone
+      // Subtle stereo positioning
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = (stringIndex - 2.5) * 0.15; // -0.375 to +0.375
       
-      // Lowpass filter for damping (simulates energy loss)
-      const damping = ctx.createBiquadFilter();
-      damping.type = 'lowpass';
-      // Higher strings are brighter
-      damping.frequency.value = 2000 + (5 - stringIndex) * 800; // 2kHz-6kHz range
-      damping.Q.value = 1.0;
+      // Connect audio graph: oscillators -> filter -> envelope -> panner -> output
+      osc.connect(filter);
+      detune.connect(filter);
+      filter.connect(envelope);
+      envelope.connect(panner);
+      panner.connect(this.masterGain!);
       
-      // Master gain for envelope
-      const output = ctx.createGain();
+      // Start playback
+      osc.start(now);
+      detune.start(now);
+      osc.stop(now + releaseTime);
+      detune.stop(now + releaseTime);
       
-      // Simple exponential decay envelope
-      const releaseTime = (duration / 1000);
-      output.gain.setValueAtTime(velocity * 0.6, now);
-      output.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
-      
-      // Optional: subtle stereo panning
-      let finalNode: AudioNode = output;
-      if (stringIndex !== undefined) {
-        const panner = ctx.createStereoPanner();
-        panner.pan.value = (stringIndex - 2.5) * 0.12; // Subtle spread
-        output.connect(panner);
-        finalNode = panner;
-      }
-      
-      // Connect the Karplus-Strong loop:
-      // Noise -> Delay -> Damping -> Feedback -> back to Delay
-      // Also Delay -> Output
-      noise.connect(delay);
-      delay.connect(damping);
-      damping.connect(feedback);
-      feedback.connect(delay);
-      damping.connect(output);
-      finalNode.connect(this.masterGain!);
-      
-      // Start the pluck
-      noise.start(now);
-      noise.stop(now + delayTime * 2); // Brief excitation
-      
-      // Clean up
+      // Clean up after playback
       setTimeout(() => {
         try {
-          noise.disconnect();
-          delay.disconnect();
-          damping.disconnect();
-          feedback.disconnect();
-          output.disconnect();
-          if (finalNode !== output) finalNode.disconnect();
+          osc.disconnect();
+          detune.disconnect();
+          filter.disconnect();
+          envelope.disconnect();
+          panner.disconnect();
         } catch (e) {
           // Already disconnected
         }
