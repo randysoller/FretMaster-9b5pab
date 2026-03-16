@@ -44,20 +44,25 @@ export function PresetProvider({ children }: { children: ReactNode }) {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const data = JSON.parse(stored);
+        console.log('Loading presets from AsyncStorage:', data.presets?.length || 0, 'presets');
         setPresets(data.presets || []);
+      } else {
+        console.log('No stored presets found, starting with empty array');
       }
       setIsInitialized(true);
     } catch (error) {
-      console.error('Failed to load presets:', error);
+      console.error('❌ Failed to load presets:', error);
       setIsInitialized(true);
     }
   };
 
   const savePresets = async () => {
     try {
+      console.log('Saving presets to AsyncStorage:', presets.length, 'presets');
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ presets }));
+      console.log('✅ Successfully saved presets to AsyncStorage');
     } catch (error) {
-      console.error('Failed to save presets:', error);
+      console.error('❌ Failed to save presets:', error);
     }
   };
 
@@ -69,7 +74,12 @@ export function PresetProvider({ children }: { children: ReactNode }) {
       chordIds,
       createdAt: Date.now(),
     };
-    setPresets(prev => [...prev, newPreset]);
+    console.log('Adding new preset:', name, 'with', chordIds.length, 'chords');
+    setPresets(prev => {
+      const updated = [...prev, newPreset];
+      console.log('Updated presets array, total count:', updated.length);
+      return updated;
+    });
     return id;
   };
 
