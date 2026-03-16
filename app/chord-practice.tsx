@@ -120,8 +120,12 @@ export default function ChordPracticeScreen() {
     
     // Auto-play first chord in free mode
     if (practiceMode === 'free') {
-      setTimeout(() => {
-        audioService.playChordPreview(shuffled[0]).catch(err => console.error('Audio failed:', err));
+      setTimeout(async () => {
+        try {
+          await audioService.playChordPreview(shuffled[0]);
+        } catch (err) {
+          console.error('🔴 Auto-play failed:', err);
+        }
       }, 500);
     }
   };
@@ -147,9 +151,14 @@ export default function ChordPracticeScreen() {
     }
   };
 
-  const handlePlayChord = () => {
+  const handlePlayChord = async () => {
     if (currentChord) {
-      audioService.playChordPreview(currentChord).catch(err => console.error('Audio failed:', err));
+      try {
+        await audioService.playChordPreview(currentChord);
+      } catch (err) {
+        console.error('🔴 Chord playback failed:', err);
+        Alert.alert('Audio Error', 'Could not play chord audio. Please try again.');
+      }
     }
   };
 
@@ -182,8 +191,12 @@ export default function ChordPracticeScreen() {
     
     // Auto-play next chord in free mode
     if (practiceMode === 'free' && !autoAdvance) {
-      setTimeout(() => {
-        audioService.playChordPreview(chordPool[currentChordIndex + 1]).catch(err => console.error('Audio failed:', err));
+      setTimeout(async () => {
+        try {
+          await audioService.playChordPreview(chordPool[currentChordIndex + 1]);
+        } catch (err) {
+          console.error('🔴 Next chord auto-play failed:', err);
+        }
       }, 300);
     }
   };

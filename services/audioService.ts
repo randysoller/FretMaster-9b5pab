@@ -17,6 +17,8 @@ class AudioService {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioContextClass();
       
+      console.log('🎵 Audio context created, state:', this.audioContext.state);
+      
       // Create master gain node
       this.masterGain = this.audioContext.createGain();
       this.masterGain.gain.value = 0.7;
@@ -34,9 +36,16 @@ class AudioService {
       this.compressor.connect(this.audioContext.destination);
     }
     
-    // Resume context if suspended (required for mobile)
+    // Resume context if suspended (CRITICAL for mobile)
     if (this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
+      console.log('⚠️ Audio context suspended, resuming...');
+      try {
+        await this.audioContext.resume();
+        console.log('✅ Audio context resumed, state:', this.audioContext.state);
+      } catch (err) {
+        console.error('❌ Failed to resume audio context:', err);
+        throw err;
+      }
     }
     
     return this.audioContext;
@@ -208,6 +217,16 @@ class AudioService {
   private async playChordSynthesis(chord: ChordData, duration: number = 2500): Promise<void> {
     try {
       const ctx = await this.getAudioContext();
+      
+      // Double-check context is running (mobile safety)
+      if (ctx.state !== 'running') {
+        console.warn('⚠️ Audio context not running, attempting resume...');
+        await ctx.resume();
+        if (ctx.state !== 'running') {
+          throw new Error('Audio context failed to start');
+        }
+      }
+      
       const now = ctx.currentTime;
       const durationSec = duration / 1000;
 
@@ -338,15 +357,23 @@ class AudioService {
    * This ensures audio ALWAYS matches the visual chord diagram
    */
   async playChordPreview(chordInput: ChordData | string): Promise<void> {
-    // Handle ChordData object (preferred)
-    if (typeof chordInput === 'object' && chordInput.positions) {
-      console.log(`🎸 Playing chord: ${chordInput.name}`);
-      await this.playChordSynthesis(chordInput, 2200);
-      return;
+    try {
+      // Ensure audio context is ready (CRITICAL for mobile)
+      await this.getAudioContext();
+      
+      // Handle ChordData object (preferred)
+      if (typeof chordInput === 'object' && chordInput.positions) {
+        console.log(`🎸 Playing chord: ${chordInput.name}`);
+        await this.playChordSynthesis(chordInput, 2200);
+        return;
+      }
+      
+      // Handle string input (fallback - not recommended)
+      console.warn(`⚠️ playChordPreview() called with string "${chordInput}". Pass ChordData object for accurate playback.`);
+    } catch (error) {
+      console.error('❌ playChordPreview failed:', error);
+      throw error;
     }
-    
-    // Handle string input (fallback - not recommended)
-    console.warn(`⚠️ playChordPreview() called with string "${chordInput}". Pass ChordData object for accurate playback.`);
   }
 
 

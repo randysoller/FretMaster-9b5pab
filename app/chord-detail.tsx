@@ -136,28 +136,13 @@ export default function ChordDetailScreen() {
 
         {/* Play Button - Centered */}
         <View style={styles.buttons}>
-          <Pressable style={styles.playButton} onPress={() => {
-            // Convert chord to notes array for playback
-            const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-            const normalizeNote = (note: string) =>
-              note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
-                .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
-            
-            const getNoteAtPosition = (stringIndex: number, fret: number): string => {
-              if (fret < 0) return '';
-              const openNote = STANDARD_TUNING[stringIndex];
-              const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
-              const noteIndex = (openNoteIndex + fret) % 12;
-              return NOTES[noteIndex];
-            };
-
-            const notes = chord.positions
-              .map((fret, index) => fret >= 0 ? getNoteAtPosition(index, fret) : null)
-              .filter(Boolean) as string[];
-            
-            audioService.playChord(notes, 2200, 3, true).catch(err => 
-              console.error('Chord playback failed:', err)
-            );
+          <Pressable style={styles.playButton} onPress={async () => {
+            try {
+              console.log('🎸 Playing chord:', chord.name);
+              await audioService.playChordPreview(chord);
+            } catch (err) {
+              console.error('🔴 Chord playback failed:', err);
+            }
           }}>
             <MaterialIcons name="play-arrow" size={20} color="#000" />
             <Text style={styles.playButtonText}>Play</Text>
