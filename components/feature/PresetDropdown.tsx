@@ -274,30 +274,13 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
                   </Text>
                 </View>
               ) : (
-                <>
-                  {/* Clear Preset Button */}
-                  {activeLibraryPresetId && (
-                    <Pressable
-                      onPress={() => {
-                        setActiveLibraryPreset(null);
-                        clearSelectedChords();
-                        setIsOpen(false);
-                      }}
-                      style={styles.clearPresetButton}
-                    >
-                      <MaterialIcons name="clear" size={20} color={colors.error} />
-                      <Text style={styles.clearPresetText}>Clear Preset</Text>
-                      <Text style={styles.clearPresetSubtext}>(Show all chords)</Text>
-                    </Pressable>
-                  )}
-                  <FlatList
-                    data={presets}
-                    renderItem={renderPresetItem}
-                    keyExtractor={(item) => item.id}
-                    showsVerticalScrollIndicator={false}
-                    scrollEnabled={false}
-                  />
-                </>
+                <FlatList
+                  data={presets}
+                  renderItem={renderPresetItem}
+                  keyExtractor={(item) => item.id}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={false}
+                />
               )}
             </ScrollView>
           </Pressable>
@@ -493,28 +476,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
     textAlign: 'center',
-  },
-  clearPresetButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.bgOverlay,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.error + '40',
-  },
-  clearPresetText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.error,
-  },
-  clearPresetSubtext: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginLeft: 'auto',
   },
 });

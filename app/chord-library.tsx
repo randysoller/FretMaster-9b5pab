@@ -158,6 +158,18 @@ export default function ChordLibraryScreen() {
       <View style={styles.presetRow}>
         <Text style={styles.presetLabel}>Preset Chord Lists:</Text>
         <PresetDropdown />
+        {activeLibraryPresetId && (
+          <Pressable
+            onPress={() => {
+              setActiveLibraryPreset(null);
+              clearSelectedChords();
+            }}
+            style={styles.clearPresetButton}
+          >
+            <MaterialIcons name="close" size={18} color={colors.error} />
+            <Text style={styles.clearPresetText}>Clear</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Search & Type Filter */}
@@ -359,6 +371,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
+  },
+  clearPresetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.error + '20',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  clearPresetText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.error,
   },
   searchContainer: {
     flexDirection: 'row',
