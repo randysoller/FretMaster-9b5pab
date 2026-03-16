@@ -22,7 +22,7 @@ const PRACTICE_MODES: PracticeModeCard[] = [
     title: 'Chords',
     description: 'Master individual chords with flashcard-style practice, audio playback, and timer challenges. Track your progress and build muscle memory.',
     icon: 'album',
-    route: '/chord-practice',
+    route: '/chord-library',
     accentColor: colors.accent,
   },
   {

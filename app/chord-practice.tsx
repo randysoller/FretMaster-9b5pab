@@ -361,7 +361,7 @@ export default function ChordPracticeScreen() {
       <View style={styles.practiceContainer}>
         {/* Header */}
         <View style={styles.practiceHeader}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.replace('/chord-library' as any)} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
           <View style={styles.progressInfo}>
@@ -521,7 +521,7 @@ export default function ChordPracticeScreen() {
             <Text style={styles.statsButtonText}>View All Stats</Text>
           </Pressable>
 
-          <Pressable onPress={() => router.back()} style={styles.doneButton}>
+          <Pressable onPress={() => router.replace('/chord-library' as any)} style={styles.doneButton}>
             <Text style={styles.doneButtonText}>Done</Text>
           </Pressable>
         </View>
