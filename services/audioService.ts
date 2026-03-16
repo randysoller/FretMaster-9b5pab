@@ -41,7 +41,7 @@ class AudioService {
         
         // Create master gain node
         this.masterGain = this.audioContext.createGain();
-        this.masterGain.gain.value = 0.7;
+        this.masterGain.gain.value = 1.4;
         console.log('✅ Master gain created');
         
         // Create dynamic compressor for automatic volume balancing
@@ -361,9 +361,14 @@ class AudioService {
           pickNoise.start(startTime);
         }
 
+        // Add explicit fade-out at the end to prevent clicks (last 50ms)
+        const fadeOutStart = startTime + durationSec - 0.05;
+        stringGain.gain.setValueAtTime(stringGain.gain.value, fadeOutStart);
+        stringGain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
+        
         // Start main oscillator
         osc.start(startTime);
-        osc.stop(startTime + durationSec);
+        osc.stop(startTime + durationSec + 0.01); // Extend slightly beyond duration to ensure fade completes
         this.activeOscillators.push(osc);
       });
 
@@ -491,18 +496,25 @@ class AudioService {
     // Remove DC offset and apply compression
     const compressionRatio = maxPeak > 0.8 ? 0.8 / maxPeak : 1.0;
     for (let i = 0; i < durationSamples; i++) {
-      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 0.7;
-      rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 0.7;
+      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 1.4;
+      rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.4;
     }
     
-    // Add smooth fade-out at the very end to prevent pops/static (last 30ms)
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.03);
+    // Add smooth fade-out at the very end to prevent pops/static (last 50ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.05);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
       // Use exponential curve for smoother fade (sounds more natural)
-      const fadeFactor = Math.pow(1 - fadeProgress, 2);
+      const fadeFactor = Math.pow(1 - fadeProgress, 3); // Steeper curve for gentler ending
       leftChannel[i] *= fadeFactor;
       rightChannel[i] *= fadeFactor;
+    }
+    
+    // Ensure absolute silence in last 5ms to eliminate any residual clicks
+    const silenceStart = durationSamples - Math.floor(sampleRate * 0.005);
+    for (let i = silenceStart; i < durationSamples; i++) {
+      leftChannel[i] = 0;
+      rightChannel[i] = 0;
     }
     
     console.log('✅ Audio synthesis complete, creating WAV file...');
@@ -621,7 +633,7 @@ class AudioService {
       // Play the generated audio
       const { sound } = await Audio.Sound.createAsync(
         { uri: wavDataUri },
-        { shouldPlay: true, volume: 0.7 }
+        { shouldPlay: true, volume: 1.0 }
       );
       
       const totalTime = Date.now() - startTime;
