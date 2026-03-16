@@ -1,5 +1,4 @@
-// Professional audio service using real guitar samples + Web Audio API fallback
-import { Audio, AVPlaybackStatus } from 'expo-av';
+// Professional audio service using Web Audio API with realistic guitar synthesis
 
 interface GuitarStringConfig {
   frequency: number;
@@ -8,13 +7,7 @@ interface GuitarStringConfig {
   damping: number;
 }
 
-interface AudioCache {
-  [key: string]: Audio.Sound | null;
-}
-
 class AudioService {
-  private audioCache: AudioCache = {};
-  private isLoadingSamples: boolean = false;
   private audioContext: AudioContext | null = null;
   private activeOscillators: OscillatorNode[] = [];
   private metronomeInterval: NodeJS.Timeout | null = null;
@@ -481,101 +474,9 @@ class AudioService {
   }
 
   /**
-   * Load and cache guitar chord sample
+   * Play chord preview with enhanced synthesis
    */
-  private async loadChordSample(chordName: string): Promise<Audio.Sound | null> {
-    // Check cache first
-    if (this.audioCache[chordName]) {
-      return this.audioCache[chordName];
-    }
-
-    try {
-      // Free guitar chord samples from freesound.org via CDN
-      const sampleUrls: { [key: string]: string } = {
-        // Major chords - using high-quality nylon string samples
-        'C': 'https://freesound.org/data/previews/415/415078_5121236-lq.mp3',
-        'D': 'https://freesound.org/data/previews/415/415079_5121236-lq.mp3',
-        'E': 'https://freesound.org/data/previews/415/415080_5121236-lq.mp3',
-        'F': 'https://freesound.org/data/previews/415/415081_5121236-lq.mp3',
-        'G': 'https://freesound.org/data/previews/415/415082_5121236-lq.mp3',
-        'A': 'https://freesound.org/data/previews/415/415083_5121236-lq.mp3',
-        'B': 'https://freesound.org/data/previews/415/415084_5121236-lq.mp3',
-        
-        // Minor chords
-        'Am': 'https://freesound.org/data/previews/415/415085_5121236-lq.mp3',
-        'Bm': 'https://freesound.org/data/previews/415/415086_5121236-lq.mp3',
-        'Cm': 'https://freesound.org/data/previews/415/415087_5121236-lq.mp3',
-        'Dm': 'https://freesound.org/data/previews/415/415088_5121236-lq.mp3',
-        'Em': 'https://freesound.org/data/previews/415/415089_5121236-lq.mp3',
-        'Fm': 'https://freesound.org/data/previews/415/415090_5121236-lq.mp3',
-        'Gm': 'https://freesound.org/data/previews/415/415091_5121236-lq.mp3',
-        
-        // Seventh chords
-        'A7': 'https://freesound.org/data/previews/415/415092_5121236-lq.mp3',
-        'B7': 'https://freesound.org/data/previews/415/415093_5121236-lq.mp3',
-        'C7': 'https://freesound.org/data/previews/415/415094_5121236-lq.mp3',
-        'D7': 'https://freesound.org/data/previews/415/415095_5121236-lq.mp3',
-        'E7': 'https://freesound.org/data/previews/415/415096_5121236-lq.mp3',
-        'F7': 'https://freesound.org/data/previews/415/415097_5121236-lq.mp3',
-        'G7': 'https://freesound.org/data/previews/415/415098_5121236-lq.mp3',
-      };
-
-      const url = sampleUrls[chordName];
-      if (!url) {
-        return null; // No sample available, will fall back to synthesis
-      }
-
-      // Configure audio mode for playback
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
-
-      // Load the sample
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: url },
-        { shouldPlay: false, volume: 0.8 },
-        null,
-        true // Download first for better performance
-      );
-
-      // Cache it
-      this.audioCache[chordName] = sound;
-      return sound;
-    } catch (error) {
-      console.log(`Failed to load sample for ${chordName}:`, error);
-      return null; // Fall back to synthesis
-    }
-  }
-
-  /**
-   * Play chord using real guitar samples (with synthesis fallback)
-   */
-  async playChordSample(chordName: string): Promise<void> {
-    try {
-      // Try to load and play sample
-      const sound = await this.loadChordSample(chordName);
-      
-      if (sound) {
-        // Reset to beginning and play
-        await sound.setPositionAsync(0);
-        await sound.playAsync();
-        return; // Success!
-      }
-    } catch (error) {
-      console.log(`Sample playback failed for ${chordName}:`, error);
-    }
-
-    // Fallback to synthesis if sample fails
-    console.log(`Using synthesis fallback for ${chordName}`);
-    this.playChordPreviewSynthesis(chordName);
-  }
-
-  /**
-   * Synthesis fallback (original implementation)
-   */
-  private playChordPreviewSynthesis(chordName: string): void {
+  playChordPreview(chordName: string): void {
     // Enhanced chord mapping with more chords and variations
     const chordMap: { [key: string]: string[] } = {
       // Major chords
@@ -647,34 +548,6 @@ class AudioService {
 
     // Play with realistic strum - extended duration
     this.playChord(notes, 2200, 3, true);
-  }
-
-  /**
-   * Enhanced chord preview - tries samples first, falls back to synthesis
-   */
-  playChordPreview(chordName: string): void {
-    // Try sample-based playback (async)
-    this.playChordSample(chordName).catch(() => {
-      // If sample fails, use synthesis immediately
-      this.playChordPreviewSynthesis(chordName);
-    });
-  }
-
-  /**
-   * Cleanup - unload all cached samples
-   */
-  async cleanup(): Promise<void> {
-    for (const chordName in this.audioCache) {
-      const sound = this.audioCache[chordName];
-      if (sound) {
-        try {
-          await sound.unloadAsync();
-        } catch (e) {
-          console.log('Error unloading sound:', e);
-        }
-      }
-    }
-    this.audioCache = {};
   }
 }
 
