@@ -1,97 +1,78 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Toast, ToastData } from '@/components/ui/Toast';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { ToastData } from '@/components/ui/Toast';
 
 interface ToastContextType {
-  showToast: (message: string, options?: Partial<ToastData>) => void;
+  toasts: ToastData[];
+  showToast: (message: string, type?: ToastData['type'], duration?: number) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
   showWarning: (message: string) => void;
   showUndo: (message: string, onUndo: () => void) => void;
-  hideToast: (id: string) => void;
-  hideAll: () => void;
+  dismiss: (id: string) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-const MAX_TOASTS = 3;
-
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastData[]>([]);
-  const insets = useSafeAreaInsets();
 
-  const showToast = (message: string, options?: Partial<ToastData>) => {
+  const showToast = (
+    message: string,
+    type: ToastData['type'] = 'info',
+    duration: number = 5000
+  ) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
-    const newToast: ToastData = {
+    const toast: ToastData = {
       id,
       message,
-      type: options?.type || 'info',
-      duration: options?.duration || 5000,
-      action: options?.action,
-      onDismiss: options?.onDismiss,
+      type,
+      duration,
+      onDismiss: () => dismiss(id),
     };
 
-    setToasts(prev => {
-      // Keep only last MAX_TOASTS-1 toasts
-      const updated = [...prev.slice(-(MAX_TOASTS - 1)), newToast];
-      return updated;
-    });
+    setToasts((prev) => [...prev, toast]);
   };
 
-  const showSuccess = (message: string) => {
-    showToast(message, { type: 'success' });
-  };
-
-  const showError = (message: string) => {
-    showToast(message, { type: 'error', duration: 7000 });
-  };
-
-  const showWarning = (message: string) => {
-    showToast(message, { type: 'warning' });
-  };
+  const showSuccess = (message: string) => showToast(message, 'success', 3000);
+  
+  const showError = (message: string) => showToast(message, 'error', 6000);
+  
+  const showWarning = (message: string) => showToast(message, 'warning', 5000);
 
   const showUndo = (message: string, onUndo: () => void) => {
-    showToast(message, {
-      type: 'warning',
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    const toast: ToastData = {
+      id,
+      message,
+      type: 'info',
       duration: 5000,
       action: {
         label: 'Undo',
         onPress: onUndo,
       },
-    });
+      onDismiss: () => dismiss(id),
+    };
+
+    setToasts((prev) => [...prev, toast]);
   };
 
-  const hideToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
-  const hideAll = () => {
-    setToasts([]);
+  const dismiss = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
   return (
     <ToastContext.Provider
       value={{
+        toasts,
         showToast,
         showSuccess,
         showError,
         showWarning,
         showUndo,
-        hideToast,
-        hideAll,
+        dismiss,
       }}
     >
       {children}
-      
-      {/* Toast Container */}
-      {toasts.length > 0 && (
-        <View style={[styles.toastContainer, { bottom: insets.bottom + 16 }]} pointerEvents="box-none">
-          {toasts.map(toast => (
-            <Toast key={toast.id} toast={toast} onDismiss={hideToast} />
-          ))}
-        </View>
-      )}
     </ToastContext.Provider>
   );
 }
@@ -103,12 +84,3 @@ export function useToast() {
   }
   return context;
 }
-
-const styles = StyleSheet.create({
-  toastContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 9999,
-  },
-});
