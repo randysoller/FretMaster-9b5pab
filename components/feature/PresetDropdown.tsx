@@ -284,25 +284,24 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
             )}
 
             {/* Presets List */}
-            <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
-              {presets.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <MaterialIcons name="collections-bookmark" size={48} color={colors.textMuted} />
-                  <Text style={styles.emptyText}>No presets yet</Text>
-                  <Text style={styles.emptySubtext}>
-                    Select chords and create your first preset
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={presets}
-                  renderItem={renderPresetItem}
-                  keyExtractor={(item) => item.id}
-                  showsVerticalScrollIndicator={false}
-                  scrollEnabled={false}
-                />
-              )}
-            </ScrollView>
+            {presets.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="collections-bookmark" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyText}>No presets yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Select chords and create your first preset
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={presets}
+                renderItem={renderPresetItem}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                style={styles.listContainer}
+                contentContainerStyle={styles.listContentContainer}
+              />
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -407,8 +406,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listContainer: {
-    flex: 1,
     maxHeight: 400,
+  },
+  listContentContainer: {
+    paddingBottom: spacing.sm,
   },
   presetItem: {
     flexDirection: 'row',
