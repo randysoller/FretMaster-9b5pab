@@ -15,6 +15,7 @@ export default function ChordDetailScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const flatListRef = useRef<FlatList>(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
 
   // Parse chords from params
   const allChords: ChordData[] = params.chords ? JSON.parse(params.chords as string) : [];
@@ -136,19 +137,28 @@ export default function ChordDetailScreen() {
 
         {/* Play Button - Centered */}
         <View style={styles.buttons}>
-          <Pressable style={styles.playButton} onPress={async () => {
-            try {
-              console.log('🎸 Play button pressed for chord:', chord.name);
-              await audioService.playChordPreview(chord);
-              console.log('✅ Chord played successfully');
-            } catch (err) {
-              console.error('🔴 Chord playback failed:', err);
-              const errorMsg = err instanceof Error ? err.message : String(err);
-              Alert.alert('Audio Error', `Could not play chord audio.\n\nError: ${errorMsg}\n\nPlease try again.`);
-            }
-          }}>
-            <MaterialIcons name="play-arrow" size={20} color="#000" />
-            <Text style={styles.playButtonText}>Play</Text>
+          <Pressable 
+            style={[styles.playButton, isPlaying && styles.playButtonDisabled]} 
+            disabled={isPlaying}
+            onPress={async () => {
+              if (isPlaying) return;
+              
+              setIsPlaying(true);
+              try {
+                console.log('🎸 Play button pressed for chord:', chord.name);
+                await audioService.playChordPreview(chord);
+                console.log('✅ Chord played successfully');
+              } catch (err) {
+                console.error('🔴 Chord playback failed:', err);
+                const errorMsg = err instanceof Error ? err.message : String(err);
+                Alert.alert('Audio Error', `Could not play chord audio.\n\nError: ${errorMsg}\n\nPlease try again.`);
+              } finally {
+                // Reset after audio duration (2.2s)
+                setTimeout(() => setIsPlaying(false), 2300);
+              }
+            }}>
+            <MaterialIcons name={isPlaying ? "hourglass-empty" : "play-arrow"} size={20} color="#000" />
+            <Text style={styles.playButtonText}>{isPlaying ? 'Playing...' : 'Play'}</Text>
           </Pressable>
         </View>
 
@@ -435,6 +445,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl * 2,
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
+  },
+  playButtonDisabled: {
+    opacity: 0.6,
   },
   playButtonText: {
     fontSize: 16,

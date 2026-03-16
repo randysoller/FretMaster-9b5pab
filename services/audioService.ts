@@ -9,6 +9,7 @@ class AudioService {
   private metronomeInterval: NodeJS.Timeout | null = null;
   private masterGain: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
+  private audioInitialized: boolean = false;
 
   /**
    * Get or create audio context with proper initialization
@@ -429,14 +430,18 @@ class AudioService {
       for (let i = startSample; i < durationSamples; i++) {
         const t = (i - startSample) / sampleRate;
         
-        // ADSR envelope
+        // ADSR envelope with anti-click fade-in
         let envelope = 0;
-        if (t < 0.003) {
-          // Attack (3ms - pick strike)
-          envelope = (t / 0.003) * baseVolume;
+        if (t < 0.001) {
+          // Ultra-fast fade-in to prevent clicks (1ms)
+          envelope = (t / 0.001) * baseVolume * 0.1;
+        } else if (t < 0.005) {
+          // Attack (4ms - pick strike)
+          const attackProgress = (t - 0.001) / 0.004;
+          envelope = (0.1 + (attackProgress * 0.9)) * baseVolume;
         } else if (t < 0.08) {
-          // Decay (80ms)
-          envelope = baseVolume - ((t - 0.003) / 0.077) * (baseVolume * 0.25);
+          // Decay (75ms)
+          envelope = baseVolume - ((t - 0.005) / 0.075) * (baseVolume * 0.25);
         } else {
           // Sustain + Release (exponential decay)
           const sustainLevel = baseVolume * 0.75;
@@ -468,15 +473,34 @@ class AudioService {
       }
     });
     
-    // Dynamic compression (normalize peaks to prevent clipping)
+    // Dynamic compression + DC offset removal to eliminate static
     let maxPeak = 0;
+    let leftDCOffset = 0;
+    let rightDCOffset = 0;
+    
+    // Calculate DC offset (average value that causes static)
     for (let i = 0; i < durationSamples; i++) {
+      leftDCOffset += leftChannel[i];
+      rightDCOffset += rightChannel[i];
       maxPeak = Math.max(maxPeak, Math.abs(leftChannel[i]), Math.abs(rightChannel[i]));
     }
+    leftDCOffset /= durationSamples;
+    rightDCOffset /= durationSamples;
+    
+    // Remove DC offset and apply compression
     const compressionRatio = maxPeak > 0.8 ? 0.8 / maxPeak : 1.0;
     for (let i = 0; i < durationSamples; i++) {
-      leftChannel[i] *= compressionRatio * 0.7; // Master volume
-      rightChannel[i] *= compressionRatio * 0.7;
+      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 0.7;
+      rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 0.7;
+    }
+    
+    // Add fade-out at the very end to prevent clicks (last 10ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.01);
+    for (let i = fadeOutStart; i < durationSamples; i++) {
+      const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
+      const fadeFactor = 1 - fadeProgress;
+      leftChannel[i] *= fadeFactor;
+      rightChannel[i] *= fadeFactor;
     }
     
     console.log('✅ Audio synthesis complete, creating WAV file...');
@@ -562,16 +586,21 @@ class AudioService {
    * Generates WAV in memory with real-time synthesis
    */
   private async playChordNative(chord: ChordData): Promise<void> {
+    const startTime = Date.now();
     try {
       console.log('📱 Starting real-time audio generation for:', chord.name);
       
-      // Initialize audio mode for iOS
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
+      // Initialize audio mode for iOS (only once per session to reduce delay)
+      if (!this.audioInitialized) {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+        this.audioInitialized = true;
+        console.log('✅ Audio mode initialized');
+      }
       
       // Validate chord has playable strings
       const playableStrings = chord.positions.filter(f => f >= 0).length;
@@ -584,7 +613,8 @@ class AudioService {
       // Generate WAV in memory with professional synthesis
       const wavDataUri = this.generateGuitarWAV(chord, 2.2);
       
-      console.log('📱 Loading and playing synthesized audio...');
+      const generationTime = Date.now() - startTime;
+      console.log(`📱 Audio generated in ${generationTime}ms, loading and playing...`);
       
       // Play the generated audio
       const { sound } = await Audio.Sound.createAsync(
@@ -592,13 +622,14 @@ class AudioService {
         { shouldPlay: true, volume: 0.7 }
       );
       
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ Native chord playback started in ${totalTime}ms total`);
+      
       // Cleanup after playback
       setTimeout(async () => {
         await sound.unloadAsync();
         console.log('🧹 Audio cleanup complete');
       }, 2500);
-      
-      console.log('✅ Native chord playback started successfully');
     } catch (error) {
       console.error('❌ Native audio generation failed:', error);
       throw error;
