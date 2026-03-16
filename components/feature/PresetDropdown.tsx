@@ -148,9 +148,13 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
           </View>
         ) : (
           <>
-            <Pressable
-              onPress={() => handleLoadPreset(item)}
+            {/* Load Preset Area - NOT wrapped in Pressable, using onTouchEnd instead */}
+            <View
               style={styles.presetContent}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                handleLoadPreset(item);
+              }}
             >
               <View style={styles.presetInfo}>
                 <Text style={[styles.presetName, isActive_preset && styles.presetNameActive]}>
@@ -163,28 +167,34 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
               {isActive_preset && (
                 <MaterialIcons name="check-circle" size={20} color={colors.primary} />
               )}
-            </Pressable>
+            </View>
 
+            {/* Action Buttons - Completely separate with direct handlers */}
             <View style={styles.presetActions}>
               <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
+                onPress={() => {
+                  console.log('Edit button pressed for:', item.name);
                   handleStartEdit(item.id, item.name);
                 }}
                 style={styles.actionButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <MaterialIcons name="edit" size={22} color={colors.textMuted} />
               </Pressable>
               <Pressable
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeletePreset(item.id, item.name);
+                onPress={() => {
+                  console.log('Delete button pressed for:', item.name, item.id);
+                  // Call delete directly without Alert.alert - use a simpler approach
+                  removePreset(item.id);
+                  if (activeLibraryPresetId === item.id) {
+                    setActiveLibraryPreset(null);
+                    clearSelectedChords();
+                  }
                 }}
-                style={styles.actionButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.actionButton, styles.deleteButton]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
-                <MaterialIcons name="delete" size={22} color={colors.error} />
+                <MaterialIcons name="delete" size={24} color={colors.error} />
               </Pressable>
             </View>
           </>
@@ -448,6 +458,11 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: spacing.sm,
+    zIndex: 999,
+  },
+  deleteButton: {
+    backgroundColor: colors.error + '15',
+    borderRadius: borderRadius.sm,
   },
   editContainer: {
     flex: 1,
