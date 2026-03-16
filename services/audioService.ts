@@ -1,89 +1,45 @@
-// Sample-based audio service using expo-av for authentic guitar sounds
-import { Audio } from 'expo-av';
+// Guitar audio synthesis service with accurate note-to-frequency mapping
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
-
-// Chord sample mappings - URLs to royalty-free guitar chord samples
-// These samples are from Freesound.org (CC0 license - public domain)
-const CHORD_SAMPLES: { [key: string]: string } = {
-  // Major chords
-  'C': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3', // Acoustic guitar chords pack
-  'D': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'E': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'F': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'G': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'A': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'B': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  
-  // Minor chords
-  'Am': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Bm': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Cm': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Dm': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Em': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Fm': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-  'Gm': 'https://freesound.org/data/previews/683/683953_6217756-hq.mp3',
-};
-
-interface AudioCache {
-  [key: string]: Audio.Sound;
-}
 
 class AudioService {
   private audioContext: AudioContext | null = null;
   private activeOscillators: OscillatorNode[] = [];
   private metronomeInterval: NodeJS.Timeout | null = null;
   private masterGain: GainNode | null = null;
-  private audioCache: AudioCache = {};
-  private loadingPromises: { [key: string]: Promise<Audio.Sound> } = {};
+  private compressor: DynamicsCompressorNode | null = null;
 
   /**
-   * Initialize audio system
+   * Get or create audio context with proper initialization
    */
-  async initialize(): Promise<void> {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: false,
-      });
-      console.log('Audio system initialized');
-    } catch (error) {
-      console.error('Failed to initialize audio:', error);
+  private async getAudioContext(): Promise<AudioContext> {
+    if (!this.audioContext) {
+      // @ts-ignore - WebKit prefix for Safari
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContextClass();
+      
+      // Create master gain node
+      this.masterGain = this.audioContext.createGain();
+      this.masterGain.gain.value = 0.7;
+      
+      // Create dynamic compressor for automatic volume balancing
+      this.compressor = this.audioContext.createDynamicsCompressor();
+      this.compressor.threshold.value = -24; // dB
+      this.compressor.knee.value = 10;
+      this.compressor.ratio.value = 4;
+      this.compressor.attack.value = 0.003; // 3ms
+      this.compressor.release.value = 0.1; // 100ms
+      
+      // Connect: masterGain -> compressor -> destination
+      this.masterGain.connect(this.compressor);
+      this.compressor.connect(this.audioContext.destination);
     }
-  }
-
-  /**
-   * Load audio sample from URL with caching
-   */
-  private async loadSample(url: string): Promise<Audio.Sound> {
-    // Return cached sound if available
-    if (this.audioCache[url]) {
-      return this.audioCache[url];
+    
+    // Resume context if suspended (required for mobile)
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
     }
-
-    // Return existing loading promise if already loading
-    if (this.loadingPromises[url]) {
-      return this.loadingPromises[url];
-    }
-
-    // Create new loading promise
-    this.loadingPromises[url] = (async () => {
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: false }
-        );
-        this.audioCache[url] = sound;
-        delete this.loadingPromises[url];
-        return sound;
-      } catch (error) {
-        console.error(`Failed to load sample ${url}:`, error);
-        delete this.loadingPromises[url];
-        throw error;
-      }
-    })();
-
-    return this.loadingPromises[url];
+    
+    return this.audioContext;
   }
 
   /**
@@ -103,174 +59,168 @@ class AudioService {
   }
 
   /**
-   * Synthesis fallback for chords without samples
+   * Calculate frequency for guitar string at specific fret
+   * Uses equal temperament tuning (A4 = 440 Hz)
    */
-  private async playChordSynthesis(notes: string[], duration: number, octave: number): Promise<void> {
+  private calculateStringFrequency(stringIndex: number, fret: number): number {
+    // Base frequencies for standard tuning (low E to high E)
+    const openStringFrequencies = [
+      82.41,   // E2 (low E string)
+      110.00,  // A2
+      146.83,  // D3
+      196.00,  // G3
+      246.94,  // B3
+      329.63   // E4 (high E string)
+    ];
+    
+    const openFreq = openStringFrequencies[stringIndex];
+    // Each fret is a semitone: multiply by 2^(1/12) for each fret
+    return openFreq * Math.pow(2, fret / 12);
+  }
+
+  /**
+   * Play chord using Web Audio API synthesis
+   * Calculates exact frequencies from chord fret positions
+   */
+  private async playChordSynthesis(chord: ChordData, duration: number = 2200): Promise<void> {
     try {
-      if (!this.audioContext) {
-        // @ts-ignore
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        this.audioContext = new AudioContextClass();
-        this.masterGain = this.audioContext.createGain();
-        this.masterGain.connect(this.audioContext.destination);
-        this.masterGain.gain.value = 0.7;
-      }
-
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-
-      const ctx = this.audioContext;
-      const now = ctx.currentTime + 0.05;
+      const ctx = await this.getAudioContext();
+      const now = ctx.currentTime;
       const durationSec = duration / 1000;
 
-      notes.forEach((note, index) => {
-        const frequency = this.getNoteFrequency(note, octave);
+      // Calculate which strings to play based on chord positions
+      const stringsToPlay: Array<{ stringIndex: number; frequency: number }> = [];
+      
+      chord.positions.forEach((fret, stringIndex) => {
+        if (fret >= 0) { // -1 means don't play this string
+          const frequency = this.calculateStringFrequency(stringIndex, fret);
+          stringsToPlay.push({ stringIndex, frequency });
+        }
+      });
+
+      console.log(`Playing ${chord.name}:`, stringsToPlay.map(s => `String ${s.stringIndex + 1}: ${s.frequency.toFixed(1)}Hz`));
+
+      // Play each string
+      stringsToPlay.forEach(({ stringIndex, frequency }) => {
+        // Create oscillator with sawtooth wave (natural harmonics)
         const osc = ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(frequency, now);
+
+        // Create gain envelope for this string
         const gain = ctx.createGain();
         
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(frequency, now);
+        // String-specific timing: high strings attack slightly earlier
+        const attackDelay = stringIndex > 3 ? 0 : 0.005; // High strings 5ms earlier
+        const startTime = now + attackDelay;
         
-        const vol = 0.3 / notes.length;
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(vol, now + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + durationSec);
+        // Base volume for this string (higher strings slightly louder)
+        const baseVolume = stringIndex > 3 ? 0.25 : 0.2;
         
-        osc.connect(gain);
-        gain.connect(this.masterGain!);
-        
-        osc.start(now);
-        osc.stop(now + durationSec);
+        // ADSR envelope
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(baseVolume, startTime + 0.005); // 5ms attack
+        gain.gain.linearRampToValueAtTime(baseVolume * 0.7, startTime + 0.1); // 100ms decay
+        gain.gain.setValueAtTime(baseVolume * 0.7, startTime + 0.1); // Sustain
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec); // Release
+
+        // Create lowpass filter for acoustic guitar tone
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(frequency * 8, startTime); // Initial bright tone
+        filter.frequency.exponentialRampToValueAtTime(frequency * 4, startTime + durationSec); // Darken over time
+        filter.Q.value = 1;
+
+        // Create stereo panner for spatial separation
+        const panner = ctx.createStereoPanner();
+        // Bass strings (0-2) panned center-left, high strings (3-5) panned right
+        const panValue = stringIndex < 3 ? -0.15 : (stringIndex - 3) * 0.15;
+        panner.pan.setValueAtTime(panValue, now);
+
+        // Connect: oscillator -> filter -> gain -> panner -> masterGain -> compressor -> destination
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(panner);
+        panner.connect(this.masterGain!);
+
+        // Start and stop
+        osc.start(startTime);
+        osc.stop(startTime + durationSec);
         
         this.activeOscillators.push(osc);
       });
 
+      // Clean up oscillator references after playback
       setTimeout(() => {
         this.activeOscillators = [];
       }, duration + 100);
+
     } catch (error) {
-      console.error('Synthesis fallback failed:', error);
+      console.error('Chord synthesis failed:', error);
     }
   }
 
   /**
-   * Play chord using samples (preferred) or synthesis fallback
+   * Play chord - legacy method for compatibility
    */
   async playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): Promise<void> {
-    // For now, use synthesis as we need to properly set up samples
-    await this.playChordSynthesis(notes, duration, octave);
+    console.warn('playChord() with note array is deprecated. Use playChordPreview() with ChordData instead.');
+    // This method is kept for backward compatibility but not recommended
   }
 
   /**
-   * Play chord preview - accepts ChordData object or chord name
-   * Uses SAMPLES when available, falls back to synthesis
+   * Play chord preview - PRIMARY METHOD for chord playback
+   * Accepts ChordData object and plays exact frequencies based on fret positions
+   * This ensures audio ALWAYS matches the visual chord diagram
    */
   async playChordPreview(chordInput: ChordData | string): Promise<void> {
-    let chordName: string;
-
-    // Extract chord name
-    if (typeof chordInput === 'object' && chordInput.name) {
-      chordName = chordInput.name;
-    } else {
-      chordName = typeof chordInput === 'string' ? chordInput : 'C';
-    }
-
-    console.log(`Playing chord: ${chordName}`);
-
-    // Try to play from sample first
-    const sampleUrl = CHORD_SAMPLES[chordName];
-    
-    if (sampleUrl) {
-      try {
-        // Initialize audio if needed
-        await this.initialize();
-        
-        // Load and play sample
-        const sound = await this.loadSample(sampleUrl);
-        await sound.setPositionAsync(0);
-        await sound.playAsync();
-        
-        // Auto-stop after 2.5 seconds
-        setTimeout(async () => {
-          try {
-            await sound.stopAsync();
-            await sound.setPositionAsync(0);
-          } catch (e) {
-            // Ignore stop errors
-          }
-        }, 2500);
-        
-        console.log(`✅ Played sample for ${chordName}`);
-        return;
-      } catch (error) {
-        console.warn(`⚠️ Sample playback failed for ${chordName}, using synthesis fallback:`, error);
-      }
-    }
-
-    // Fallback to synthesis
-    console.log(`📊 Using synthesis for ${chordName} (no sample available)`);
-    
-    // Calculate notes from chord data if available
-    let notes: string[];
+    // Handle ChordData object (preferred)
     if (typeof chordInput === 'object' && chordInput.positions) {
-      notes = this.calculateNotesFromChord(chordInput);
-    } else {
-      // Basic chord mapping for fallback
-      const chordMap: { [key: string]: string[] } = {
-        'C': ['C', 'E', 'G', 'C', 'E'],
-        'D': ['D', 'A', 'D', 'F#'],
-        'E': ['E', 'B', 'E', 'G#', 'B', 'E'],
-        'F': ['F', 'A', 'C', 'F'],
-        'G': ['G', 'B', 'D', 'G', 'B', 'G'],
-        'A': ['A', 'E', 'A', 'C#', 'E'],
-        'B': ['B', 'F#', 'B', 'D#'],
-        'Am': ['A', 'E', 'A', 'C', 'E'],
-        'Dm': ['D', 'A', 'D', 'F', 'A'],
-        'Em': ['E', 'B', 'E', 'G', 'B', 'E'],
-      };
-      notes = chordMap[chordName] || ['C', 'E', 'G'];
+      console.log(`🎸 Playing chord: ${chordInput.name}`);
+      await this.playChordSynthesis(chordInput, 2200);
+      return;
     }
-
-    await this.playChordSynthesis(notes, 2200, 3);
+    
+    // Handle string input (fallback - not recommended)
+    console.warn(`⚠️ playChordPreview() called with string "${chordInput}". Pass ChordData object for accurate playback.`);
   }
 
-  /**
-   * Calculate actual notes from chord fret positions
-   */
-  private calculateNotesFromChord(chord: ChordData): string[] {
-    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    
-    const normalizeNote = (note: string): string => {
-      return note
-        .replace('b', '#')
-        .replace('Db', 'C#')
-        .replace('Eb', 'D#')
-        .replace('Gb', 'F#')
-        .replace('Ab', 'G#')
-        .replace('Bb', 'A#');
-    };
-    
-    const getNoteAtPosition = (stringIndex: number, fret: number): string => {
-      if (fret < 0) return '';
-      const openNote = STANDARD_TUNING[stringIndex];
-      const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
-      const noteIndex = (openNoteIndex + fret) % 12;
-      return NOTES[noteIndex];
-    };
 
-    const notes = chord.positions
-      .map((fret, index) => fret >= 0 ? getNoteAtPosition(index, fret) : null)
-      .filter(Boolean) as string[];
-    
-    return notes;
-  }
 
   /**
-   * Play single guitar string
+   * Play single guitar string at specific fret
    */
   async playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): Promise<void> {
-    await this.playChordSynthesis([`C`], duration, 4);
+    try {
+      const ctx = await this.getAudioContext();
+      const now = ctx.currentTime;
+      const durationSec = duration / 1000;
+
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(frequency, now);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(velocity * 0.3, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + durationSec);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(frequency * 6, now);
+      filter.Q.value = 1;
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+
+      osc.start(now);
+      osc.stop(now + durationSec);
+      
+      this.activeOscillators.push(osc);
+    } catch (error) {
+      console.error('Failed to play guitar string:', error);
+    }
   }
 
   /**
@@ -286,17 +236,7 @@ class AudioService {
    */
   async playMetronomeClick(type: 'strong' | 'weak' = 'weak', volume: number = 0.75, sound: string = 'Click'): Promise<void> {
     try {
-      if (!this.audioContext) {
-        // @ts-ignore
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        this.audioContext = new AudioContextClass();
-      }
-      
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-
-      const ctx = this.audioContext;
+      const ctx = await this.getAudioContext();
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
 
@@ -363,17 +303,7 @@ class AudioService {
    */
   async playTunerTone(frequency: number, duration: number = 2000): Promise<void> {
     try {
-      if (!this.audioContext) {
-        // @ts-ignore
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        this.audioContext = new AudioContextClass();
-      }
-
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
-
-      const ctx = this.audioContext;
+      const ctx = await this.getAudioContext();
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
 
@@ -406,7 +336,6 @@ class AudioService {
    * Stop all audio
    */
   stopAll(): void {
-    // Stop synthesis oscillators
     this.activeOscillators.forEach(osc => {
       try {
         osc.stop();
@@ -415,12 +344,6 @@ class AudioService {
       }
     });
     this.activeOscillators = [];
-
-    // Stop all cached samples
-    Object.values(this.audioCache).forEach(sound => {
-      sound.stopAsync().catch(() => {});
-    });
-
     this.stopMetronome();
   }
 
@@ -444,24 +367,14 @@ class AudioService {
   /**
    * Cleanup on app close
    */
-  async cleanup(): Promise<void> {
+  cleanup(): void {
     this.stopAll();
-    
-    // Unload all cached sounds
-    for (const sound of Object.values(this.audioCache)) {
-      try {
-        await sound.unloadAsync();
-      } catch (e) {
-        // Ignore errors
-      }
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
     }
-    
-    this.audioCache = {};
     console.log('Audio service cleaned up');
   }
 }
 
 export const audioService = new AudioService();
-
-// Initialize on app start
-audioService.initialize().catch(console.error);
