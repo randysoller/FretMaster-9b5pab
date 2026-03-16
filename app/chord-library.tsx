@@ -156,7 +156,7 @@ export default function ChordLibraryScreen() {
 
       {/* Preset Selector */}
       <View style={styles.presetRow}>
-        <Text style={styles.presetLabel}>Practice Preset:</Text>
+        <Text style={styles.presetLabel}>Preset Chord Lists:</Text>
         <PresetDropdown />
       </View>
 
