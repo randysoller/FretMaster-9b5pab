@@ -292,6 +292,7 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
 
 const styles = StyleSheet.create({
   trigger: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,

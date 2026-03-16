@@ -67,6 +67,7 @@ export default function ChordLibraryScreen() {
     searchQuery,
     selectedChordIds,
     activeLibraryPresetId,
+    setActiveLibraryPreset,
     toggleCategory,
     toggleBarreRoot,
     setSearchQuery,
@@ -155,21 +156,23 @@ export default function ChordLibraryScreen() {
       </View>
 
       {/* Preset Selector */}
-      <View style={styles.presetRow}>
+      <View style={styles.presetSection}>
         <Text style={styles.presetLabel}>Preset Chord Lists:</Text>
-        <PresetDropdown />
-        {activeLibraryPresetId && (
-          <Pressable
-            onPress={() => {
-              setActiveLibraryPreset(null);
-              clearSelectedChords();
-            }}
-            style={styles.clearPresetButton}
-          >
-            <MaterialIcons name="close" size={18} color={colors.error} />
-            <Text style={styles.clearPresetText}>Clear</Text>
-          </Pressable>
-        )}
+        <View style={styles.presetRow}>
+          <PresetDropdown />
+          {activeLibraryPresetId && (
+            <Pressable
+              onPress={() => {
+                setActiveLibraryPreset(null);
+                clearSelectedChords();
+              }}
+              style={styles.clearPresetButton}
+            >
+              <MaterialIcons name="close" size={18} color={colors.error} />
+              <Text style={styles.clearPresetText}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* Search & Type Filter */}
@@ -360,17 +363,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
+  presetSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
   presetRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
   },
   presetLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: spacing.xs,
   },
   clearPresetButton: {
     flexDirection: 'row',
