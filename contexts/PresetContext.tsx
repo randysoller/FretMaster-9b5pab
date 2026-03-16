@@ -25,15 +25,19 @@ const STORAGE_KEY = 'fretmaster-presets';
 export function PresetProvider({ children }: { children: ReactNode }) {
   const [presets, setPresets] = useState<ChordPreset[]>([]);
 
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Load from AsyncStorage on mount
   useEffect(() => {
     loadPresets();
   }, []);
 
-  // Save to AsyncStorage whenever presets change
+  // Save to AsyncStorage whenever presets change (but only after initial load)
   useEffect(() => {
-    savePresets();
-  }, [presets]);
+    if (isInitialized) {
+      savePresets();
+    }
+  }, [presets, isInitialized]);
 
   const loadPresets = async () => {
     try {
@@ -42,8 +46,10 @@ export function PresetProvider({ children }: { children: ReactNode }) {
         const data = JSON.parse(stored);
         setPresets(data.presets || []);
       }
+      setIsInitialized(true);
     } catch (error) {
       console.error('Failed to load presets:', error);
+      setIsInitialized(true);
     }
   };
 

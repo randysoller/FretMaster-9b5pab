@@ -38,16 +38,19 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeLibraryPresetId, setActiveLibraryPresetId] = useState<string | null>(null);
   const [selectedChordIds, setSelectedChordIds] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load from AsyncStorage on mount
   useEffect(() => {
     loadState();
   }, []);
 
-  // Save to AsyncStorage whenever state changes
+  // Save to AsyncStorage whenever state changes (but only after initial load)
   useEffect(() => {
-    saveState();
-  }, [filterCategories, filterTypes, filterBarreRoots, searchQuery, activeLibraryPresetId, selectedChordIds]);
+    if (isInitialized) {
+      saveState();
+    }
+  }, [filterCategories, filterTypes, filterBarreRoots, searchQuery, activeLibraryPresetId, selectedChordIds, isInitialized]);
 
   const loadState = async () => {
     try {
@@ -61,8 +64,10 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
         setActiveLibraryPresetId(data.activeLibraryPresetId || null);
         setSelectedChordIds(data.selectedChordIds || []);
       }
+      setIsInitialized(true);
     } catch (error) {
       console.error('Failed to load chord library state:', error);
+      setIsInitialized(true);
     }
   };
 

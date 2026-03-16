@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChordCard } from '@/components/feature/ChordCard';
 import { TypeFilterDropdown } from '@/components/feature/TypeFilterDropdown';
 import { PresetDropdown } from '@/components/feature/PresetDropdown';
@@ -23,9 +24,41 @@ const BARRE_ROOT_FILTERS: { label: string; value: BarreRoot }[] = [
   { label: '4th', value: 4 },
 ];
 
+const STORAGE_KEY = 'fretmaster-chord-manager-edits';
+
 export default function ChordLibraryScreen() {
   const router = useRouter();
   const { presets } = usePresets();
+  const [allChords, setAllChords] = useState<ChordData[]>(CHORD_DATA);
+
+  // Load edited chords from AsyncStorage
+  useEffect(() => {
+    loadChords();
+  }, []);
+
+  const loadChords = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const editedChords = JSON.parse(stored);
+        // Merge edited chords with original CHORD_DATA
+        const mergedChords = [...CHORD_DATA].map(originalChord => {
+          const editedChord = editedChords.find((c: ChordData) => c.id === originalChord.id);
+          return editedChord || originalChord;
+        });
+        // Add any new chords that don't exist in CHORD_DATA
+        const newChords = editedChords.filter((c: ChordData) => 
+          !CHORD_DATA.some(original => original.id === c.id)
+        );
+        setAllChords([...mergedChords, ...newChords]);
+      } else {
+        setAllChords(CHORD_DATA);
+      }
+    } catch (error) {
+      console.error('Failed to load chords:', error);
+      setAllChords(CHORD_DATA);
+    }
+  };
   
   const {
     filterCategories,
@@ -43,13 +76,13 @@ export default function ChordLibraryScreen() {
   } = useChordLibrary();
 
   const filteredChords = useMemo(() => {
-    let result = CHORD_DATA;
+    let result = allChords;
 
     // If a preset is active, filter by preset chords first
     if (activeLibraryPresetId) {
       const activePreset = presets.find(p => p.id === activeLibraryPresetId);
       if (activePreset) {
-        result = CHORD_DATA.filter(chord => activePreset.chordIds.includes(chord.id!));
+        result = allChords.filter(chord => activePreset.chordIds.includes(chord.id!));
       }
     }
 
@@ -72,7 +105,7 @@ export default function ChordLibraryScreen() {
       }
       return true;
     });
-  }, [searchQuery, filterCategories, filterTypes, filterBarreRoots, activeLibraryPresetId, presets]);
+  }, [searchQuery, filterCategories, filterTypes, filterBarreRoots, activeLibraryPresetId, presets, allChords]);
   
   const showBarreRootFilter = filterCategories.includes('barre') || filterCategories.includes('movable');
   const hasActiveFilters = filterCategories.length > 0 || filterTypes.length > 0 || filterBarreRoots.length > 0 || searchQuery.length > 0;
@@ -111,7 +144,7 @@ export default function ChordLibraryScreen() {
           <View style={styles.titleContent}>
             <Text style={styles.title}>Chord Library</Text>
             <Text style={styles.subtitle}>
-              Browse all {CHORD_DATA.length} chord diagrams — tap the checkbox to select chords for a practice preset
+              Browse all {allChords.length} chord diagrams — tap the checkbox to select chords for a practice preset
             </Text>
           </View>
           <Pressable onPress={() => router.push('/chord-manager' as any)} style={styles.manageButton}>

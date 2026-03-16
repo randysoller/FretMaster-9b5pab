@@ -78,30 +78,27 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
   
   const normalizedRootNote = normalizeNote(rootNote);
 
-  // Detect and render barre chords
+  // Detect and render barre chords - FIXED VERSION
   const detectBarres = () => {
     const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
-    const fingerGroups = new Map<number, number[]>();
-    
-    chord.fingers.forEach((finger, idx) => {
-      if (finger > 0 && chord.positions[idx] > 0) {
-        if (!fingerGroups.has(finger)) {
-          fingerGroups.set(finger, []);
-        }
-        fingerGroups.get(finger)!.push(idx);
+    const fretMap: { [key: string]: number[] } = {};
+
+    // Group strings by fret and finger
+    chord.positions.forEach((fret, stringIndex) => {
+      if (fret > 0 && chord.fingers[stringIndex] > 0) {
+        const key = `${fret}-${chord.fingers[stringIndex]}`;
+        if (!fretMap[key]) fretMap[key] = [];
+        fretMap[key].push(stringIndex);
       }
     });
 
-    fingerGroups.forEach((stringIndices, finger) => {
-      if (stringIndices.length >= 2) {
-        const frets = stringIndices.map(si => chord.positions[si]);
-        const uniqueFrets = [...new Set(frets)];
-        if (uniqueFrets.length === 1) {
-          const fret = uniqueFrets[0];
-          const fromString = Math.min(...stringIndices);
-          const toString = Math.max(...stringIndices);
-          barres.push({ fret, fromString, toString, finger });
-        }
+    // Create barre for groups with 2+ strings
+    Object.entries(fretMap).forEach(([key, strings]) => {
+      if (strings.length >= 2) {
+        const [fret, finger] = key.split('-').map(Number);
+        const fromString = Math.min(...strings);
+        const toString = Math.max(...strings);
+        barres.push({ fret, fromString, toString, finger });
       }
     });
 
