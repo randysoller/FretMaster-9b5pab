@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 import { colors, spacing, borderRadius } from '@/constants/theme';
 import { playChord } from '@/services/audioService';
+import { Fretboard } from '@/components/feature/Fretboard';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -117,57 +118,7 @@ export default function ChordDetailScreen() {
         {/* Fretboard and String Notation */}
         <View style={styles.diagramRow}>
           <View style={styles.fretboardContainer}>
-            {isBarreChord && <Text style={styles.fretLabel}>{startFret}fr</Text>}
-            <View style={[styles.fretboard, { width: DIAGRAM_WIDTH, height: DIAGRAM_HEIGHT }]}>
-              {/* Top markers */}
-              <View style={[styles.topMarkersRow, { width: DIAGRAM_WIDTH }]}>
-                {chord.positions.map((fret, stringIndex) => (
-                  <View key={`marker-${stringIndex}`} style={[styles.topMarker, { left: stringIndex * STRING_SPACING - 10 }]}>
-                    {fret === -1 && <Text style={styles.mutedX}>×</Text>}
-                    {fret === 0 && <Text style={styles.openO}>○</Text>}
-                  </View>
-                ))}
-              </View>
-
-              {/* Grid */}
-              <View style={styles.gridArea}>
-                {Array.from({ length: STRINGS }).map((_, i) => (
-                  <View key={`string-${i}`} style={[styles.string, { left: i * STRING_SPACING }]} />
-                ))}
-                {Array.from({ length: FRETS + 1 }).map((_, i) => (
-                  <View key={`fret-${i}`} style={[styles.fret, { top: i * FRET_SPACING }, i === 0 && !isBarreChord && styles.nutLine]} />
-                ))}
-
-                {/* Finger dots */}
-                {chord.positions.map((fret, stringIndex) => {
-                  if (fret <= 0) return null;
-                  const displayFret = fret - startFret + 1;
-                  if (displayFret < 1 || displayFret > FRETS) return null;
-
-                  const noteAtPosition = getNoteAtPosition(stringIndex, fret);
-                  const isRootNote = normalizeNote(noteAtPosition) === normalizedRootNote;
-                  const fingerNumber = chord.fingers?.[stringIndex] || 1;
-
-                  const xPos = stringIndex * STRING_SPACING;
-                  const yPos = (displayFret - 0.5) * FRET_SPACING;
-
-                  return (
-                    <View key={`dot-${stringIndex}`} style={[styles.dotContainer, { left: xPos, top: yPos }]}>
-                      {isRootNote ? (
-                        <>
-                          <View style={styles.diamondDot} />
-                          <Text style={styles.diamondNumber}>{fingerNumber}</Text>
-                        </>
-                      ) : (
-                        <View style={styles.circleDot}>
-                          <Text style={styles.circleNumber}>{fingerNumber}</Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
+            <Fretboard chord={chord} size="lg" />
           </View>
 
           {/* String Notation Box */}
