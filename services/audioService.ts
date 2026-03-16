@@ -53,72 +53,126 @@ class AudioService {
   }
 
   /**
-   * Simple guitar string synthesis using filtered oscillators
-   * Clean, warm tone without complex physical modeling
+   * Nylon string acoustic guitar synthesis
+   * Warm, mellow tone with soft attack and natural decay
    */
   playGuitarString(frequency: number, duration: number = 1500, velocity: number = 0.8, stringIndex: number = 0): void {
     try {
       const ctx = this.getAudioContext();
       const now = ctx.currentTime;
       
-      // Create fundamental oscillator (triangle wave for warm tone)
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.value = frequency;
+      // Nylon strings have a warmer, mellower tone - use sine + triangle blend
+      const fundamental = ctx.createOscillator();
+      fundamental.type = 'sine'; // Pure, warm fundamental
+      fundamental.frequency.value = frequency;
       
-      // Add subtle detuning for richness
-      const detune = ctx.createOscillator();
-      detune.type = 'triangle';
-      detune.frequency.value = frequency;
-      detune.detune.value = (Math.random() - 0.5) * 8; // ±4 cents variation
+      // Second harmonic for body
+      const harmonic1 = ctx.createOscillator();
+      harmonic1.type = 'triangle';
+      harmonic1.frequency.value = frequency * 2;
       
-      // Lowpass filter for warmth and to simulate body resonance
+      // Third harmonic for warmth
+      const harmonic2 = ctx.createOscillator();
+      harmonic2.type = 'sine';
+      harmonic2.frequency.value = frequency * 3;
+      
+      // Gain nodes for mixing harmonics
+      const fundamentalGain = ctx.createGain();
+      fundamentalGain.gain.value = 1.0; // Full fundamental
+      
+      const harmonic1Gain = ctx.createGain();
+      harmonic1Gain.gain.value = 0.3; // Subtle second harmonic
+      
+      const harmonic2Gain = ctx.createGain();
+      harmonic2Gain.gain.value = 0.15; // Very subtle third harmonic
+      
+      // Lowpass filter for nylon string mellowness
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      // Higher strings = brighter tone
-      filter.frequency.value = 1200 + (5 - stringIndex) * 400; // 1.2kHz - 3.2kHz
-      filter.Q.value = 1.5;
+      // Nylon strings are much warmer/darker than steel
+      filter.frequency.value = 800 + (5 - stringIndex) * 300; // 800Hz - 2.3kHz (much darker)
+      filter.Q.value = 0.8; // Gentle rolloff
       
-      // ADSR envelope - critical for guitar-like sound
+      // Soft pluck envelope - nylon strings have gentler attack than steel
       const envelope = ctx.createGain();
-      const attackTime = 0.002; // Very fast attack (2ms pluck)
-      const decayTime = 0.1; // Quick initial decay
-      const sustainLevel = velocity * 0.3; // Lower sustain for natural decay
+      const attackTime = 0.008; // Slower attack for soft nylon pluck (8ms)
+      const decayTime = 0.15; // Gradual decay
+      const sustainLevel = velocity * 0.35; // Moderate sustain
       const releaseTime = duration / 1000;
       
-      // Attack: instant pluck
+      // Soft attack curve
       envelope.gain.setValueAtTime(0, now);
-      envelope.gain.linearRampToValueAtTime(velocity * 0.5, now + attackTime);
-      // Decay: quick drop
+      envelope.gain.linearRampToValueAtTime(velocity * 0.4, now + attackTime); // Softer peak
+      // Gentle decay
       envelope.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
-      // Sustain and release: gradual fade
+      // Natural fade
       envelope.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
       
-      // Subtle stereo positioning
-      const panner = ctx.createStereoPanner();
-      panner.pan.value = (stringIndex - 2.5) * 0.15; // -0.375 to +0.375
+      // Subtle room ambience for acoustic character
+      const reverb = ctx.createConvolver();
+      const reverbGain = ctx.createGain();
+      reverbGain.gain.value = 0.15; // Very subtle reverb
       
-      // Connect audio graph: oscillators -> filter -> envelope -> panner -> output
-      osc.connect(filter);
-      detune.connect(filter);
+      // Create simple reverb impulse response
+      const reverbLength = ctx.sampleRate * 0.5; // 0.5 second reverb
+      const reverbBuffer = ctx.createBuffer(2, reverbLength, ctx.sampleRate);
+      for (let channel = 0; channel < 2; channel++) {
+        const channelData = reverbBuffer.getChannelData(channel);
+        for (let i = 0; i < reverbLength; i++) {
+          // Exponentially decaying noise
+          channelData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (reverbLength * 0.2));
+        }
+      }
+      reverb.buffer = reverbBuffer;
+      
+      // Stereo positioning
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = (stringIndex - 2.5) * 0.1; // Subtle stereo spread
+      
+      // Connect audio graph:
+      // Oscillators -> Harmonic gains -> Filter -> Envelope -> Split (dry + reverb) -> Output
+      fundamental.connect(fundamentalGain);
+      harmonic1.connect(harmonic1Gain);
+      harmonic2.connect(harmonic2Gain);
+      
+      fundamentalGain.connect(filter);
+      harmonic1Gain.connect(filter);
+      harmonic2Gain.connect(filter);
+      
       filter.connect(envelope);
+      
+      // Dry signal
       envelope.connect(panner);
       panner.connect(this.masterGain!);
       
+      // Wet signal (reverb)
+      envelope.connect(reverb);
+      reverb.connect(reverbGain);
+      reverbGain.connect(this.masterGain!);
+      
       // Start playback
-      osc.start(now);
-      detune.start(now);
-      osc.stop(now + releaseTime);
-      detune.stop(now + releaseTime);
+      fundamental.start(now);
+      harmonic1.start(now);
+      harmonic2.start(now);
+      
+      fundamental.stop(now + releaseTime);
+      harmonic1.stop(now + releaseTime);
+      harmonic2.stop(now + releaseTime);
       
       // Clean up after playback
       setTimeout(() => {
         try {
-          osc.disconnect();
-          detune.disconnect();
+          fundamental.disconnect();
+          harmonic1.disconnect();
+          harmonic2.disconnect();
+          fundamentalGain.disconnect();
+          harmonic1Gain.disconnect();
+          harmonic2Gain.disconnect();
           filter.disconnect();
           envelope.disconnect();
           panner.disconnect();
+          reverb.disconnect();
+          reverbGain.disconnect();
         } catch (e) {
           // Already disconnected
         }
