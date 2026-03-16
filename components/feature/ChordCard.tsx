@@ -165,7 +165,7 @@ export function ChordCard({ chord, cardNumber, isSelected = false, onPress, onCh
         >
           <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
             {isSelected && (
-              <MaterialIcons name="check" size={14} color={colors.primary} />
+              <MaterialIcons name="check" size={18} color={colors.primary} />
             )}
           </View>
         </Pressable>
@@ -225,9 +225,9 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 3,
+    width: 22.5,
+    height: 22.5,
+    borderRadius: 4,
     borderWidth: 2,
     borderColor: '#444',
     backgroundColor: 'transparent',

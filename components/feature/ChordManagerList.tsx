@@ -146,7 +146,7 @@ export function ChordManagerList({
           <Pressable onPress={onSelectAll} style={styles.selectAllButton}>
             <MaterialIcons 
               name={selectedChords.size === filteredChords.length ? "check-box" : "check-box-outline-blank"} 
-              size={20} 
+              size={25} 
               color={colors.primary} 
             />
             <Text style={styles.selectAllText}>
@@ -160,7 +160,7 @@ export function ChordManagerList({
             <Pressable onPress={() => onSelectChord(chord.id!)} style={styles.checkbox}>
               <MaterialIcons 
                 name={selectedChords.has(chord.id!) ? "check-box" : "check-box-outline-blank"} 
-                size={24} 
+                size={30} 
                 color={selectedChords.has(chord.id!) ? colors.primary : colors.textMuted} 
               />
             </Pressable>
