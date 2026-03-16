@@ -124,15 +124,19 @@ export function ChordLibraryProvider({ children }: { children: ReactNode }) {
   const clearBarreRoots = () => setFilterBarreRoots([]);
 
   const setActiveLibraryPreset = (id: string | null) => {
+    console.log('📋 ChordLibraryContext: setActiveLibraryPreset called with ID:', id);
     setActiveLibraryPresetId(id);
+    console.log('✅ ChordLibraryContext: activeLibraryPresetId state updated');
   };
 
   const toggleChordSelection = (id: string) => {
-    setSelectedChordIds(prev =>
-      prev.includes(id)
+    setSelectedChordIds(prev => {
+      const updated = prev.includes(id)
         ? prev.filter((c) => c !== id)
-        : [...prev, id]
-    );
+        : [...prev, id];
+      console.log('🔄 toggleChordSelection:', id, 'New count:', updated.length);
+      return updated;
+    });
   };
 
   const clearSelectedChords = () => setSelectedChordIds([]);

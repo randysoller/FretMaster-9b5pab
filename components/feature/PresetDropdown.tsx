@@ -36,8 +36,10 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
   };
 
   const handleLoadPreset = (preset: ChordPreset) => {
+    console.log('🎯 handleLoadPreset called for:', preset.name, 'ID:', preset.id, 'Chord IDs:', preset.chordIds);
     setActiveLibraryPreset(preset.id);
     setSelectedChordIds(preset.chordIds);
+    console.log('✅ Set active preset ID to:', preset.id);
     setIsOpen(false);
     onClose?.();
   };
@@ -148,11 +150,11 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
           </View>
         ) : (
           <>
-            {/* Load Preset Area - NOT wrapped in Pressable, using onTouchEnd instead */}
-            <View
+            {/* Load Preset Area - Changed to Pressable for better event handling */}
+            <Pressable
               style={styles.presetContent}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
+              onPress={() => {
+                console.log('🔵 Preset item pressed:', item.name);
                 handleLoadPreset(item);
               }}
             >
@@ -167,7 +169,7 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
               {isActive_preset && (
                 <MaterialIcons name="check-circle" size={20} color={colors.primary} />
               )}
-            </View>
+            </Pressable>
 
             {/* Action Buttons - Completely separate with direct handlers */}
             <View style={styles.presetActions}>

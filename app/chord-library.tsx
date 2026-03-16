@@ -77,13 +77,21 @@ export default function ChordLibraryScreen() {
   } = useChordLibrary();
 
   const filteredChords = useMemo(() => {
+    console.log('🔍 Recalculating filteredChords...');
+    console.log('  - activeLibraryPresetId:', activeLibraryPresetId);
+    console.log('  - Total chords:', allChords.length);
+    console.log('  - Available presets:', presets.length);
+    
     let result = allChords;
 
     // If a preset is active, filter by preset chords first
     if (activeLibraryPresetId) {
       const activePreset = presets.find(p => p.id === activeLibraryPresetId);
+      console.log('  - Active preset found:', activePreset?.name);
+      console.log('  - Active preset chord IDs:', activePreset?.chordIds);
       if (activePreset) {
         result = allChords.filter(chord => activePreset.chordIds.includes(chord.id!));
+        console.log('  - Filtered to', result.length, 'chords from preset');
       }
     }
 
@@ -106,6 +114,9 @@ export default function ChordLibraryScreen() {
       }
       return true;
     });
+    
+    console.log('  - Final filtered count:', result.length);
+    return result;
   }, [searchQuery, filterCategories, filterTypes, filterBarreRoots, activeLibraryPresetId, presets, allChords]);
   
   const showBarreRootFilter = filterCategories.includes('barre') || filterCategories.includes('movable');
