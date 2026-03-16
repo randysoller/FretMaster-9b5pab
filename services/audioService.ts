@@ -1,4 +1,4 @@
-// Professional audio service using Web Audio API with realistic guitar synthesis
+// Professional audio service using Web Audio API with simplified guitar synthesis
 import { ChordData, STANDARD_TUNING } from '@/constants/musicData';
 
 interface GuitarStringConfig {
@@ -65,8 +65,9 @@ class AudioService {
   }
 
   /**
-   * Create realistic plucked guitar string sound
-   * Based on the working web implementation
+   * Create simplified guitar string sound with sawtooth wave
+   * SIMPLIFIED APPROACH: 1 oscillator instead of 3 (66% CPU reduction)
+   * Sawtooth naturally contains harmonics - no need for layering
    */
   private createPluck(
     ctx: AudioContext,
@@ -74,98 +75,54 @@ class AudioService {
     startTime: number,
     duration: number,
     volume: number,
-    masterGain: GainNode
-  ): OscillatorNode[] {
-    // Main tone — triangle gives a warm, muted guitar-like timbre
-    const osc1 = ctx.createOscillator();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(frequency, startTime);
+    destinationNode: AudioNode,
+    stringIndex: number
+  ): OscillatorNode {
+    // Single sawtooth oscillator - naturally rich in harmonics
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(frequency, startTime);
 
-    // Harmonic layer — sine an octave up for brightness (boosted for high notes)
-    const osc2 = ctx.createOscillator();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(frequency * 2, startTime);
+    // ADSR envelope - guitar pluck characteristics
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.008); // Fast attack (pick)
+    gainNode.gain.exponentialRampToValueAtTime(volume * 0.25, startTime + 0.12); // Quick decay
+    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration); // Gentle release
 
-    // Sub harmonic for body (reduced for high frequencies)
-    const osc3 = ctx.createOscillator();
-    osc3.type = 'sine';
-    osc3.frequency.setValueAtTime(frequency * 0.5, startTime);
-
-    // Aggressive EQ for high frequencies - make them sparkle and cut through
-    const isHighFreq = frequency > 250; // G string and above
-    const isVeryHighFreq = frequency > 350; // B string and above
-    const harmonicBoost = isVeryHighFreq ? 2.2 : isHighFreq ? 1.8 : 1.0;
-    const subReduction = isVeryHighFreq ? 0.3 : isHighFreq ? 0.5 : 1.0; // Reduce bass for clarity
-
-    // Gain envelopes — guitar pluck: fast attack, quick decay, gentle sustain
-    const mainGain = ctx.createGain();
-    mainGain.gain.setValueAtTime(0, startTime);
-    mainGain.gain.linearRampToValueAtTime(volume * 0.50, startTime + 0.008);
-    mainGain.gain.exponentialRampToValueAtTime(volume * 0.20, startTime + 0.12);
-    mainGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
-    const harmonicGain = ctx.createGain();
-    harmonicGain.gain.setValueAtTime(0, startTime);
-    // More harmonic content for brightness and presence
-    harmonicGain.gain.linearRampToValueAtTime(volume * 0.14 * harmonicBoost, startTime + 0.005);
-    harmonicGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.6);
-
-    const subGain = ctx.createGain();
-    subGain.gain.setValueAtTime(0, startTime);
-    subGain.gain.linearRampToValueAtTime(volume * 0.12 * subReduction, startTime + 0.01);
-    subGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.7);
-
-    // High-pass for high strings to remove muddiness, low-pass for all to soften
-    const highpass = ctx.createBiquadFilter();
-    highpass.type = 'highpass';
-    if (isHighFreq) {
-      highpass.frequency.setValueAtTime(frequency * 0.5, startTime); // Remove low mud
-      highpass.Q.setValueAtTime(0.7, startTime);
-    } else {
-      highpass.frequency.setValueAtTime(60, startTime); // Minimal effect on bass
-      highpass.Q.setValueAtTime(0.5, startTime);
-    }
-
-    // Low-pass filter with much higher cutoff for high frequencies
+    // Lowpass filter - tame the bright sawtooth to sound more like a guitar
     const lowpass = ctx.createBiquadFilter();
     lowpass.type = 'lowpass';
-    const initialCutoff = Math.min(frequency * 12, 12000); // Much higher for sparkle
-    const sustainCutoff = Math.min(frequency * 5, 5000); // Higher sustain
+    const initialCutoff = Math.min(frequency * 8, 8000);
+    const sustainCutoff = Math.min(frequency * 4, 4000);
     lowpass.frequency.setValueAtTime(initialCutoff, startTime);
-    lowpass.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + duration * 0.4);
-    lowpass.Q.setValueAtTime(0.8, startTime); // Slight resonance for presence
+    lowpass.frequency.exponentialRampToValueAtTime(sustainCutoff, startTime + duration * 0.5);
+    lowpass.Q.setValueAtTime(1.0, startTime); // Slight resonance
 
-    // High-shelf boost for very high frequencies (B and high E strings)
-    const highShelf = ctx.createBiquadFilter();
-    highShelf.type = 'highshelf';
-    highShelf.frequency.setValueAtTime(2000, startTime);
-    highShelf.gain.setValueAtTime(isVeryHighFreq ? 6 : isHighFreq ? 3 : 0, startTime); // +6dB boost for top strings
+    // Stereo panning for spatial separation
+    // Bass strings (0-2): center to slight left
+    // High strings (3-5): slight right for clarity
+    const panner = ctx.createStereoPanner();
+    if (stringIndex <= 2) {
+      panner.pan.setValueAtTime(-0.1 * stringIndex, startTime); // 0.0 to -0.2 (center-left)
+    } else {
+      panner.pan.setValueAtTime(0.15 * (stringIndex - 2), startTime); // 0.15 to 0.45 (right)
+    }
 
-    // Routing — through filters to master gain (highpass → lowpass → highshelf → master)
-    osc1.connect(mainGain);
-    osc2.connect(harmonicGain);
-    osc3.connect(subGain);
+    // Signal chain: oscillator → lowpass → gain → panner → destination
+    osc.connect(lowpass);
+    lowpass.connect(gainNode);
+    gainNode.connect(panner);
+    panner.connect(destinationNode);
 
-    mainGain.connect(highpass);
-    harmonicGain.connect(highpass);
-    subGain.connect(highpass);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
 
-    highpass.connect(lowpass);
-    lowpass.connect(highShelf);
-    highShelf.connect(masterGain);
-
-    osc1.start(startTime);
-    osc2.start(startTime);
-    osc3.start(startTime);
-    osc1.stop(startTime + duration + 0.05);
-    osc2.stop(startTime + duration + 0.05);
-    osc3.stop(startTime + duration + 0.05);
-
-    return [osc1, osc2, osc3];
+    return osc;
   }
 
   /**
-   * Play a guitar string with realistic pluck sound
+   * Play a guitar string with simplified sawtooth synthesis
    */
   async playGuitarString(frequency: number, duration: number = 2000, velocity: number = 0.8, stringIndex: number = 0): Promise<void> {
     try {
@@ -173,25 +130,21 @@ class AudioService {
       const now = ctx.currentTime + 0.05;
       const durationSec = duration / 1000;
       
-      // Aggressive boost for higher strings (G, B, high E) to make them clearly audible
+      // Balanced volume - compression will help even things out
       // String index: 0=low E, 1=A, 2=D, 3=G, 4=B, 5=high E
-      const vol = stringIndex >= 5 ? 0.48 : // High E - maximum boost
-                  stringIndex >= 4 ? 0.44 : // B string - very loud
-                  stringIndex >= 3 ? 0.40 : // G string - loud
-                  stringIndex >= 1 ? 0.30 : // A, D - medium
-                  0.28;                     // Low E - bass foundation
+      const vol = stringIndex >= 4 ? 0.38 : // High strings - boosted
+                  stringIndex >= 2 ? 0.32 : // Mid strings
+                  0.28;                      // Low strings
       
-      const oscillators = this.createPluck(ctx, frequency, now, durationSec, vol * velocity, this.masterGain!);
-      this.activeOscillators.push(...oscillators);
+      const osc = this.createPluck(ctx, frequency, now, durationSec, vol * velocity, this.masterGain!, stringIndex);
+      this.activeOscillators.push(osc);
       
       // Clean up after playback
       setTimeout(() => {
-        oscillators.forEach(osc => {
-          const index = this.activeOscillators.indexOf(osc);
-          if (index > -1) {
-            this.activeOscillators.splice(index, 1);
-          }
-        });
+        const index = this.activeOscillators.indexOf(osc);
+        if (index > -1) {
+          this.activeOscillators.splice(index, 1);
+        }
       }, duration + 100);
       
     } catch (error) {
@@ -208,40 +161,56 @@ class AudioService {
   }
 
   /**
-   * Play a guitar chord with realistic strumming
-   * Uses the proven web implementation approach
+   * Play a guitar chord with compression and spatial separation
+   * OPTIMIZED: 6 oscillators instead of 18 (66% reduction)
    */
   async playChord(notes: string[], duration: number = 1500, octave: number = 3, strum: boolean = true): Promise<void> {
     try {
       const ctx = await this.getAudioContext();
       const now = ctx.currentTime + 0.05;
-      const strumDelay = 0.035; // 35ms between strings — natural strum speed
+      
+      // Dynamic compressor - automatically balances loud/quiet strings
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-24, now);
+      compressor.knee.setValueAtTime(10, now);
+      compressor.ratio.setValueAtTime(4, now);
+      compressor.attack.setValueAtTime(0.003, now);
+      compressor.release.setValueAtTime(0.1, now);
+      compressor.connect(this.masterGain!);
+
+      const strumDelay = 0.035; // 35ms between strings
       const noteDuration = 2.5; // ring out for 2.5 seconds
       
       if (strum) {
-        // Realistic strum - play from low to high strings
+        // Strum with attack timing optimization
         notes.forEach((note, index) => {
           const frequency = this.getNoteFrequency(note, octave);
-          const startTime = now + index * strumDelay;
-          const vol = 0.3 - index * 0.015; // Bass strings slightly louder
           
-          const oscillators = this.createPluck(ctx, frequency, startTime, noteDuration, vol, this.masterGain!);
-          this.activeOscillators.push(...oscillators);
+          // High strings attack 5ms earlier for clarity
+          const attackOffset = index >= 3 ? -0.005 : 0;
+          const startTime = now + index * strumDelay + attackOffset;
+          
+          // Balanced volume - compressor will even things out
+          const vol = index >= 4 ? 0.35 : index >= 2 ? 0.30 : 0.28;
+          
+          const osc = this.createPluck(ctx, frequency, startTime, noteDuration, vol, compressor, index);
+          this.activeOscillators.push(osc);
         });
       } else {
         // Play all notes simultaneously
         notes.forEach((note, index) => {
           const frequency = this.getNoteFrequency(note, octave);
-          const vol = 0.3 - index * 0.015;
+          const vol = index >= 4 ? 0.35 : index >= 2 ? 0.30 : 0.28;
           
-          const oscillators = this.createPluck(ctx, frequency, now, noteDuration, vol, this.masterGain!);
-          this.activeOscillators.push(...oscillators);
+          const osc = this.createPluck(ctx, frequency, now, noteDuration, vol, compressor, index);
+          this.activeOscillators.push(osc);
         });
       }
       
       // Clean up after playback
       setTimeout(() => {
         this.activeOscillators = [];
+        compressor.disconnect();
       }, (noteDuration * 1000) + 100);
       
     } catch (error) {
