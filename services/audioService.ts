@@ -495,8 +495,8 @@ class AudioService {
       rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 0.7;
     }
     
-    // Add smooth fade-out at the very end to prevent pops/static (last 50ms)
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.05);
+    // Add smooth fade-out at the very end to prevent pops/static (last 25ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.025);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
       // Use cubic exponential curve for ultra-smooth fade to silence
