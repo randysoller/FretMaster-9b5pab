@@ -389,11 +389,181 @@ class AudioService {
   }
 
   /**
+   * Generate WAV file in memory with guitar synthesis
+   */
+  private generateGuitarWAV(chord: ChordData, duration: number = 2.2): string {
+    const sampleRate = 44100; // CD quality
+    const numChannels = 2; // Stereo
+    const durationSamples = Math.floor(sampleRate * duration);
+    
+    // Create stereo buffer
+    const leftChannel = new Float32Array(durationSamples);
+    const rightChannel = new Float32Array(durationSamples);
+    
+    // Get strings to play (same logic as web version)
+    const stringsToPlay: Array<{ stringIndex: number; frequency: number }> = [];
+    chord.positions.forEach((fret, stringIndex) => {
+      if (fret >= 0) {
+        const frequency = this.calculateStringFrequency(stringIndex, fret);
+        stringsToPlay.push({ stringIndex, frequency });
+      }
+    });
+    
+    console.log(`🎸 Synthesizing ${stringsToPlay.length} strings:`, stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
+    
+    // Synthesize each string
+    stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
+      const strumDelay = arrayIndex * 0.012; // 12ms between strings (natural strum)
+      const startSample = Math.floor(strumDelay * sampleRate);
+      
+      // Velocity variation (softer on first/last strings)
+      const velocityCurve = arrayIndex === 0 || arrayIndex === stringsToPlay.length - 1 ? 0.85 : 1.0;
+      const baseVolume = (stringIndex > 3 ? 0.28 : 0.24) * velocityCurve;
+      
+      // Stereo panning (bass center-left, treble right)
+      const panValue = stringIndex < 3 ? -0.2 + (stringIndex * 0.1) : (stringIndex - 3) * 0.15;
+      const leftGain = panValue <= 0 ? 1 : 1 - panValue;
+      const rightGain = panValue >= 0 ? 1 : 1 + panValue;
+      
+      // Generate samples for this string
+      for (let i = startSample; i < durationSamples; i++) {
+        const t = (i - startSample) / sampleRate;
+        
+        // ADSR envelope
+        let envelope = 0;
+        if (t < 0.003) {
+          // Attack (3ms - pick strike)
+          envelope = (t / 0.003) * baseVolume;
+        } else if (t < 0.08) {
+          // Decay (80ms)
+          envelope = baseVolume - ((t - 0.003) / 0.077) * (baseVolume * 0.25);
+        } else {
+          // Sustain + Release (exponential decay)
+          const sustainLevel = baseVolume * 0.75;
+          envelope = sustainLevel * Math.exp(-(t - 0.08) / (duration * 0.3));
+        }
+        
+        // Guitar waveform with harmonics (same harmonic content as web version)
+        const phase = 2 * Math.PI * frequency * t;
+        let sample = 0;
+        sample += Math.sin(phase) * 1.0;        // Fundamental
+        sample += Math.sin(phase * 2) * 0.5;    // 2nd harmonic
+        sample += Math.sin(phase * 3) * 0.3;    // 3rd harmonic
+        sample += Math.sin(phase * 4) * 0.15;   // 4th harmonic
+        sample += Math.sin(phase * 5) * 0.08;   // 5th harmonic
+        sample += Math.sin(phase * 6) * 0.04;   // 6th harmonic
+        sample += Math.sin(phase * 7) * 0.02;   // 7th harmonic
+        
+        // Apply envelope
+        sample *= envelope;
+        
+        // Simple frequency-dependent tone shaping (mellower over time)
+        if (t > 0.5) {
+          sample *= 0.7; // Reduce brightness in sustain
+        }
+        
+        // Add to stereo channels with panning
+        leftChannel[i] += sample * leftGain;
+        rightChannel[i] += sample * rightGain;
+      }
+    });
+    
+    // Dynamic compression (normalize peaks to prevent clipping)
+    let maxPeak = 0;
+    for (let i = 0; i < durationSamples; i++) {
+      maxPeak = Math.max(maxPeak, Math.abs(leftChannel[i]), Math.abs(rightChannel[i]));
+    }
+    const compressionRatio = maxPeak > 0.8 ? 0.8 / maxPeak : 1.0;
+    for (let i = 0; i < durationSamples; i++) {
+      leftChannel[i] *= compressionRatio * 0.7; // Master volume
+      rightChannel[i] *= compressionRatio * 0.7;
+    }
+    
+    console.log('✅ Audio synthesis complete, creating WAV file...');
+    
+    // Convert to WAV format
+    return this.createWAVFromBuffers(leftChannel, rightChannel, sampleRate);
+  }
+
+  /**
+   * Create WAV file from audio buffers
+   */
+  private createWAVFromBuffers(leftChannel: Float32Array, rightChannel: Float32Array, sampleRate: number): string {
+    const numChannels = 2;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    const numSamples = leftChannel.length;
+    const dataSize = numSamples * blockAlign;
+    const headerSize = 44;
+    const totalSize = headerSize + dataSize;
+    
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    
+    // WAV Header
+    // "RIFF" chunk descriptor
+    this.writeString(view, 0, 'RIFF');
+    view.setUint32(4, totalSize - 8, true);
+    this.writeString(view, 8, 'WAVE');
+    
+    // "fmt " sub-chunk
+    this.writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, 1, true); // audio format (1 = PCM)
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true); // byte rate
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    
+    // "data" sub-chunk
+    this.writeString(view, 36, 'data');
+    view.setUint32(40, dataSize, true);
+    
+    // Write audio data (interleaved stereo)
+    let offset = 44;
+    for (let i = 0; i < numSamples; i++) {
+      // Left channel
+      const leftSample = Math.max(-1, Math.min(1, leftChannel[i]));
+      view.setInt16(offset, leftSample * 0x7FFF, true);
+      offset += 2;
+      
+      // Right channel
+      const rightSample = Math.max(-1, Math.min(1, rightChannel[i]));
+      view.setInt16(offset, rightSample * 0x7FFF, true);
+      offset += 2;
+    }
+    
+    // Convert to base64 data URI
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    const dataUri = `data:audio/wav;base64,${base64}`;
+    
+    console.log(`✅ WAV file created: ${(bytes.length / 1024).toFixed(1)}KB`);
+    return dataUri;
+  }
+
+  /**
+   * Helper to write string to DataView
+   */
+  private writeString(view: DataView, offset: number, string: string): void {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  /**
    * Play chord using native audio on mobile platforms
+   * Generates WAV in memory with real-time synthesis
    */
   private async playChordNative(chord: ChordData): Promise<void> {
     try {
-      console.log('📱 Using native audio playback for:', chord.name);
+      console.log('📱 Starting real-time audio generation for:', chord.name);
       
       // Initialize audio mode for iOS
       await Audio.setAudioModeAsync({
@@ -403,32 +573,34 @@ class AudioService {
         shouldDuckAndroid: true,
       });
       
-      // Generate simple tones for each string using Expo AV
-      const stringsToPlay = chord.positions
-        .map((fret, stringIndex) => ({ stringIndex, fret }))
-        .filter(s => s.fret >= 0);
-      
-      if (stringsToPlay.length === 0) {
-        throw new Error('No strings to play in chord');
+      // Validate chord has playable strings
+      const playableStrings = chord.positions.filter(f => f >= 0).length;
+      if (playableStrings === 0) {
+        throw new Error('Chord has no playable strings');
       }
       
-      console.log(`📱 Playing ${stringsToPlay.length} strings natively`);
+      console.log(`🎸 Generating audio for ${playableStrings} strings...`);
       
-      // For now, play a simple confirmation tone
-      // TODO: Implement proper tone generation or use audio samples
+      // Generate WAV in memory with professional synthesis
+      const wavDataUri = this.generateGuitarWAV(chord, 2.2);
+      
+      console.log('📱 Loading and playing synthesized audio...');
+      
+      // Play the generated audio
       const { sound } = await Audio.Sound.createAsync(
-        { uri: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=' }, // Empty WAV
-        { shouldPlay: true, volume: 0.5 }
+        { uri: wavDataUri },
+        { shouldPlay: true, volume: 0.7 }
       );
       
-      // Play for 2 seconds
+      // Cleanup after playback
       setTimeout(async () => {
         await sound.unloadAsync();
-      }, 2000);
+        console.log('🧹 Audio cleanup complete');
+      }, 2500);
       
-      console.log('✅ Native chord playback completed');
+      console.log('✅ Native chord playback started successfully');
     } catch (error) {
-      console.error('❌ Native audio playback failed:', error);
+      console.error('❌ Native audio generation failed:', error);
       throw error;
     }
   }
