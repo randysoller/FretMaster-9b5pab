@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { undoService } from '@/services/undoService';
 
 export interface ChordPreset {
   id: string;
@@ -16,6 +17,7 @@ interface PresetContextType {
   addPreset: (name: string, chordIds: string[]) => Promise<string>;
   updatePreset: (id: string, chordIds: string[]) => void;
   removePreset: (id: string) => void;
+  undoRemovePreset: (id: string) => void;
   renamePreset: (id: string, name: string) => void;
   reorderPreset: (fromIndex: number, toIndex: number) => void;
   getPreset: (id: string) => ChordPreset | undefined;
@@ -159,7 +161,33 @@ export function PresetProvider({ children }: { children: ReactNode }) {
   };
 
   const removePreset = (id: string) => {
+    const preset = presets.find(p => p.id === id);
+    if (!preset) return;
+
+    // Temporarily remove from UI
     setPresets(prev => prev.filter((p) => p.id !== id));
+    
+    // Store for undo
+    undoService.storeDeletedPreset(
+      preset,
+      () => {
+        // Permanent deletion after timeout (no action needed, already removed from state)
+        console.log('✅ Preset permanently deleted:', preset.name);
+      }
+    );
+  };
+
+  const undoRemovePreset = (id: string) => {
+    const restored = undoService.restorePreset(id);
+    if (restored) {
+      setPresets(prev => [...prev, {
+        id: restored.id,
+        name: restored.name,
+        chordIds: restored.chordIds,
+        createdAt: restored.deletedAt,
+      }]);
+      console.log('↩️ Restored preset:', restored.name);
+    }
   };
 
   const renamePreset = (id: string, name: string) => {
@@ -194,6 +222,7 @@ export function PresetProvider({ children }: { children: ReactNode }) {
         addPreset,
         updatePreset,
         removePreset,
+        undoRemovePreset,
         renamePreset,
         reorderPreset,
         getPreset,

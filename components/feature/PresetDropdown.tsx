@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '@/constants/theme';
 import { usePresets, ChordPreset } from '@/contexts/PresetContext';
 import { useChordLibrary } from '@/contexts/ChordLibraryContext';
+import { useToast } from '@/contexts/ToastContext';
 
 interface PresetDropdownProps {
   onClose?: () => void;
@@ -15,8 +16,9 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   
-  const { presets, addPreset, removePreset, renamePreset, reorderPreset } = usePresets();
+  const { presets, addPreset, removePreset, undoRemovePreset, renamePreset, reorderPreset } = usePresets();
   const { selectedChordIds, activeLibraryPresetId, setActiveLibraryPreset, setSelectedChordIds, clearSelectedChords } = useChordLibrary();
+  const { showUndo, showSuccess } = useToast();
 
   const handleCreatePreset = async () => {
     const trimmedName = newPresetName.trim();
@@ -226,12 +228,26 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
               <Pressable
                 onPress={() => {
                   console.log('Delete button pressed for:', item.name, item.id);
-                  // Call delete directly without Alert.alert - use a simpler approach
-                  removePreset(item.id);
-                  if (activeLibraryPresetId === item.id) {
+                  
+                  // Store preset info before deletion
+                  const presetName = item.name;
+                  const presetId = item.id;
+                  
+                  // Remove from UI
+                  removePreset(presetId);
+                  if (activeLibraryPresetId === presetId) {
                     setActiveLibraryPreset(null);
                     clearSelectedChords();
                   }
+                  
+                  // Show undo toast
+                  showUndo(
+                    `Deleted preset "${presetName}"`,
+                    () => {
+                      undoRemovePreset(presetId);
+                      showSuccess(`Restored preset "${presetName}"`);
+                    }
+                  );
                 }}
                 style={[styles.actionButton, styles.deleteButton]}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}

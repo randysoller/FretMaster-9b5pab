@@ -9,6 +9,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ChordLibraryProvider } from '@/contexts/ChordLibraryContext';
 import { PresetProvider } from '@/contexts/PresetContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -26,17 +27,19 @@ export default function RootLayout() {
       <AuthProvider>
         <PresetProvider>
           <ChordLibraryProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-                <Stack.Screen name="sign-up" options={{ headerShown: false }} />
-                <Stack.Screen name="profile" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </ThemeProvider>
+            <ToastProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+                  <Stack.Screen name="sign-up" options={{ headerShown: false }} />
+                  <Stack.Screen name="profile" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </ToastProvider>
           </ChordLibraryProvider>
         </PresetProvider>
       </AuthProvider>

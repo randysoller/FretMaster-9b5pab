@@ -9,6 +9,8 @@ import { ChordManagerList } from '@/components/feature/ChordManagerList';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 import { usePresets } from '@/contexts/PresetContext';
+import { useToast } from '@/contexts/ToastContext';
+import { undoService } from '@/services/undoService';
 import { ChordData, ChordShape, ChordType, ALL_CHORD_TYPES, CHORD_TYPE_LABELS, CATEGORY_LABELS, STANDARD_TUNING, CHORDS } from '@/constants/musicData';
 import { supabase } from '@/services/supabaseClient';
 
@@ -64,7 +66,8 @@ const DOT_COLORS = [
 export default function ChordManagerScreen() {
   const router = useRouter();
   const { isAdmin } = useAuth();
-  const { presets, addPreset, updatePreset } = usePresets();
+  const { presets, addPreset, updatePreset, undoRemovePreset } = usePresets();
+  const { showUndo, showSuccess, showError } = useToast();
 
   // State
   const [chords, setChords] = useState<ChordData[]>([]);
@@ -476,14 +479,37 @@ export default function ChordManagerScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              const chordToDelete = { ...editingChord };
+              
+              // Temporarily remove from UI
               const updatedChords = chords.filter(c => c.id !== editingChord.id);
               setChords(updatedChords);
               setEditingChord(null);
               setViewMode('list');
-              Alert.alert('Success', 'Chord deleted from library');
+              
+              // Store for undo with permanent deletion handler
+              undoService.storeDeletedChord(
+                chordToDelete,
+                () => {
+                  // Permanent deletion - no action needed (already removed from state)
+                  console.log('✅ Chord permanently deleted:', chordToDelete.name);
+                }
+              );
+              
+              // Show undo toast
+              showUndo(
+                `Deleted "${chordToDelete.name}"`,
+                () => {
+                  const restored = undoService.restoreChord(chordToDelete.id!);
+                  if (restored) {
+                    setChords(prev => [...prev, restored]);
+                    showSuccess(`Restored "${restored.name}"`);
+                  }
+                }
+              );
             } catch (err) {
               console.error('❌ Failed to delete chord:', err);
-              Alert.alert('Error', 'Failed to delete chord. Please try again.');
+              showError('Failed to delete chord. Please try again.');
             }
           }
         }
@@ -507,10 +533,41 @@ export default function ChordManagerScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
+            const deletedCount = selectedChords.size;
+            const deletedChordObjects = chords.filter(c => selectedChords.has(c.id!));
+            
+            // Temporarily remove from UI
             const updatedChords = chords.filter(c => !selectedChords.has(c.id!));
             setChords(updatedChords);
             setSelectedChords(new Set());
-            Alert.alert('Success', `${selectedChords.size} chord(s) deleted`);
+            
+            // Store each deleted chord for undo
+            deletedChordObjects.forEach(chord => {
+              undoService.storeDeletedChord(
+                chord,
+                () => {
+                  console.log('✅ Chord permanently deleted:', chord.name);
+                }
+              );
+            });
+            
+            // Show undo toast
+            showUndo(
+              `Deleted ${deletedCount} chord${deletedCount > 1 ? 's' : ''}`,
+              () => {
+                let restoredCount = 0;
+                deletedChordObjects.forEach(chord => {
+                  const restored = undoService.restoreChord(chord.id!);
+                  if (restored) {
+                    setChords(prev => [...prev, restored]);
+                    restoredCount++;
+                  }
+                });
+                if (restoredCount > 0) {
+                  showSuccess(`Restored ${restoredCount} chord${restoredCount > 1 ? 's' : ''}`);
+                }
+              }
+            );
           }
         }
       ]
