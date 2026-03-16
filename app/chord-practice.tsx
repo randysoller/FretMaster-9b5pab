@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Screen } from '@/components';
 import { Fretboard } from '@/components/feature/Fretboard';
@@ -530,8 +530,14 @@ export default function ChordPracticeScreen() {
   };
 
   return (
-    <Screen edges={['top']}>
-      <View style={styles.container}>
+    <>
+      <Stack.Screen 
+        options={{
+          headerShown: false,
+        }} 
+      />
+      <Screen edges={['top']}>
+        <View style={styles.container}>
         {phase === 'setup' && renderSetupScreen()}
         {phase === 'practice' && renderPracticeScreen()}
         {phase === 'results' && renderResultsScreen()}
@@ -570,8 +576,9 @@ export default function ChordPracticeScreen() {
             </View>
           </Pressable>
         </Modal>
-      </View>
-    </Screen>
+        </View>
+      </Screen>
+    </>
   );
 }
 

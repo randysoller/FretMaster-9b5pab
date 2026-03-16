@@ -21,13 +21,16 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(tabs)';
+    // Define public routes that don't require authentication
+    const publicRoutes = ['sign-in', 'sign-up', 'forgot-password'];
+    const currentRoute = segments[0];
+    const isPublicRoute = publicRoutes.includes(currentRoute as string);
 
-    if (!user && inAuthGroup) {
+    if (!user && !isPublicRoute) {
       // Redirect to sign-in if not authenticated and trying to access protected routes
       router.replace('/sign-in');
-    } else if (user && !inAuthGroup) {
-      // Redirect to tabs if authenticated and on sign-in/sign-up pages
+    } else if (user && isPublicRoute) {
+      // Redirect to tabs if authenticated and on public auth pages
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
@@ -38,7 +41,18 @@ function RootLayoutNav() {
       <Stack.Screen name="sign-up" options={{ headerShown: false }} />
       <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="chord-practice" options={{ headerShown: false }} />
+      <Stack.Screen name="progressions" options={{ headerShown: false }} />
+      <Stack.Screen name="progressions-practice" options={{ headerShown: false }} />
+      <Stack.Screen name="chord-library" options={{ headerShown: false }} />
+      <Stack.Screen name="scale-library" options={{ headerShown: false }} />
+      <Stack.Screen name="triad-library" options={{ headerShown: false }} />
+      <Stack.Screen name="chord-detail" options={{ headerShown: false }} />
+      <Stack.Screen name="chord-manager" options={{ headerShown: false }} />
+      <Stack.Screen name="editor" options={{ headerShown: false }} />
       <Stack.Screen name="profile" options={{ headerShown: false }} />
+      <Stack.Screen name="stats" options={{ headerShown: false }} />
+      <Stack.Screen name="calibration" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
