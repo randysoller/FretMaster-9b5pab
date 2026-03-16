@@ -43,29 +43,24 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
   };
 
   const handleDeletePreset = (id: string, name: string) => {
-    // Wrap in setTimeout to ensure event completes and alert shows properly
-    setTimeout(() => {
-      Alert.alert(
-        'Delete Preset',
-        `Are you sure you want to delete "${name}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              console.log('Deleting preset:', id, name);
-              removePreset(id);
-              if (activeLibraryPresetId === id) {
-                setActiveLibraryPreset(null);
-                clearSelectedChords();
-              }
-            },
+    Alert.alert(
+      'Delete Preset',
+      `Are you sure you want to delete "${name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            removePreset(id);
+            if (activeLibraryPresetId === id) {
+              setActiveLibraryPreset(null);
+              clearSelectedChords();
+            }
           },
-        ],
-        { cancelable: true }
-      );
-    }, 100);
+        },
+      ]
+    );
   };
 
   const handleStartEdit = (id: string, name: string) => {
@@ -172,28 +167,24 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
 
             <View style={styles.presetActions}>
               <Pressable
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
                   handleStartEdit(item.id, item.name);
                 }}
-                onPressIn={(e) => {
-                  if (e && e.stopPropagation) e.stopPropagation();
-                }}
                 style={styles.actionButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <MaterialIcons name="edit" size={18} color={colors.textMuted} />
+                <MaterialIcons name="edit" size={22} color={colors.textMuted} />
               </Pressable>
               <Pressable
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
                   handleDeletePreset(item.id, item.name);
                 }}
-                onPressIn={(e) => {
-                  if (e && e.stopPropagation) e.stopPropagation();
-                }}
-                style={[styles.actionButton, { zIndex: 999 }]}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.actionButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <MaterialIcons name="delete" size={18} color={colors.error} />
+                <MaterialIcons name="delete" size={22} color={colors.error} />
               </Pressable>
             </View>
           </>
@@ -456,7 +447,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   actionButton: {
-    padding: spacing.xs,
+    padding: spacing.sm,
   },
   editContainer: {
     flex: 1,
