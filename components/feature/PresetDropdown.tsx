@@ -167,13 +167,19 @@ export function PresetDropdown({ onClose }: PresetDropdownProps) {
 
             <View style={styles.presetActions}>
               <Pressable
-                onPress={() => handleStartEdit(item.id, item.name)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleStartEdit(item.id, item.name);
+                }}
                 style={styles.actionButton}
               >
                 <MaterialIcons name="edit" size={18} color={colors.textMuted} />
               </Pressable>
               <Pressable
-                onPress={() => handleDeletePreset(item.id, item.name)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeletePreset(item.id, item.name);
+                }}
                 style={styles.actionButton}
               >
                 <MaterialIcons name="delete" size={18} color={colors.error} />
