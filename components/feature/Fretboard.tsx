@@ -212,7 +212,7 @@ export function Fretboard({ chord, size = 'md' }: FretboardProps) {
         const y = getFretY(relFret) - fretSpacing / 2;
         const x1 = getStringX(barre.fromString);
         const x2 = getStringX(barre.toString);
-        const barHeight = config.dotRadius * 1.3; // Thinner bar (was 1.5)
+        const barHeight = config.dotRadius * 1.2; // Thinner bar (was 1.3, now 1.2)
 
         const contactStrings: number[] = [];
         for (let si = barre.fromString; si <= barre.toString; si++) {

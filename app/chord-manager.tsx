@@ -166,6 +166,29 @@ export default function ChordManagerScreen() {
     return matchesSearch && matchesShape && matchesType;
   });
 
+  // Root note detection helper functions
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  
+  const normalizeNote = (note: string) => {
+    return note.replace('b', '#').replace('Db', 'C#').replace('Eb', 'D#')
+      .replace('Gb', 'F#').replace('Ab', 'G#').replace('Bb', 'A#');
+  };
+  
+  const getNoteAtPosition = (stringIndex: number, fret: number): string => {
+    if (fret < 0) return '';
+    const openNote = STANDARD_TUNING[stringIndex];
+    const openNoteIndex = NOTES.indexOf(normalizeNote(openNote));
+    const noteIndex = (openNoteIndex + fret) % 12;
+    return NOTES[noteIndex];
+  };
+  
+  const isRootNote = (stringIndex: number, fret: number, chordName: string): boolean => {
+    const rootNote = chordName.match(/^[A-G][#b]?/)?.[0] || 'C';
+    const normalizedRootNote = normalizeNote(rootNote);
+    const noteAtPosition = getNoteAtPosition(stringIndex, fret);
+    return normalizeNote(noteAtPosition) === normalizedRootNote;
+  };
+
   // Auto-detect barres: find dots on same fret with same finger number
   const detectBarres = (positions: number[], fingers: number[]) => {
     const barres: Array<{ fret: number; fromString: number; toString: number; finger: number }> = [];
@@ -730,27 +753,30 @@ export default function ChordManagerScreen() {
 
             return (
               <React.Fragment key={`preview-barre-${idx}`}>
-                {/* Barre bar - thinner */}
+                {/* Barre bar - thinner (14px down from 16px) */}
                 <View
                   style={{
                     position: 'absolute',
-                    left: fromX - 8,
-                    top: y - 8,
-                    width: barreWidth + 16,
-                    height: 16,
+                    left: fromX - 7,
+                    top: y - 7,
+                    width: barreWidth + 14,
+                    height: 14,
                     backgroundColor: '#D4952A',
-                    borderRadius: 8,
+                    borderRadius: 7,
                   }}
                 />
-                {/* Individual dots on top of barre */}
+                {/* Individual dots on top of barre - with ROOT NOTE DETECTION */}
                 {Array.from({ length: barre.toString - barre.fromString + 1 }).map((_, offset) => {
                   const si = barre.fromString + offset;
                   if (editingChord.positions[si] !== barre.fret) return null;
 
                   const dotX = si * STRING_SPACING;
-                  const thisShape = dotShapes[si];
-                  const thisColor = dotColors[si];
                   const fingerNum = editingChord.fingers[si];
+                  
+                  // CRITICAL: Check if this is a root note - if so, force blue diamond
+                  const isRoot = isRootNote(si, barre.fret, editingChord.name);
+                  const thisShape = isRoot ? 'diamond' : dotShapes[si];
+                  const thisColor = isRoot ? '#4DB8E8' : dotColors[si];
 
                   return (
                     <View
@@ -954,27 +980,30 @@ export default function ChordManagerScreen() {
 
               return (
                 <React.Fragment key={`barre-${idx}`}>
-                  {/* Barre bar - thinner */}
+                  {/* Barre bar - thinner (14px down from 16px) */}
                   <View
                     style={{
                       position: 'absolute',
-                      left: fromX - 8,
-                      top: y - 8,
-                      width: barreWidth + 16,
-                      height: 16,
+                      left: fromX - 7,
+                      top: y - 7,
+                      width: barreWidth + 14,
+                      height: 14,
                       backgroundColor: '#D4952A',
-                      borderRadius: 8,
+                      borderRadius: 7,
                     }}
                   />
-                  {/* Individual dots on top of barre */}
+                  {/* Individual dots on top of barre - with ROOT NOTE DETECTION */}
                   {Array.from({ length: barre.toString - barre.fromString + 1 }).map((_, offset) => {
                     const si = barre.fromString + offset;
                     if (editingChord.positions[si] !== barre.fret) return null;
 
                     const dotX = si * STRING_SPACING;
-                    const thisShape = dotShapes[si];
-                    const thisColor = dotColors[si];
                     const fingerNum = editingChord.fingers[si];
+                    
+                    // CRITICAL: Check if this is a root note - if so, force blue diamond
+                    const isRoot = isRootNote(si, barre.fret, editingChord.name);
+                    const thisShape = isRoot ? 'diamond' : dotShapes[si];
+                    const thisColor = isRoot ? '#4DB8E8' : dotColors[si];
 
                     return (
                       <View
