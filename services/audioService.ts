@@ -10,45 +10,61 @@ class AudioService {
 
   /**
    * Get or create audio context with proper initialization
+   * MUST be called directly from user gesture on mobile
    */
   private async getAudioContext(): Promise<AudioContext> {
-    if (!this.audioContext) {
-      // @ts-ignore - WebKit prefix for Safari
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      this.audioContext = new AudioContextClass();
+    try {
+      if (!this.audioContext) {
+        console.log('🎵 Creating new audio context...');
+        // @ts-ignore - WebKit prefix for Safari
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        
+        if (!AudioContextClass) {
+          throw new Error('Web Audio API not supported in this browser');
+        }
+        
+        this.audioContext = new AudioContextClass();
+        console.log('🎵 Audio context created, state:', this.audioContext.state);
+        
+        // Create master gain node
+        this.masterGain = this.audioContext.createGain();
+        this.masterGain.gain.value = 0.7;
+        console.log('✅ Master gain created');
+        
+        // Create dynamic compressor for automatic volume balancing
+        this.compressor = this.audioContext.createDynamicsCompressor();
+        this.compressor.threshold.value = -24; // dB
+        this.compressor.knee.value = 10;
+        this.compressor.ratio.value = 4;
+        this.compressor.attack.value = 0.003; // 3ms
+        this.compressor.release.value = 0.1; // 100ms
+        console.log('✅ Compressor created');
+        
+        // Connect: masterGain -> compressor -> destination
+        this.masterGain.connect(this.compressor);
+        this.compressor.connect(this.audioContext.destination);
+        console.log('✅ Audio graph connected');
+      }
       
-      console.log('🎵 Audio context created, state:', this.audioContext.state);
-      
-      // Create master gain node
-      this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.value = 0.7;
-      
-      // Create dynamic compressor for automatic volume balancing
-      this.compressor = this.audioContext.createDynamicsCompressor();
-      this.compressor.threshold.value = -24; // dB
-      this.compressor.knee.value = 10;
-      this.compressor.ratio.value = 4;
-      this.compressor.attack.value = 0.003; // 3ms
-      this.compressor.release.value = 0.1; // 100ms
-      
-      // Connect: masterGain -> compressor -> destination
-      this.masterGain.connect(this.compressor);
-      this.compressor.connect(this.audioContext.destination);
-    }
-    
-    // Resume context if suspended (CRITICAL for mobile)
-    if (this.audioContext.state === 'suspended') {
-      console.log('⚠️ Audio context suspended, resuming...');
-      try {
+      // CRITICAL: Resume context if suspended (always check on mobile)
+      if (this.audioContext.state === 'suspended') {
+        console.log('⚠️ Audio context suspended, resuming...');
         await this.audioContext.resume();
         console.log('✅ Audio context resumed, state:', this.audioContext.state);
-      } catch (err) {
-        console.error('❌ Failed to resume audio context:', err);
-        throw err;
+        
+        // Verify it actually resumed
+        if (this.audioContext.state !== 'running') {
+          throw new Error(`Audio context failed to resume. State: ${this.audioContext.state}`);
+        }
       }
+      
+      console.log('✅ Audio context ready, state:', this.audioContext.state);
+      return this.audioContext;
+      
+    } catch (err) {
+      console.error('❌ Audio context initialization failed:', err);
+      throw new Error(`Audio context error: ${err instanceof Error ? err.message : String(err)}`);
     }
-    
-    return this.audioContext;
   }
 
   /**
@@ -216,15 +232,15 @@ class AudioService {
    */
   private async playChordSynthesis(chord: ChordData, duration: number = 2500): Promise<void> {
     try {
+      console.log(`🎸 Starting playChordSynthesis for: ${chord.name}`);
       const ctx = await this.getAudioContext();
+      
+      console.log('🎵 Got audio context, state:', ctx.state);
       
       // Double-check context is running (mobile safety)
       if (ctx.state !== 'running') {
-        console.warn('⚠️ Audio context not running, attempting resume...');
-        await ctx.resume();
-        if (ctx.state !== 'running') {
-          throw new Error('Audio context failed to start');
-        }
+        console.warn('⚠️ Audio context not running after getAudioContext, state:', ctx.state);
+        throw new Error(`Audio context is ${ctx.state}, not running`);
       }
       
       const now = ctx.currentTime;
@@ -249,7 +265,12 @@ class AudioService {
         }
       });
 
-      console.log(`🎸 Professional synthesis: ${chord.name}`);
+      console.log(`🎸 Professional synthesis: ${chord.name}, ${stringsToPlay.length} strings to play`);
+      console.log('🎸 String frequencies:', stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
+
+      if (stringsToPlay.length === 0) {
+        throw new Error('No strings to play in chord');
+      }
 
       // Play each string with advanced synthesis
       stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
@@ -333,13 +354,17 @@ class AudioService {
         this.activeOscillators.push(osc);
       });
 
+      console.log(`✅ Started ${stringsToPlay.length} oscillators for chord ${chord.name}`);
+
       // Cleanup
       setTimeout(() => {
         this.activeOscillators = [];
+        console.log('🧹 Cleaned up oscillators');
       }, duration + 200);
 
     } catch (error) {
-      console.error('Professional chord synthesis failed:', error);
+      console.error('❌ Professional chord synthesis failed:', error);
+      throw error; // Re-throw to propagate to caller
     }
   }
 
@@ -357,22 +382,38 @@ class AudioService {
    * This ensures audio ALWAYS matches the visual chord diagram
    */
   async playChordPreview(chordInput: ChordData | string): Promise<void> {
+    console.log('🎵 playChordPreview called with:', typeof chordInput === 'object' ? chordInput.name : chordInput);
+    
     try {
       // Ensure audio context is ready (CRITICAL for mobile)
-      await this.getAudioContext();
+      console.log('🎵 Initializing audio context...');
+      const ctx = await this.getAudioContext();
+      console.log('✅ Audio context ready, state:', ctx.state);
       
       // Handle ChordData object (preferred)
       if (typeof chordInput === 'object' && chordInput.positions) {
-        console.log(`🎸 Playing chord: ${chordInput.name}`);
+        console.log(`🎸 Playing chord: ${chordInput.name}, positions:`, chordInput.positions);
+        
+        // Validate chord has playable strings
+        const playableStrings = chordInput.positions.filter(f => f >= 0).length;
+        if (playableStrings === 0) {
+          throw new Error('Chord has no playable strings');
+        }
+        
         await this.playChordSynthesis(chordInput, 2200);
+        console.log('✅ Chord playback completed successfully');
         return;
       }
       
       // Handle string input (fallback - not recommended)
       console.warn(`⚠️ playChordPreview() called with string "${chordInput}". Pass ChordData object for accurate playback.`);
+      throw new Error('Invalid input: expected ChordData object');
+      
     } catch (error) {
       console.error('❌ playChordPreview failed:', error);
-      throw error;
+      // Include error details in thrown error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Chord playback error: ${errorMessage}`);
     }
   }
 

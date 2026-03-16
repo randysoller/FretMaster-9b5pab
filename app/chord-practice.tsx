@@ -154,10 +154,13 @@ export default function ChordPracticeScreen() {
   const handlePlayChord = async () => {
     if (currentChord) {
       try {
+        console.log('🎵 Play button pressed for chord:', currentChord.name);
         await audioService.playChordPreview(currentChord);
+        console.log('✅ Chord played successfully');
       } catch (err) {
         console.error('🔴 Chord playback failed:', err);
-        Alert.alert('Audio Error', 'Could not play chord audio. Please try again.');
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        Alert.alert('Audio Error', `Could not play chord audio.\n\nError: ${errorMsg}\n\nPlease try again.`);
       }
     }
   };

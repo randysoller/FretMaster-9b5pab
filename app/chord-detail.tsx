@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, Pressable, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -138,10 +138,13 @@ export default function ChordDetailScreen() {
         <View style={styles.buttons}>
           <Pressable style={styles.playButton} onPress={async () => {
             try {
-              console.log('🎸 Playing chord:', chord.name);
+              console.log('🎸 Play button pressed for chord:', chord.name);
               await audioService.playChordPreview(chord);
+              console.log('✅ Chord played successfully');
             } catch (err) {
               console.error('🔴 Chord playback failed:', err);
+              const errorMsg = err instanceof Error ? err.message : String(err);
+              Alert.alert('Audio Error', `Could not play chord audio.\n\nError: ${errorMsg}\n\nPlease try again.`);
             }
           }}>
             <MaterialIcons name="play-arrow" size={20} color="#000" />
