@@ -583,6 +583,10 @@ export default function ChordManagerScreen() {
         <View style={styles.selectionBar}>
           <Text style={styles.selectionText}>{selectedChords.size} selected</Text>
           <View style={styles.selectionActions}>
+            <Pressable onPress={() => setShowPresetModal(true)} style={styles.selectionButton}>
+              <MaterialIcons name="bookmark" size={18} color={colors.primary} />
+              <Text style={styles.selectionButtonText}>Save to Preset</Text>
+            </Pressable>
             <Pressable onPress={() => setShowBulkMenu(true)} style={styles.selectionButton}>
               <MaterialIcons name="edit" size={18} color={colors.primary} />
               <Text style={styles.selectionButtonText}>Bulk Edit</Text>
@@ -1555,35 +1559,64 @@ export default function ChordManagerScreen() {
               style={styles.modalContent}
               onPress={(e) => e.stopPropagation()}
             >
-              <Text style={styles.modalTitle}>Save Chord to Preset</Text>
+              <Text style={styles.modalTitle}>
+                {viewMode === 'editor' 
+                  ? 'Save Chord to Preset' 
+                  : `Save ${selectedChords.size} Chord${selectedChords.size > 1 ? 's' : ''} to Preset`
+                }
+              </Text>
               
               {presets.length > 0 && (
                 <>
                   <Text style={styles.modalSectionTitle}>Existing Presets</Text>
-                  {presets.map((preset) => (
-                    <Pressable
-                      key={preset.id}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        if (editingChord?.id) {
-                          const updatedChordIds = [...preset.chordIds];
-                          if (!updatedChordIds.includes(editingChord.id)) {
-                            updatedChordIds.push(editingChord.id);
-                            updatePreset(preset.id, updatedChordIds);
-                            Alert.alert('Success', `Added to "${preset.name}"`);
-                            setShowPresetModal(false);
-                          } else {
-                            Alert.alert('Already Added', `This chord is already in "${preset.name}"`);
+                  {presets.map((preset) => {
+                    // Get chord IDs to add based on current context
+                    const getChordIds = () => {
+                      if (viewMode === 'editor' && editingChord?.id) {
+                        return [editingChord.id];
+                      } else if (viewMode === 'list' && selectedChords.size > 0) {
+                        return Array.from(selectedChords);
+                      }
+                      return [];
+                    };
+
+                    return (
+                      <Pressable
+                        key={preset.id}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          const chordIdsToAdd = getChordIds();
+                          if (chordIdsToAdd.length > 0) {
+                            const updatedChordIds = [...preset.chordIds];
+                            let addedCount = 0;
+                            
+                            chordIdsToAdd.forEach(id => {
+                              if (!updatedChordIds.includes(id)) {
+                                updatedChordIds.push(id);
+                                addedCount++;
+                              }
+                            });
+
+                            if (addedCount > 0) {
+                              updatePreset(preset.id, updatedChordIds);
+                              Alert.alert('Success', `Added ${addedCount} chord${addedCount > 1 ? 's' : ''} to "${preset.name}"`);
+                              setShowPresetModal(false);
+                              if (viewMode === 'list') {
+                                setSelectedChords(new Set());
+                              }
+                            } else {
+                              Alert.alert('Already Added', `${chordIdsToAdd.length > 1 ? 'These chords are' : 'This chord is'} already in "${preset.name}"`);
+                            }
                           }
-                        }
-                      }}
-                      style={styles.modalButton}
-                    >
-                      <MaterialIcons name="bookmark" size={20} color={colors.primary} />
-                      <Text style={styles.modalButtonText}>{preset.name}</Text>
-                      <Text style={styles.modalButtonSubtext}>({preset.chordIds.length} chords)</Text>
-                    </Pressable>
-                  ))}
+                        }}
+                        style={styles.modalButton}
+                      >
+                        <MaterialIcons name="bookmark" size={20} color={colors.primary} />
+                        <Text style={styles.modalButtonText}>{preset.name}</Text>
+                        <Text style={styles.modalButtonSubtext}>({preset.chordIds.length} chords)</Text>
+                      </Pressable>
+                    );
+                  })}
                 </>
               )}
 
@@ -1598,11 +1631,26 @@ export default function ChordManagerScreen() {
               <Pressable 
                 onPress={async (e) => {
                   e.stopPropagation();
-                  if (newPresetName.trim() && editingChord?.id) {
-                    await addPreset(newPresetName.trim(), [editingChord.id]);
-                    Alert.alert('Success', `Created preset "${newPresetName.trim()}"`);
-                    setNewPresetName('');
-                    setShowPresetModal(false);
+                  if (newPresetName.trim()) {
+                    // Get chord IDs based on current context
+                    let chordIds: string[] = [];
+                    if (viewMode === 'editor' && editingChord?.id) {
+                      chordIds = [editingChord.id];
+                    } else if (viewMode === 'list' && selectedChords.size > 0) {
+                      chordIds = Array.from(selectedChords);
+                    }
+
+                    if (chordIds.length > 0) {
+                      await addPreset(newPresetName.trim(), chordIds);
+                      Alert.alert('Success', `Created preset "${newPresetName.trim()}" with ${chordIds.length} chord${chordIds.length > 1 ? 's' : ''}`);
+                      setNewPresetName('');
+                      setShowPresetModal(false);
+                      if (viewMode === 'list') {
+                        setSelectedChords(new Set());
+                      }
+                    } else {
+                      Alert.alert('Error', 'No chords selected');
+                    }
                   } else {
                     Alert.alert('Error', 'Please enter a preset name');
                   }
