@@ -154,7 +154,7 @@ export default function ChordDetailScreen() {
                 Alert.alert('Audio Error', `Could not play chord audio.\n\nError: ${errorMsg}\n\nPlease try again.`);
               } finally {
                 // Reset after audio duration (3.7s)
-                setTimeout(() => setIsPlaying(false), 3800);
+                setTimeout(() => setIsPlaying(false), 3400);
               }
             }}>
             <MaterialIcons name={isPlaying ? "hourglass-empty" : "play-arrow"} size={20} color="#000" />
