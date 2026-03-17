@@ -308,6 +308,10 @@ class AudioService {
       const now = ctx.currentTime;
       const durationSec = duration / 1000;
 
+      // Track all nodes for comprehensive cleanup (MUST be declared first!)
+      const allNodesToCleanup: AudioNode[] = [];
+      const reverbNodes: AudioNode[] = [];
+
       // Create custom guitar waveform
       const guitarWave = this.createGuitarWaveform(ctx);
       
@@ -340,10 +344,6 @@ class AudioService {
       if (stringsToPlay.length === 0) {
         throw new Error('No strings to play in chord');
       }
-
-      // Track all nodes for comprehensive cleanup
-      const allNodesToCleanup: AudioNode[] = [];
-      const reverbNodes: AudioNode[] = []; // Separate tracking for reverb nodes
 
       // Play each string with advanced synthesis
       stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
