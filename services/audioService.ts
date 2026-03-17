@@ -656,18 +656,18 @@ class AudioService {
       rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.4;
     }
     
-    // Add smooth fade-out at the very end to prevent pops/static (last 50ms)
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.05);
+    // Add extended smooth fade-out to completely eliminate end static (last 100ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.1);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
-      // Use exponential curve for smoother fade (sounds more natural)
-      const fadeFactor = Math.pow(1 - fadeProgress, 3); // Steeper curve for gentler ending
+      // Use gentler exponential curve for ultra-smooth fade to zero
+      const fadeFactor = Math.pow(1 - fadeProgress, 4); // Even gentler curve
       leftChannel[i] *= fadeFactor;
       rightChannel[i] *= fadeFactor;
     }
     
-    // Ensure absolute silence in last 5ms to eliminate any residual clicks
-    const silenceStart = durationSamples - Math.floor(sampleRate * 0.005);
+    // Ensure absolute silence in last 15ms to eliminate any residual static/clicks
+    const silenceStart = durationSamples - Math.floor(sampleRate * 0.015);
     for (let i = silenceStart; i < durationSamples; i++) {
       leftChannel[i] = 0;
       rightChannel[i] = 0;
