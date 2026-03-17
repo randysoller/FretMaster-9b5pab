@@ -52,6 +52,17 @@ class AudioService {
     
     console.log(`🎸 Synthesizing ${stringsToPlay.length} strings:`, stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
     
+    // Generate random harmonic phases per string (eliminates initial transient spike)
+    const harmonicPhases: number[][] = [];
+    stringsToPlay.forEach(() => {
+      const phases = [Math.PI / 2]; // Fundamental always at zero-crossing
+      // Randomize phases for harmonics 2-8 to prevent constructive interference
+      for (let h = 2; h <= 8; h++) {
+        phases.push(Math.random() * Math.PI * 2);
+      }
+      harmonicPhases.push(phases);
+    });
+    
     // Synthesize each string
     stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
       const strumDelay = arrayIndex * 0.012; // 12ms between strings (natural strum)
@@ -66,33 +77,37 @@ class AudioService {
       const leftGain = panValue <= 0 ? 1 : 1 - panValue;
       const rightGain = panValue >= 0 ? 1 : 1 + panValue;
       
+      // High-pass filter state (eliminates sub-audible rumble)
+      let prevSample = 0;
+      const hpfCoeff = 0.98; // Cutoff ~15 Hz
+      
       // Generate samples for this string
       for (let i = startSample; i < durationSamples; i++) {
         const t = (i - startSample) / sampleRate;
         
         // Professional ADSR envelope matching acoustic guitar behavior
         let envelope = 0;
-        if (t < 0.002) {
-          // Pre-roll silence - absolute zero to eliminate any artifacts (2ms)
+        if (t < 0.010) {
+          // Extended pre-roll silence - absolute zero to eliminate any artifacts (10ms)
           envelope = 0;
-        } else if (t < 0.007) {
-          // Ultra-smooth exponential fade-in from absolute zero (5ms)
-          const fadeProgress = (t - 0.002) / 0.005;
-          // Exponential curve for natural attack (starts very gently)
-          envelope = baseVolume * Math.pow(fadeProgress, 2.5) * 0.2;
-        } else if (t < 0.015) {
+        } else if (t < 0.017) {
+          // Ultra-smooth exponential fade-in from absolute zero (7ms)
+          const fadeProgress = (t - 0.010) / 0.007;
+          // Even gentler exponential curve for natural attack (power 3.5 - starts extremely smoothly)
+          envelope = baseVolume * Math.pow(fadeProgress, 3.5) * 0.2;
+        } else if (t < 0.025) {
           // Attack continuation (8ms - realistic pick strike)
-          const attackProgress = (t - 0.007) / 0.008;
+          const attackProgress = (t - 0.017) / 0.008;
           envelope = (0.2 + (attackProgress * 0.8)) * baseVolume;
-        } else if (t < 0.135) {
+        } else if (t < 0.145) {
           // Decay to sustain (120ms - acoustic guitar characteristic)
-          const decayProgress = (t - 0.015) / 0.12;
+          const decayProgress = (t - 0.025) / 0.12;
           envelope = baseVolume - (decayProgress * baseVolume * 0.18);
         } else {
           // Sustain + Natural exponential release (realistic acoustic guitar)
           const sustainLevel = baseVolume * 0.82;
-          const timeSinceSustain = t - 0.135;
-          const decayTime = duration - 0.135;
+          const timeSinceSustain = t - 0.145;
+          const decayTime = duration - 0.145;
           
           // Natural guitar decay: frequency-dependent damping
           // Higher strings decay slightly faster (realistic physics)
@@ -109,21 +124,31 @@ class AudioService {
         }
         
         // Professional guitar waveform with physically-modeled harmonic content
-        // CRITICAL: Phase offset ensures waveform starts at zero-crossing (eliminates initial click)
-        const phaseOffset = Math.PI / 2; // Start at sine wave zero-crossing
-        const phase = 2 * Math.PI * frequency * t + phaseOffset;
+        // Each harmonic has randomized phase to prevent initial transient spike
+        const phase = 2 * Math.PI * frequency * t;
         let sample = 0;
         
-        // Fundamental and harmonics with time-varying amplitudes (realistic string behavior)
+        // Fundamental and harmonics with time-varying amplitudes AND staggered fade-in (realistic string behavior)
         const timeFactor = Math.min(1, t / 0.3); // Harmonics settle over first 300ms
-        sample += Math.sin(phase) * 1.0;                                    // Fundamental (always present)
-        sample += Math.sin(phase * 2) * (0.5 * (1 + timeFactor * 0.1));    // 2nd harmonic (grows slightly)
-        sample += Math.sin(phase * 3) * (0.32 * (1 - timeFactor * 0.15));  // 3rd (fades slightly)
-        sample += Math.sin(phase * 4) * (0.18 * (1 - timeFactor * 0.2));   // 4th
-        sample += Math.sin(phase * 5) * (0.10 * (1 - timeFactor * 0.25));  // 5th
-        sample += Math.sin(phase * 6) * (0.05 * (1 - timeFactor * 0.3));   // 6th
-        sample += Math.sin(phase * 7) * (0.025 * (1 - timeFactor * 0.35)); // 7th
-        sample += Math.sin(phase * 8) * (0.012 * (1 - timeFactor * 0.4));  // 8th (adds sparkle)
+        
+        // Harmonic fade-in stagger: higher harmonics take slightly longer to develop (realistic pluck physics)
+        const h1Stagger = Math.min(1, Math.max(0, (t - 0.010) / 0.005)); // Fundamental: immediate
+        const h2Stagger = Math.min(1, Math.max(0, (t - 0.012) / 0.006)); // 2nd: 2ms delay
+        const h3Stagger = Math.min(1, Math.max(0, (t - 0.014) / 0.007)); // 3rd: 4ms delay
+        const h4Stagger = Math.min(1, Math.max(0, (t - 0.016) / 0.008)); // 4th: 6ms delay
+        const h5Stagger = Math.min(1, Math.max(0, (t - 0.018) / 0.009)); // 5th: 8ms delay
+        const h6Stagger = Math.min(1, Math.max(0, (t - 0.020) / 0.010)); // 6th: 10ms delay
+        const h7Stagger = Math.min(1, Math.max(0, (t - 0.022) / 0.011)); // 7th: 12ms delay
+        const h8Stagger = Math.min(1, Math.max(0, (t - 0.024) / 0.012)); // 8th: 14ms delay
+        
+        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.0 * h1Stagger;                                    // Fundamental
+        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.5 * (1 + timeFactor * 0.1)) * h2Stagger;    // 2nd harmonic
+        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.32 * (1 - timeFactor * 0.15)) * h3Stagger;  // 3rd
+        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.18 * (1 - timeFactor * 0.2)) * h4Stagger;   // 4th
+        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.10 * (1 - timeFactor * 0.25)) * h5Stagger;  // 5th
+        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.05 * (1 - timeFactor * 0.3)) * h6Stagger;   // 6th
+        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.025 * (1 - timeFactor * 0.35)) * h7Stagger; // 7th
+        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.012 * (1 - timeFactor * 0.4)) * h8Stagger;  // 8th
         
         // Apply envelope
         sample *= envelope;
@@ -134,9 +159,13 @@ class AudioService {
         const toneBalance = 0.65 + (brightnessDecay * 0.35); // 65% to 100% brightness range
         sample *= toneBalance;
         
+        // Apply high-pass filter (removes sub-audible rumble that causes static artifacts)
+        const filteredSample = sample - (hpfCoeff * prevSample);
+        prevSample = sample;
+        
         // Add to stereo channels with panning
-        leftChannel[i] += sample * leftGain;
-        rightChannel[i] += sample * rightGain;
+        leftChannel[i] += filteredSample * leftGain;
+        rightChannel[i] += filteredSample * rightGain;
       }
     });
     
