@@ -604,10 +604,10 @@ class AudioService {
           // Decay (75ms)
           envelope = baseVolume - ((t - 0.005) / 0.075) * (baseVolume * 0.25);
         } else {
-          // Sustain + Release (exponential decay to near-zero)
+          // Sustain + Release (aggressive exponential decay to absolute zero)
           const sustainLevel = baseVolume * 0.75;
-          const decayFactor = (t - 0.08) / (duration * 0.25); // Faster decay
-          envelope = sustainLevel * Math.exp(-decayFactor * 3); // Reaches ~0.005 by end
+          const decayFactor = (t - 0.08) / (duration * 0.25);
+          envelope = sustainLevel * Math.exp(-decayFactor * 5); // Aggressive decay reaches ~0.0001 by end
         }
         
         // Guitar waveform with harmonics (same harmonic content as web version)
@@ -656,18 +656,25 @@ class AudioService {
       rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.4;
     }
     
+    // Apply threshold gate: zero out any samples below audible threshold (eliminates pre-static)
+    const gateThreshold = 0.0001;
+    for (let i = 0; i < durationSamples; i++) {
+      if (Math.abs(leftChannel[i]) < gateThreshold) leftChannel[i] = 0;
+      if (Math.abs(rightChannel[i]) < gateThreshold) rightChannel[i] = 0;
+    }
+    
     // Add extended smooth fade-out to completely eliminate end static (last 100ms)
     const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.1);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
-      // Use gentler exponential curve for ultra-smooth fade to zero
-      const fadeFactor = Math.pow(1 - fadeProgress, 4); // Even gentler curve
+      // Use ultra-gentle exponential curve for absolute-zero fade
+      const fadeFactor = Math.pow(1 - fadeProgress, 6); // Extremely gentle curve
       leftChannel[i] *= fadeFactor;
       rightChannel[i] *= fadeFactor;
     }
     
-    // Ensure absolute silence in last 15ms to eliminate any residual static/clicks
-    const silenceStart = durationSamples - Math.floor(sampleRate * 0.015);
+    // Ensure absolute silence in last 30ms to eliminate any residual static/clicks
+    const silenceStart = durationSamples - Math.floor(sampleRate * 0.03);
     for (let i = silenceStart; i < durationSamples; i++) {
       leftChannel[i] = 0;
       rightChannel[i] = 0;
