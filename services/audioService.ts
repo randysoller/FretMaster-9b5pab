@@ -30,7 +30,7 @@ class AudioService {
 
   /**
    * Generate WAV file in memory with professional guitar synthesis
-   * Based on physical modeling research - realistic acoustic guitar sustain and harmonics
+   * OPTIMIZED: Percussive pluck attack, NOT trumpet-like sustain
    */
   private generateGuitarWAV(chord: ChordData, duration: number = 2.0): string {
     const sampleRate = 44100; // CD quality
@@ -70,10 +70,10 @@ class AudioService {
       
       // Velocity variation (softer on first/last strings) + realistic guitar dynamics
       const velocityCurve = arrayIndex === 0 || arrayIndex === stringsToPlay.length - 1 ? 0.85 : 1.0;
-      // INCREASED base volume for louder, fuller sound (25% boost)
+      // Base volume optimized for guitar (NOT trumpet)
       const baseVolume = (stringIndex > 3 ? 0.48 : 0.43) * velocityCurve;
       
-      // Tighter stereo field for more centered power (less thin)
+      // Tighter stereo field for more centered power
       const panValue = stringIndex < 3 ? -0.12 + (stringIndex * 0.06) : (stringIndex - 3) * 0.09;
       const leftGain = panValue <= 0 ? 1 : 1 - panValue;
       const rightGain = panValue >= 0 ? 1 : 1 + panValue;
@@ -86,98 +86,122 @@ class AudioService {
       for (let i = startSample; i < durationSamples; i++) {
         const t = (i - startSample) / sampleRate;
         
-        // Professional ADSR envelope matching acoustic guitar behavior
+        // PERCUSSIVE GUITAR ENVELOPE (NOT trumpet-like sustain)
         let envelope = 0;
-        if (t < 0.010) {
-          // Extended pre-roll silence - absolute zero to eliminate any artifacts (10ms)
+        if (t < 0.002) {
+          // Brief pre-roll silence (2ms - minimal)
           envelope = 0;
-        } else if (t < 0.020) {
-          // Ultra-smooth exponential fade-in from absolute zero (10ms - gentler for warmth)
-          const fadeProgress = (t - 0.010) / 0.010;
-          // Ultra-gentle exponential curve for warm, natural attack (power 4.0 - maximum smoothness)
-          envelope = baseVolume * Math.pow(fadeProgress, 4.0) * 0.2;
-        } else if (t < 0.028) {
-          // Attack continuation (8ms - realistic pick strike)
-          const attackProgress = (t - 0.020) / 0.008;
-          envelope = (0.2 + (attackProgress * 0.8)) * baseVolume;
-        } else if (t < 0.148) {
-          // Decay to sustain (120ms - acoustic guitar characteristic)
-          const decayProgress = (t - 0.028) / 0.12;
-          envelope = baseVolume - (decayProgress * baseVolume * 0.18);
+        } else if (t < 0.008) {
+          // SHARP PLUCK ATTACK - percussive like guitar pick hitting strings (6ms)
+          const attackProgress = (t - 0.002) / 0.006;
+          // Sharper exponential curve for percussive guitar attack (power 1.8 - NOT trumpet-smooth)
+          envelope = baseVolume * Math.pow(attackProgress, 1.8);
+        } else if (t < 0.025) {
+          // Immediate fast decay after pluck (17ms - guitar strings settle quickly)
+          const decayProgress = (t - 0.008) / 0.017;
+          // Fast exponential drop (NOT sustained like trumpet)
+          envelope = baseVolume * (1.0 - (decayProgress * 0.35));
+        } else if (t < 0.080) {
+          // Secondary decay to sustain (55ms - faster than trumpet, like plucked string)
+          const decayProgress = (t - 0.025) / 0.055;
+          envelope = baseVolume * 0.65 * (1.0 - (decayProgress * 0.15));
         } else {
-          // Sustain + Natural exponential release (realistic acoustic guitar)
-          const sustainLevel = baseVolume * 0.82;
-          const timeSinceSustain = t - 0.148;
-          const decayTime = duration - 0.148;
+          // Natural plucked string decay - FASTER than trumpet (guitar strings don't sustain like brass)
+          const sustainLevel = baseVolume * 0.55; // LOWER sustain (not trumpet-like)
+          const timeSinceSustain = t - 0.080;
+          const decayTime = duration - 0.080;
           
-          // Natural guitar decay: frequency-dependent damping
-          // Higher strings decay slightly faster (realistic physics)
-          const dampingFactor = stringIndex > 3 ? 2.2 : 2.5;
+          // AGGRESSIVE guitar string damping (NOT sustained like trumpet)
+          // Higher strings decay faster (realistic physics)
+          const dampingFactor = stringIndex > 3 ? 3.2 : 3.8; // INCREASED damping (guitar, not trumpet)
           const decayRatio = timeSinceSustain / decayTime;
           
-          // Exponential decay with realistic damping
+          // Fast exponential decay matching plucked guitar strings
           envelope = sustainLevel * Math.exp(-decayRatio * dampingFactor);
           
-          // Subtle body resonance - adds warmth without wah effect (REDUCED)
-          const resonanceFreq = 2.5; // Hz - typical guitar body resonance
+          // Minimal body resonance (guitar strings, not trumpet vibrato)
+          const resonanceFreq = 2.8; // Hz - guitar body resonance
           const lowFreqResonance = Math.sin(2 * Math.PI * resonanceFreq * t);
-          const resonanceMod = 1 + (lowFreqResonance * 0.012); // Reduced to 0.012 (from 0.035) - minimal modulation
+          const resonanceMod = 1 + (lowFreqResonance * 0.008); // Minimal (not trumpet vibrato)
           envelope *= resonanceMod;
         }
         
-        // Professional guitar waveform with physically-modeled harmonic content
-        // Each harmonic has randomized phase to prevent initial transient spike
+        // GUITAR-LIKE HARMONIC SYNTHESIS (NOT trumpet-like)
+        // Key differences from trumpet:
+        // 1. FAST harmonic decay (plucked string physics, not sustained brass)
+        // 2. Stronger upper harmonics during attack (percussive pick strike)
+        // 3. Rapid high-frequency rolloff (string damping, not brass resonance)
         const phase = 2 * Math.PI * frequency * t;
         let sample = 0;
         
-        // CLEAN HARMONIC SYNTHESIS - No wah/sweep artifacts
-        // All harmonics start together like a real plucked string
-        // Subtle, natural decay without time-varying sweep effects
-        const timeFactor = Math.min(1, t / 0.5); // Gentle harmonic settling (reduced modulation)
+        // Time-based harmonic decay (AGGRESSIVE - guitar strings, not trumpet)
+        const attackPhase = Math.min(1, t / 0.015); // First 15ms - percussive attack
+        const decayPhase = Math.min(1, t / 0.3);    // Fast 300ms decay (not trumpet sustain)
         
-        // OPTIMIZED WARM HARMONICS - authentic acoustic guitar tone (NO STAGGER):
-        // - Powerful fundamental (1.25) for rich low-end warmth
-        // - Strong 2nd/3rd harmonics (body and thickness)
-        // - Softer upper harmonics (reduced harshness)
-        // - Subtle natural decay (no sweep/wah effect)
-        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.25;                                  // Fundamental (warm, powerful)
-        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.72 * (1 - timeFactor * 0.03)); // 2nd harmonic (body) - gentle decay
-        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.48 * (1 - timeFactor * 0.04)); // 3rd (thickness)
-        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.26 * (1 - timeFactor * 0.06)); // 4th (richness)
-        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.13 * (1 - timeFactor * 0.08)); // 5th (reduced)
-        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.06 * (1 - timeFactor * 0.10)); // 6th (softer)
-        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.03 * (1 - timeFactor * 0.12)); // 7th (gentle)
-        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.01 * (1 - timeFactor * 0.15)); // 8th (minimal)
+        // GUITAR-SPECIFIC HARMONIC CONTENT:
+        // - Moderate fundamental (not trumpet-dominant)
+        // - Bright attack harmonics (pick strike)
+        // - FAST decay on upper harmonics (plucked string physics)
+        
+        // Fundamental - moderate strength (not trumpet-powerful)
+        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.0;
+        
+        // 2nd harmonic - strong during attack, decays moderately
+        const h2Decay = 1 - (decayPhase * 0.25);
+        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.65 * h2Decay);
+        
+        // 3rd harmonic - bright attack, faster decay (guitar characteristic)
+        const h3Decay = 1 - (decayPhase * 0.35);
+        const h3Attack = 1 + (attackPhase * 0.4); // Boost during pick attack
+        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.52 * h3Decay * h3Attack);
+        
+        // 4th harmonic - percussive attack emphasis, rapid decay
+        const h4Decay = 1 - (decayPhase * 0.50);
+        const h4Attack = 1 + (attackPhase * 0.6); // Strong pick attack brightness
+        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.35 * h4Decay * h4Attack);
+        
+        // 5th-8th harmonics - FAST decay (guitar strings lose high frequencies quickly)
+        const h5Decay = Math.pow(1 - decayPhase, 2.0); // Exponential fast decay
+        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.22 * h5Decay * (1 + attackPhase * 0.5));
+        
+        const h6Decay = Math.pow(1 - decayPhase, 2.5);
+        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.12 * h6Decay * (1 + attackPhase * 0.4));
+        
+        const h7Decay = Math.pow(1 - decayPhase, 3.0);
+        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.06 * h7Decay * (1 + attackPhase * 0.3));
+        
+        const h8Decay = Math.pow(1 - decayPhase, 3.5);
+        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.03 * h8Decay * (1 + attackPhase * 0.2));
         
         // Apply envelope
         sample *= envelope;
         
-        // PROFESSIONAL WARM EQ PROCESSING (analog-modeled tone shaping)
-        // Multi-band EQ optimized for warm, full-bodied acoustic guitar tone
+        // GUITAR-SPECIFIC EQ PROCESSING (NOT trumpet-like)
+        // Key differences: Less low-end dominance, faster high-frequency decay
         
-        // 1. Low-shelf boost (60-200Hz) - INCREASED warmth and depth
-        const lowShelfBoost = frequency < 200 ? 1.38 : 1.0;
+        // 1. Moderate low-end (guitar, not bass-heavy trumpet)
+        const lowShelfBoost = frequency < 200 ? 1.15 : 1.0;
         
-        // 2. Low-mid boost (200-500Hz) - ENHANCED body and thickness
-        const lowMidBoost = (frequency >= 200 && frequency < 500) ? 1.32 : 1.0;
+        // 2. Balanced low-mids (guitar body, not trumpet brass)
+        const lowMidBoost = (frequency >= 200 && frequency < 500) ? 1.22 : 1.0;
         
-        // 3. Mid-range boost (500-1000Hz) - NEW: adds fullness and reduces thinness
-        const midRangeBoost = (frequency >= 500 && frequency < 1000) ? 1.18 : 1.0;
+        // 3. Enhanced mid-range (guitar presence, not trumpet mellowness)
+        const midRangeBoost = (frequency >= 500 && frequency < 1500) ? 1.28 : 1.0;
         
-        // 4. Gentle presence lift (2.5-3.5kHz) - REDUCED harshness, maintains clarity
-        const presenceLift = (frequency >= 2500 && frequency < 3500) ? 1.06 : 1.0;
+        // 4. Strong presence lift (guitar pick attack clarity)
+        const presenceLift = (frequency >= 2000 && frequency < 4500) ? 1.18 : 1.0;
         
-        // 5. High-frequency rolloff above 5kHz - ELIMINATES harshness
-        const highRolloff = frequency > 5000 ? 0.88 : 1.0;
+        // 5. Gentle high-frequency rolloff (guitar natural damping)
+        const highRolloff = frequency > 6000 ? 0.85 : 1.0;
         
-        // 6. Natural high-frequency damping (warm acoustic character)
-        const brightnessDecay = Math.exp(-t * 0.75); // Increased damping for warmth (0.5 → 0.75)
-        const toneBalance = 0.68 + (brightnessDecay * 0.32); // 68% to 100% (warmer)
+        // 6. AGGRESSIVE high-frequency damping (plucked strings lose brightness FAST)
+        const brightnessDecay = Math.exp(-t * 1.5); // FAST decay (guitar, not sustained trumpet)
+        const toneBalance = 0.55 + (brightnessDecay * 0.45); // 55% to 100% (rapid brightness loss)
         
         // Apply comprehensive EQ processing
         sample *= lowShelfBoost * lowMidBoost * midRangeBoost * presenceLift * highRolloff * toneBalance;
         
-        // Apply high-pass filter (removes sub-audible rumble that causes static artifacts)
+        // Apply high-pass filter (removes sub-audible rumble)
         const filteredSample = sample - (hpfCoeff * prevSample);
         prevSample = sample;
         
@@ -187,12 +211,12 @@ class AudioService {
       }
     });
     
-    // Dynamic compression + DC offset removal to eliminate static
+    // Dynamic compression + DC offset removal
     let maxPeak = 0;
     let leftDCOffset = 0;
     let rightDCOffset = 0;
     
-    // Calculate DC offset (average value that causes static)
+    // Calculate DC offset
     for (let i = 0; i < durationSamples; i++) {
       leftDCOffset += leftChannel[i];
       rightDCOffset += rightChannel[i];
@@ -201,32 +225,32 @@ class AudioService {
     leftDCOffset /= durationSamples;
     rightDCOffset /= durationSamples;
     
-    // Remove DC offset and apply gentle compression (preserve dynamics for warmth)
+    // Remove DC offset and apply gentle compression
     const compressionRatio = maxPeak > 0.85 ? 0.85 / maxPeak : 1.0;
     for (let i = 0; i < durationSamples; i++) {
-      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 1.85; // INCREASED final gain (25% boost)
+      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 1.85;
       rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.85;
     }
     
-    // Apply noise gate: zero out samples below audible threshold (eliminates floor noise)
+    // Apply noise gate
     const gateThreshold = 0.00008;
     for (let i = 0; i < durationSamples; i++) {
       if (Math.abs(leftChannel[i]) < gateThreshold) leftChannel[i] = 0;
       if (Math.abs(rightChannel[i]) < gateThreshold) rightChannel[i] = 0;
     }
     
-    // Natural fade-out at the very end (last 120ms) - mimics natural string damping
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.12);
+    // Natural fade-out (last 80ms) - guitar strings dampen naturally
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.08);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
-      // Smooth exponential curve matching natural acoustic guitar decay
-      const fadeFactor = Math.pow(1 - fadeProgress, 4);
+      // Fast exponential fade (plucked string physics)
+      const fadeFactor = Math.pow(1 - fadeProgress, 3);
       leftChannel[i] *= fadeFactor;
       rightChannel[i] *= fadeFactor;
     }
     
-    // Final silence window (last 25ms) for absolute clean ending
-    const silenceStart = durationSamples - Math.floor(sampleRate * 0.025);
+    // Final silence window (last 20ms) for clean ending
+    const silenceStart = durationSamples - Math.floor(sampleRate * 0.020);
     for (let i = silenceStart; i < durationSamples; i++) {
       leftChannel[i] = 0;
       rightChannel[i] = 0;
