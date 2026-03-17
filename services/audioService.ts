@@ -382,8 +382,12 @@ class AudioService {
         stringGain.gain.setValueAtTime(0, startTime);
         stringGain.gain.linearRampToValueAtTime(baseVolume, startTime + 0.003); // 3ms attack (pick)
         stringGain.gain.linearRampToValueAtTime(baseVolume * 0.75, startTime + 0.08); // 80ms decay
-        stringGain.gain.setValueAtTime(baseVolume * 0.75, startTime + 0.08); // Sustain
-        stringGain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec); // Natural decay
+        // Exponential decay from sustain to near-zero over the entire duration
+        const sustainStart = startTime + 0.08;
+        const sustainDuration = durationSec - 0.08;
+        stringGain.gain.setValueAtTime(baseVolume * 0.75, sustainStart);
+        // Smooth exponential decay - reaches 0.001 at end (inaudible)
+        stringGain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec);
 
         // === FORMANT FILTERS (guitar body character) ===
         const formants = this.createFormantFilters(ctx, frequency);
@@ -429,11 +433,6 @@ class AudioService {
           pickNoise.start(startTime);
           allNodesToCleanup.push(pickNoise, pickGain);
         }
-
-        // Add explicit fade-out at the end to prevent clicks (last 50ms)
-        const fadeOutStart = startTime + durationSec - 0.05;
-        stringGain.gain.setValueAtTime(stringGain.gain.value, fadeOutStart);
-        stringGain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
         
         // Start main oscillator
         osc.start(startTime);
