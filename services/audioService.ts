@@ -594,23 +594,28 @@ class AudioService {
         
         // Professional ADSR envelope matching acoustic guitar behavior
         let envelope = 0;
-        if (t < 0.001) {
-          // Ultra-fast fade-in to prevent clicks (1ms)
-          envelope = (t / 0.001) * baseVolume * 0.15;
-        } else if (t < 0.008) {
-          // Attack (7ms - realistic pick strike)
-          const attackProgress = (t - 0.001) / 0.007;
-          envelope = (0.15 + (attackProgress * 0.85)) * baseVolume;
-        } else if (t < 0.12) {
-          // Decay to sustain (110ms - acoustic guitar characteristic)
-          const decayProgress = (t - 0.008) / 0.112;
+        if (t < 0.002) {
+          // Pre-roll silence - absolute zero to eliminate any artifacts (2ms)
+          envelope = 0;
+        } else if (t < 0.007) {
+          // Ultra-smooth exponential fade-in from absolute zero (5ms)
+          const fadeProgress = (t - 0.002) / 0.005;
+          // Exponential curve for natural attack (starts very gently)
+          envelope = baseVolume * Math.pow(fadeProgress, 2.5) * 0.2;
+        } else if (t < 0.015) {
+          // Attack continuation (8ms - realistic pick strike)
+          const attackProgress = (t - 0.007) / 0.008;
+          envelope = (0.2 + (attackProgress * 0.8)) * baseVolume;
+        } else if (t < 0.135) {
+          // Decay to sustain (120ms - acoustic guitar characteristic)
+          const decayProgress = (t - 0.015) / 0.12;
           envelope = baseVolume - (decayProgress * baseVolume * 0.18);
         } else {
           // Sustain + Natural exponential release (realistic 10-15s total sustain for acoustic guitar)
           // Using gentler decay exponent for authentic guitar ring-out
           const sustainLevel = baseVolume * 0.82;
-          const timeSinceSustain = t - 0.12;
-          const decayTime = duration - 0.12;
+          const timeSinceSustain = t - 0.135;
+          const decayTime = duration - 0.135;
           
           // Natural guitar decay: frequency-dependent damping
           // Higher strings decay slightly faster (realistic physics)
@@ -627,7 +632,9 @@ class AudioService {
         }
         
         // Professional guitar waveform with physically-modeled harmonic content
-        const phase = 2 * Math.PI * frequency * t;
+        // CRITICAL: Phase offset ensures waveform starts at zero-crossing (eliminates initial click)
+        const phaseOffset = Math.PI / 2; // Start at sine wave zero-crossing
+        const phase = 2 * Math.PI * frequency * t + phaseOffset;
         let sample = 0;
         
         // Fundamental and harmonics with time-varying amplitudes (realistic string behavior)
