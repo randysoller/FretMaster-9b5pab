@@ -6,6 +6,9 @@ import { Audio } from 'expo-av';
 class AudioService {
   private audioContext: AudioContext | null = null;
   private activeOscillators: OscillatorNode[] = [];
+  private activeNodes: AudioNode[] = []; // Track ALL active nodes for cleanup
+  private cleanupTimers: NodeJS.Timeout[] = []; // Track cleanup timers
+  private isPlaying: boolean = false; // Prevent overlapping playbacks
   private metronomeInterval: NodeJS.Timeout | null = null;
   private masterGain: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
@@ -240,12 +243,58 @@ class AudioService {
   }
 
   /**
+   * Force stop all active audio immediately
+   */
+  private forceStopAllAudio(): void {
+    console.log('🛑 Force stopping all active audio...');
+    
+    // Stop all oscillators
+    this.activeOscillators.forEach(osc => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch (e) {
+        // Already stopped/disconnected
+      }
+    });
+    this.activeOscillators = [];
+    
+    // Disconnect all nodes
+    this.activeNodes.forEach(node => {
+      try {
+        node.disconnect();
+      } catch (e) {
+        // Already disconnected
+      }
+    });
+    this.activeNodes = [];
+    
+    // Clear all cleanup timers
+    this.cleanupTimers.forEach(timer => clearTimeout(timer));
+    this.cleanupTimers = [];
+    
+    this.isPlaying = false;
+    console.log('✅ All audio forcefully stopped');
+  }
+
+  /**
    * Play chord using professional acoustic guitar synthesis
    * Calculates exact frequencies from chord fret positions
    */
   private async playChordSynthesis(chord: ChordData, duration: number = 2500): Promise<void> {
     try {
       console.log(`🎸 Starting playChordSynthesis for: ${chord.name}`);
+      
+      // CRITICAL: Prevent overlapping playbacks
+      if (this.isPlaying) {
+        console.log('⚠️ Already playing, stopping previous audio...');
+        this.forceStopAllAudio();
+        // Small delay to ensure cleanup completes
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      this.isPlaying = true;
+      
       const ctx = await this.getAudioContext();
       
       console.log('🎵 Got audio context, state:', ctx.state);
@@ -268,6 +317,13 @@ class AudioService {
       reverbGain.gain.value = 0.25; // 25% wet signal
       const dryGain = ctx.createGain();
       dryGain.gain.value = 0.75; // 75% dry signal
+      
+      // Track reverb nodes
+      if (reverb) {
+        reverbNodes.push(reverb, reverbGain);
+      }
+      reverbNodes.push(dryGain);
+      allNodesToCleanup.push(...reverbNodes);
 
       // Calculate which strings to play
       const stringsToPlay: Array<{ stringIndex: number; frequency: number }> = [];
@@ -285,8 +341,9 @@ class AudioService {
         throw new Error('No strings to play in chord');
       }
 
-      // Track all nodes for cleanup
+      // Track all nodes for comprehensive cleanup
       const allNodesToCleanup: AudioNode[] = [];
+      const reverbNodes: AudioNode[] = []; // Separate tracking for reverb nodes
 
       // Play each string with advanced synthesis
       stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
@@ -375,8 +432,15 @@ class AudioService {
         const stopTime = startTime + durationSec;
         osc.stop(stopTime);
         
-        // Auto-disconnect all nodes after playback to prevent audio leaks
+        // Track oscillator and all nodes
+        this.activeOscillators.push(osc);
+        allNodesToCleanup.push(osc, stringGain, mainFilter, panner, ...formants);
+        
+        // Reliable cleanup via onended (browser-dependent)
+        let cleanupDone = false;
         osc.onended = () => {
+          if (cleanupDone) return;
+          cleanupDone = true;
           try {
             osc.disconnect();
             formants.forEach(f => f.disconnect());
@@ -388,24 +452,39 @@ class AudioService {
             // Already disconnected
           }
         };
-        
-        this.activeOscillators.push(osc);
-        allNodesToCleanup.push(osc, stringGain, mainFilter, panner, ...formants);
       });
 
       console.log(`✅ Started ${stringsToPlay.length} oscillators for chord ${chord.name}`);
+      
+      // Store all nodes for tracking
+      this.activeNodes.push(...allNodesToCleanup);
 
-      // Complete cleanup after playback finishes
-      setTimeout(() => {
+      // CRITICAL: Comprehensive cleanup with multiple safeguards
+      const cleanupAll = () => {
         try {
-          // Disconnect reverb nodes
-          if (reverb) {
-            reverb.disconnect();
-            reverbGain.disconnect();
-          }
-          dryGain.disconnect();
+          console.log('🧹 Starting comprehensive audio cleanup...');
           
-          // Disconnect any remaining nodes
+          // 1. Stop and disconnect all oscillators
+          this.activeOscillators.forEach(osc => {
+            try {
+              osc.stop();
+              osc.disconnect();
+            } catch (e) {
+              // Already stopped/disconnected
+            }
+          });
+          this.activeOscillators = [];
+          
+          // 2. Disconnect reverb chain
+          reverbNodes.forEach(node => {
+            try {
+              node.disconnect();
+            } catch (e) {
+              // Already disconnected
+            }
+          });
+          
+          // 3. Disconnect ALL tracked nodes
           allNodesToCleanup.forEach(node => {
             try {
               node.disconnect();
@@ -414,13 +493,34 @@ class AudioService {
             }
           });
           
-          // Clear oscillator references
-          this.activeOscillators = [];
-          console.log('🧹 Complete audio cleanup finished');
+          // 4. Clear tracked nodes
+          this.activeNodes = [];
+          
+          // 5. Reset playing flag
+          this.isPlaying = false;
+          
+          console.log('✅ Complete audio cleanup finished');
         } catch (error) {
-          console.warn('Cleanup warning:', error);
+          console.warn('⚠️ Cleanup warning:', error);
+          // Force reset even if cleanup failed
+          this.activeOscillators = [];
+          this.activeNodes = [];
+          this.isPlaying = false;
         }
-      }, duration + 100);
+      };
+      
+      // Set up cleanup timer (primary cleanup mechanism)
+      const cleanupTimer = setTimeout(cleanupAll, duration + 100);
+      this.cleanupTimers.push(cleanupTimer);
+      
+      // Backup cleanup timer (safety net)
+      const backupTimer = setTimeout(() => {
+        if (this.isPlaying) {
+          console.warn('⚠️ Backup cleanup triggered - audio may have stuck');
+          cleanupAll();
+        }
+      }, duration + 500);
+      this.cleanupTimers.push(backupTimer);
 
     } catch (error) {
       console.error('❌ Professional chord synthesis failed:', error);
