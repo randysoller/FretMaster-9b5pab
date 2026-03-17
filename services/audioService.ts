@@ -70,8 +70,8 @@ class AudioService {
       
       // Velocity variation (softer on first/last strings) + realistic guitar dynamics
       const velocityCurve = arrayIndex === 0 || arrayIndex === stringsToPlay.length - 1 ? 0.85 : 1.0;
-      // Boosted base volume for fuller sound
-      const baseVolume = (stringIndex > 3 ? 0.38 : 0.34) * velocityCurve;
+      // INCREASED base volume for louder, fuller sound (25% boost)
+      const baseVolume = (stringIndex > 3 ? 0.48 : 0.43) * velocityCurve;
       
       // Tighter stereo field for more centered power (less thin)
       const panValue = stringIndex < 3 ? -0.12 + (stringIndex * 0.06) : (stringIndex - 3) * 0.09;
@@ -91,24 +91,24 @@ class AudioService {
         if (t < 0.010) {
           // Extended pre-roll silence - absolute zero to eliminate any artifacts (10ms)
           envelope = 0;
-        } else if (t < 0.017) {
-          // Ultra-smooth exponential fade-in from absolute zero (7ms)
-          const fadeProgress = (t - 0.010) / 0.007;
-          // Even gentler exponential curve for natural attack (power 3.5 - starts extremely smoothly)
-          envelope = baseVolume * Math.pow(fadeProgress, 3.5) * 0.2;
-        } else if (t < 0.025) {
+        } else if (t < 0.020) {
+          // Ultra-smooth exponential fade-in from absolute zero (10ms - gentler for warmth)
+          const fadeProgress = (t - 0.010) / 0.010;
+          // Ultra-gentle exponential curve for warm, natural attack (power 4.0 - maximum smoothness)
+          envelope = baseVolume * Math.pow(fadeProgress, 4.0) * 0.2;
+        } else if (t < 0.028) {
           // Attack continuation (8ms - realistic pick strike)
-          const attackProgress = (t - 0.017) / 0.008;
+          const attackProgress = (t - 0.020) / 0.008;
           envelope = (0.2 + (attackProgress * 0.8)) * baseVolume;
-        } else if (t < 0.145) {
+        } else if (t < 0.148) {
           // Decay to sustain (120ms - acoustic guitar characteristic)
-          const decayProgress = (t - 0.025) / 0.12;
+          const decayProgress = (t - 0.028) / 0.12;
           envelope = baseVolume - (decayProgress * baseVolume * 0.18);
         } else {
           // Sustain + Natural exponential release (realistic acoustic guitar)
           const sustainLevel = baseVolume * 0.82;
-          const timeSinceSustain = t - 0.145;
-          const decayTime = duration - 0.145;
+          const timeSinceSustain = t - 0.148;
+          const decayTime = duration - 0.148;
           
           // Natural guitar decay: frequency-dependent damping
           // Higher strings decay slightly faster (realistic physics)
@@ -143,40 +143,47 @@ class AudioService {
         const h7Stagger = Math.min(1, Math.max(0, (t - 0.022) / 0.011)); // 7th: 12ms delay
         const h8Stagger = Math.min(1, Math.max(0, (t - 0.024) / 0.012)); // 8th: 14ms delay
         
-        // REBALANCED HARMONICS for warmth and body:
-        // - Stronger fundamental (1.0 → 1.15) for low-end warmth
-        // - Boosted 2nd/3rd harmonics (body and richness)
-        // - Enhanced lower harmonics, reduced upper harmonic decay for fuller sound
-        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.15 * h1Stagger;                                    // Fundamental (boosted)
-        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.62 * (1 + timeFactor * 0.08)) * h2Stagger;   // 2nd harmonic (warmth)
-        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.42 * (1 - timeFactor * 0.10)) * h3Stagger;   // 3rd (body)
-        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.24 * (1 - timeFactor * 0.12)) * h4Stagger;   // 4th (richness)
-        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.14 * (1 - timeFactor * 0.15)) * h5Stagger;   // 5th
-        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.08 * (1 - timeFactor * 0.18)) * h6Stagger;   // 6th
-        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.04 * (1 - timeFactor * 0.22)) * h7Stagger;   // 7th
-        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.02 * (1 - timeFactor * 0.25)) * h8Stagger;   // 8th
+        // OPTIMIZED WARM HARMONICS - authentic acoustic guitar tone:
+        // - Powerful fundamental (1.25) for rich low-end warmth
+        // - Strong 2nd/3rd harmonics (body and thickness)
+        // - Softer upper harmonics (reduced harshness)
+        // - Natural harmonic decay for realistic acoustic behavior
+        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.25 * h1Stagger;                                    // Fundamental (warm, powerful)
+        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.72 * (1 + timeFactor * 0.08)) * h2Stagger;   // 2nd harmonic (body)
+        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.48 * (1 - timeFactor * 0.10)) * h3Stagger;   // 3rd (thickness)
+        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.26 * (1 - timeFactor * 0.14)) * h4Stagger;   // 4th (richness)
+        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.13 * (1 - timeFactor * 0.18)) * h5Stagger;   // 5th (reduced)
+        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.06 * (1 - timeFactor * 0.24)) * h6Stagger;   // 6th (softer)
+        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.03 * (1 - timeFactor * 0.30)) * h7Stagger;   // 7th (gentle)
+        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.01 * (1 - timeFactor * 0.38)) * h8Stagger;   // 8th (minimal)
         
         // Apply envelope
         sample *= envelope;
         
-        // MULTI-BAND EQ PROCESSING (professional tone shaping)
-        // Simulates analog EQ with low-shelf boost, mid presence, and gentle high-frequency damping
+        // PROFESSIONAL WARM EQ PROCESSING (analog-modeled tone shaping)
+        // Multi-band EQ optimized for warm, full-bodied acoustic guitar tone
         
-        // 1. Low-shelf boost (60-200Hz) - adds warmth and body
-        const lowShelfBoost = frequency < 200 ? 1.25 : 1.0;
+        // 1. Low-shelf boost (60-200Hz) - INCREASED warmth and depth
+        const lowShelfBoost = frequency < 200 ? 1.38 : 1.0;
         
-        // 2. Low-mid boost (200-500Hz) - adds thickness and fullness
-        const lowMidBoost = (frequency >= 200 && frequency < 500) ? 1.18 : 1.0;
+        // 2. Low-mid boost (200-500Hz) - ENHANCED body and thickness
+        const lowMidBoost = (frequency >= 200 && frequency < 500) ? 1.32 : 1.0;
         
-        // 3. Presence peak (3-4kHz) - adds clarity without harshness
-        const presencePeak = (frequency >= 3000 && frequency < 4000) ? 1.12 : 1.0;
+        // 3. Mid-range boost (500-1000Hz) - NEW: adds fullness and reduces thinness
+        const midRangeBoost = (frequency >= 500 && frequency < 1000) ? 1.18 : 1.0;
         
-        // 4. Reduced high-frequency damping (keep more air and sparkle)
-        const brightnessDecay = Math.exp(-t * 0.5); // Reduced from 0.8 to 0.5
-        const toneBalance = 0.75 + (brightnessDecay * 0.25); // 75% to 100% (less aggressive)
+        // 4. Gentle presence lift (2.5-3.5kHz) - REDUCED harshness, maintains clarity
+        const presenceLift = (frequency >= 2500 && frequency < 3500) ? 1.06 : 1.0;
         
-        // Apply EQ processing
-        sample *= lowShelfBoost * lowMidBoost * presencePeak * toneBalance;
+        // 5. High-frequency rolloff above 5kHz - ELIMINATES harshness
+        const highRolloff = frequency > 5000 ? 0.88 : 1.0;
+        
+        // 6. Natural high-frequency damping (warm acoustic character)
+        const brightnessDecay = Math.exp(-t * 0.75); // Increased damping for warmth (0.5 → 0.75)
+        const toneBalance = 0.68 + (brightnessDecay * 0.32); // 68% to 100% (warmer)
+        
+        // Apply comprehensive EQ processing
+        sample *= lowShelfBoost * lowMidBoost * midRangeBoost * presenceLift * highRolloff * toneBalance;
         
         // Apply high-pass filter (removes sub-audible rumble that causes static artifacts)
         const filteredSample = sample - (hpfCoeff * prevSample);
@@ -205,8 +212,8 @@ class AudioService {
     // Remove DC offset and apply gentle compression (preserve dynamics for warmth)
     const compressionRatio = maxPeak > 0.85 ? 0.85 / maxPeak : 1.0;
     for (let i = 0; i < durationSamples; i++) {
-      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 1.5; // Increased gain
-      rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.5;
+      leftChannel[i] = (leftChannel[i] - leftDCOffset) * compressionRatio * 1.85; // INCREASED final gain (25% boost)
+      rightChannel[i] = (rightChannel[i] - rightDCOffset) * compressionRatio * 1.85;
     }
     
     // Apply noise gate: zero out samples below audible threshold (eliminates floor noise)
