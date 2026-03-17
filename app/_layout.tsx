@@ -21,16 +21,25 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading) return;
 
+    // CRITICAL: Only check top-level route, ignore nested navigation within (tabs)
+    const inTabsGroup = segments[0] === '(tabs)';
+    const currentRoute = segments[0] as string;
+    
     // Define public routes that don't require authentication
     const publicRoutes = ['sign-in', 'sign-up', 'forgot-password'];
-    const currentRoute = segments[0];
-    const isPublicRoute = publicRoutes.includes(currentRoute as string);
+    const isPublicRoute = publicRoutes.includes(currentRoute);
 
+    // If user is in tabs group, never redirect (internal navigation is fine)
+    if (inTabsGroup) return;
+
+    // Not authenticated + trying to access protected route → redirect to sign-in
     if (!user && !isPublicRoute) {
-      // Redirect to sign-in if not authenticated and trying to access protected routes
+      console.log('🔒 Not authenticated, redirecting to sign-in');
       router.replace('/sign-in');
-    } else if (user && isPublicRoute) {
-      // Redirect to tabs if authenticated and on public auth pages
+    } 
+    // Authenticated + on auth page → redirect to home
+    else if (user && isPublicRoute) {
+      console.log('✅ Already authenticated, redirecting to home');
       router.replace('/(tabs)');
     }
   }, [user, loading, segments]);
