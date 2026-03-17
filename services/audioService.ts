@@ -219,7 +219,7 @@ class AudioService {
   private createReverb(ctx: AudioContext): ConvolverNode | null {
     try {
       // Create impulse response for small room reverb
-      const reverbTime = 0.8; // 800ms reverb tail
+      const reverbTime = 0.4; // 400ms reverb tail
       const sampleRate = ctx.sampleRate;
       const length = sampleRate * reverbTime;
       const impulse = ctx.createBuffer(2, length, sampleRate);
@@ -809,7 +809,7 @@ class AudioService {
       console.log(`🎸 Generating audio for ${playableStrings} strings...`);
       
       // Generate WAV in memory with professional synthesis (extended duration for realistic sustain)
-      const wavDataUri = this.generateGuitarWAV(chord, 3.5); // 3.5 seconds - realistic acoustic guitar sustain
+      const wavDataUri = this.generateGuitarWAV(chord, 2.0); // 2.0 seconds - realistic acoustic guitar sustain
       
       const generationTime = Date.now() - startTime;
       console.log(`📱 Audio generated in ${generationTime}ms, loading and playing...`);
@@ -827,7 +827,7 @@ class AudioService {
       setTimeout(async () => {
         await sound.unloadAsync();
         console.log('🧹 Audio cleanup complete');
-      }, 3800); // 3.8s cleanup (300ms buffer after 3.5s audio)
+      }, 2300); // 2.3s cleanup (300ms buffer after 2.0s audio)
     } catch (error) {
       console.error('❌ Native audio generation failed:', error);
       throw error;
@@ -866,7 +866,7 @@ class AudioService {
         console.log('🎵 Initializing web audio context...');
         const ctx = await this.getAudioContext();
         console.log('✅ Audio context ready, state:', ctx.state);
-        await this.playChordSynthesis(chordInput, 1900);
+        await this.playChordSynthesis(chordInput, 400);
       }
       
       console.log('✅ Chord playback completed successfully');
