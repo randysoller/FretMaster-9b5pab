@@ -248,13 +248,21 @@ class AudioService {
   private forceStopAllAudio(): void {
     console.log('🛑 Force stopping all active audio...');
     
-    // Stop all oscillators
+    const ctx = this.audioContext;
+    const now = ctx ? ctx.currentTime : 0;
+    
+    // Stop all oscillators IMMEDIATELY
     this.activeOscillators.forEach(osc => {
       try {
-        osc.stop();
+        // Use stop(time) for immediate stop - prevents scheduling conflicts
+        if (ctx && ctx.state === 'running') {
+          osc.stop(now);
+        } else {
+          osc.stop();
+        }
         osc.disconnect();
       } catch (e) {
-        // Already stopped/disconnected
+        // Already stopped/disconnected - this is expected
       }
     });
     this.activeOscillators = [];
@@ -290,7 +298,7 @@ class AudioService {
         console.log('⚠️ Already playing, stopping previous audio...');
         this.forceStopAllAudio();
         // Small delay to ensure cleanup completes
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       this.isPlaying = true;
@@ -464,13 +472,12 @@ class AudioService {
         try {
           console.log('🧹 Starting comprehensive audio cleanup...');
           
-          // 1. Stop and disconnect all oscillators
+          // 1. Disconnect oscillators (they should already be stopped by schedule)
           this.activeOscillators.forEach(osc => {
             try {
-              osc.stop();
               osc.disconnect();
             } catch (e) {
-              // Already stopped/disconnected
+              // Already disconnected
             }
           });
           this.activeOscillators = [];
@@ -493,8 +500,16 @@ class AudioService {
             }
           });
           
-          // 4. Clear tracked nodes
+          // 4. Clear tracked nodes and timers
           this.activeNodes = [];
+          const currentTimerIndex = this.cleanupTimers.indexOf(cleanupTimer);
+          if (currentTimerIndex > -1) {
+            this.cleanupTimers.splice(currentTimerIndex, 1);
+          }
+          const backupTimerIndex = this.cleanupTimers.indexOf(backupTimer);
+          if (backupTimerIndex > -1) {
+            this.cleanupTimers.splice(backupTimerIndex, 1);
+          }
           
           // 5. Reset playing flag
           this.isPlaying = false;
