@@ -118,10 +118,10 @@ class AudioService {
           // Exponential decay with realistic damping
           envelope = sustainLevel * Math.exp(-decayRatio * dampingFactor);
           
-          // Enhanced body resonance - adds warmth and fullness (80-120Hz emphasis)
+          // Subtle body resonance - adds warmth without wah effect (REDUCED)
           const resonanceFreq = 2.5; // Hz - typical guitar body resonance
           const lowFreqResonance = Math.sin(2 * Math.PI * resonanceFreq * t);
-          const resonanceMod = 1 + (lowFreqResonance * 0.035); // Increased from 0.015 to 0.035
+          const resonanceMod = 1 + (lowFreqResonance * 0.012); // Reduced to 0.012 (from 0.035) - minimal modulation
           envelope *= resonanceMod;
         }
         
@@ -130,32 +130,24 @@ class AudioService {
         const phase = 2 * Math.PI * frequency * t;
         let sample = 0;
         
-        // Fundamental and harmonics with time-varying amplitudes AND staggered fade-in (realistic string behavior)
-        const timeFactor = Math.min(1, t / 0.3); // Harmonics settle over first 300ms
+        // CLEAN HARMONIC SYNTHESIS - No wah/sweep artifacts
+        // All harmonics start together like a real plucked string
+        // Subtle, natural decay without time-varying sweep effects
+        const timeFactor = Math.min(1, t / 0.5); // Gentle harmonic settling (reduced modulation)
         
-        // Harmonic fade-in stagger: higher harmonics take slightly longer to develop (realistic pluck physics)
-        const h1Stagger = Math.min(1, Math.max(0, (t - 0.010) / 0.005)); // Fundamental: immediate
-        const h2Stagger = Math.min(1, Math.max(0, (t - 0.012) / 0.006)); // 2nd: 2ms delay
-        const h3Stagger = Math.min(1, Math.max(0, (t - 0.014) / 0.007)); // 3rd: 4ms delay
-        const h4Stagger = Math.min(1, Math.max(0, (t - 0.016) / 0.008)); // 4th: 6ms delay
-        const h5Stagger = Math.min(1, Math.max(0, (t - 0.018) / 0.009)); // 5th: 8ms delay
-        const h6Stagger = Math.min(1, Math.max(0, (t - 0.020) / 0.010)); // 6th: 10ms delay
-        const h7Stagger = Math.min(1, Math.max(0, (t - 0.022) / 0.011)); // 7th: 12ms delay
-        const h8Stagger = Math.min(1, Math.max(0, (t - 0.024) / 0.012)); // 8th: 14ms delay
-        
-        // OPTIMIZED WARM HARMONICS - authentic acoustic guitar tone:
+        // OPTIMIZED WARM HARMONICS - authentic acoustic guitar tone (NO STAGGER):
         // - Powerful fundamental (1.25) for rich low-end warmth
         // - Strong 2nd/3rd harmonics (body and thickness)
         // - Softer upper harmonics (reduced harshness)
-        // - Natural harmonic decay for realistic acoustic behavior
-        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.25 * h1Stagger;                                    // Fundamental (warm, powerful)
-        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.72 * (1 + timeFactor * 0.08)) * h2Stagger;   // 2nd harmonic (body)
-        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.48 * (1 - timeFactor * 0.10)) * h3Stagger;   // 3rd (thickness)
-        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.26 * (1 - timeFactor * 0.14)) * h4Stagger;   // 4th (richness)
-        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.13 * (1 - timeFactor * 0.18)) * h5Stagger;   // 5th (reduced)
-        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.06 * (1 - timeFactor * 0.24)) * h6Stagger;   // 6th (softer)
-        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.03 * (1 - timeFactor * 0.30)) * h7Stagger;   // 7th (gentle)
-        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.01 * (1 - timeFactor * 0.38)) * h8Stagger;   // 8th (minimal)
+        // - Subtle natural decay (no sweep/wah effect)
+        sample += Math.sin(phase + harmonicPhases[arrayIndex][0]) * 1.25;                                  // Fundamental (warm, powerful)
+        sample += Math.sin(phase * 2 + harmonicPhases[arrayIndex][1]) * (0.72 * (1 - timeFactor * 0.03)); // 2nd harmonic (body) - gentle decay
+        sample += Math.sin(phase * 3 + harmonicPhases[arrayIndex][2]) * (0.48 * (1 - timeFactor * 0.04)); // 3rd (thickness)
+        sample += Math.sin(phase * 4 + harmonicPhases[arrayIndex][3]) * (0.26 * (1 - timeFactor * 0.06)); // 4th (richness)
+        sample += Math.sin(phase * 5 + harmonicPhases[arrayIndex][4]) * (0.13 * (1 - timeFactor * 0.08)); // 5th (reduced)
+        sample += Math.sin(phase * 6 + harmonicPhases[arrayIndex][5]) * (0.06 * (1 - timeFactor * 0.10)); // 6th (softer)
+        sample += Math.sin(phase * 7 + harmonicPhases[arrayIndex][6]) * (0.03 * (1 - timeFactor * 0.12)); // 7th (gentle)
+        sample += Math.sin(phase * 8 + harmonicPhases[arrayIndex][7]) * (0.01 * (1 - timeFactor * 0.15)); // 8th (minimal)
         
         // Apply envelope
         sample *= envelope;
