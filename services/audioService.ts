@@ -285,6 +285,9 @@ class AudioService {
         throw new Error('No strings to play in chord');
       }
 
+      // Track all nodes for cleanup
+      const allNodesToCleanup: AudioNode[] = [];
+
       // Play each string with advanced synthesis
       stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
         // Natural strum timing (downstroke from bass to treble)
@@ -359,6 +362,7 @@ class AudioService {
           pickNoise.connect(pickGain);
           pickGain.connect(this.masterGain!);
           pickNoise.start(startTime);
+          allNodesToCleanup.push(pickNoise, pickGain);
         }
 
         // Add explicit fade-out at the end to prevent clicks (last 50ms)
@@ -368,17 +372,55 @@ class AudioService {
         
         // Start main oscillator
         osc.start(startTime);
-        osc.stop(startTime + durationSec + 0.01); // Extend slightly beyond duration to ensure fade completes
+        const stopTime = startTime + durationSec;
+        osc.stop(stopTime);
+        
+        // Auto-disconnect all nodes after playback to prevent audio leaks
+        osc.onended = () => {
+          try {
+            osc.disconnect();
+            formants.forEach(f => f.disconnect());
+            mainFilter.disconnect();
+            stringGain.disconnect();
+            panner.disconnect();
+            if (pickGain) pickGain.disconnect();
+          } catch (e) {
+            // Already disconnected
+          }
+        };
+        
         this.activeOscillators.push(osc);
+        allNodesToCleanup.push(osc, stringGain, mainFilter, panner, ...formants);
       });
 
       console.log(`✅ Started ${stringsToPlay.length} oscillators for chord ${chord.name}`);
 
-      // Cleanup
+      // Complete cleanup after playback finishes
       setTimeout(() => {
-        this.activeOscillators = [];
-        console.log('🧹 Cleaned up oscillators');
-      }, duration + 200);
+        try {
+          // Disconnect reverb nodes
+          if (reverb) {
+            reverb.disconnect();
+            reverbGain.disconnect();
+          }
+          dryGain.disconnect();
+          
+          // Disconnect any remaining nodes
+          allNodesToCleanup.forEach(node => {
+            try {
+              node.disconnect();
+            } catch (e) {
+              // Already disconnected
+            }
+          });
+          
+          // Clear oscillator references
+          this.activeOscillators = [];
+          console.log('🧹 Complete audio cleanup finished');
+        } catch (error) {
+          console.warn('Cleanup warning:', error);
+        }
+      }, duration + 100);
 
     } catch (error) {
       console.error('❌ Professional chord synthesis failed:', error);
