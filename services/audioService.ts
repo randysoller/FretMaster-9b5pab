@@ -809,7 +809,7 @@ class AudioService {
       console.log(`🎸 Generating audio for ${playableStrings} strings...`);
       
       // Generate WAV in memory with professional synthesis (extended duration for realistic sustain)
-      const wavDataUri = this.generateGuitarWAV(chord, 5.0); // 5 seconds - realistic acoustic guitar sustain
+      const wavDataUri = this.generateGuitarWAV(chord, 3.5); // 3.5 seconds - realistic acoustic guitar sustain
       
       const generationTime = Date.now() - startTime;
       console.log(`📱 Audio generated in ${generationTime}ms, loading and playing...`);
@@ -827,7 +827,7 @@ class AudioService {
       setTimeout(async () => {
         await sound.unloadAsync();
         console.log('🧹 Audio cleanup complete');
-      }, 5300); // 5.3s cleanup (300ms buffer after 5s audio)
+      }, 3800); // 3.8s cleanup (300ms buffer after 3.5s audio)
     } catch (error) {
       console.error('❌ Native audio generation failed:', error);
       throw error;
