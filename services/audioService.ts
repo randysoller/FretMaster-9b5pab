@@ -287,9 +287,8 @@ class AudioService {
   }
 
   /**
-   * Generate advanced guitar synthesis with professional DSP
-   * Implements: Multi-voice Karplus-Strong, ADSR, pitch drift, detuning,
-   * string coupling, velocity layers, stereo widening, reverb
+   * Generate guitar chord audio using Karplus-Strong synthesis
+   * Robust implementation with proper error handling and validation
    */
   private generateGuitarWAV(chord: ChordData, duration: number = 2.5): string {
     const sampleRate = 44100; // CD quality
@@ -309,240 +308,116 @@ class AudioService {
       }
     });
     
-    console.log(`🎸 Karplus-Strong synthesis for ${stringsToPlay.length} strings:`, stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
+    console.log(`🎸 Synthesizing ${stringsToPlay.length} strings:`, stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
     
-    // ====================================
-    // ADVANCED KARPLUS-STRONG SYNTHESIS
-    // ====================================
-    // Per-string synthesis with professional DSP techniques
-    
+    // Synthesize each string independently
     stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
-      // Humanized strum timing (15-25ms variance)
-      const strumBase = arrayIndex * 0.018; // 18ms base strum delay
-      const strumJitter = (Math.random() - 0.5) * 0.008; // ±4ms jitter
-      const strumDelay = strumBase + strumJitter;
+      // Strum timing (15ms between strings)
+      const strumDelay = arrayIndex * 0.015;
       const startSample = Math.floor(strumDelay * sampleRate);
       
-      // ====================================
-      // PITCH DRIFT & DETUNING
-      // ====================================
-      // Slight detuning per string (1-3 cents) for chorus effect
-      const detuneAmount = (Math.random() - 0.5) * 0.06; // ±3 cents
-      const detunedFreq = frequency * Math.pow(2, detuneAmount / 1200);
-      
-      // Calculate delay line length for detuned frequency
-      const delayLength = Math.round(sampleRate / detunedFreq);
-      
-      // ====================================
-      // MULTI-VOICE EXCITATION
-      // ====================================
-      // Initialize delay line with shaped noise burst (realistic pluck)
-      const delayLine = new Float32Array(delayLength);
-      for (let j = 0; j < delayLength; j++) {
-        // Pink noise (1/f spectrum) for more realistic pluck
-        const whiteNoise = (Math.random() * 2 - 1);
-        const pinkFilter = 0.5 + 0.5 * Math.cos(2 * Math.PI * j / delayLength);
-        delayLine[j] = whiteNoise * pinkFilter;
+      // Karplus-Strong delay line length
+      const delayLength = Math.round(sampleRate / frequency);
+      if (delayLength < 10 || delayLength > 5000) {
+        console.warn(`⚠️ Invalid delay length ${delayLength} for freq ${frequency}Hz, skipping string`);
+        return; // Skip this string if parameters are invalid
       }
       
-      // ====================================
-      // VELOCITY LAYERS & ADSR
-      // ====================================
-      // Velocity-sensitive amplitude and tone
-      const isEdgeString = arrayIndex === 0 || arrayIndex === stringsToPlay.length - 1;
-      const velocityBase = isEdgeString ? 0.70 : 0.88;
-      const velocityJitter = (Math.random() - 0.5) * 0.15; // ±7.5% variation
-      const velocity = Math.max(0.5, Math.min(1.0, velocityBase + velocityJitter));
+      // Initialize delay line with noise burst (pluck excitation)
+      const delayLine = new Float32Array(delayLength);
+      for (let j = 0; j < delayLength; j++) {
+        delayLine[j] = (Math.random() * 2 - 1) * 0.5;
+      }
       
-      const baseAmplitude = (stringIndex > 3 ? 0.38 : 0.35) * velocity;
+      // String parameters
+      const baseAmplitude = (stringIndex > 3 ? 0.35 : 0.32) / stringsToPlay.length;
+      const damping = 0.9975; // Constant damping for stability
       
-      // ADSR envelope parameters
-      const attackTime = 0.003; // 3ms attack
-      const decayTime = 0.08;   // 80ms decay
-      const sustainLevel = 0.75; // 75% sustain
-      const releaseTime = 1.2;  // 1.2s release
-      
-      // ====================================
-      // STEREO IMAGING
-      // ====================================
-      // Natural string positioning (low strings left, high strings right)
-      const panValue = stringIndex < 3
-        ? -0.20 + (stringIndex * 0.08)  // Low strings: -20% to -4%
-        : (stringIndex - 3) * 0.12;      // High strings: 0% to +24%
-      const leftGain = panValue <= 0 ? 1 : 1 - panValue;
-      const rightGain = panValue >= 0 ? 1 : 1 + panValue;
-      
-      // ====================================
-      // FREQUENCY-DEPENDENT DAMPING
-      // ====================================
-      // Higher frequencies decay faster (realistic physics)
-      const dampingBase = stringIndex > 3 ? 0.9968 : 0.9978;
-      const frequencyFactor = Math.min(1, frequency / 350);
-      const damping = dampingBase - (frequencyFactor * 0.0018);
-      
-      // Velocity affects damping (harder pluck = brighter tone initially)
-      const velocityDampingOffset = (1 - velocity) * 0.0008;
-      const finalDamping = damping - velocityDampingOffset;
-      
-      // ====================================
-      // LOOP FILTER (Karplus-Strong core)
-      // ====================================
-      // Two-stage low-pass for smoother tone
-      const lpfCoeff = 0.48 + (velocity * 0.08); // Velocity-dependent brightness
-      
-      // ====================================
-      // STRING COUPLING (sympathetic resonance)
-      // ====================================
-      // Strings vibrating at related frequencies resonate together
-      const couplingStrength = 0.015;
+      // Stereo panning (low strings left, high strings right)
+      const panValue = (stringIndex - 2.5) * 0.15; // -0.375 to +0.375
+      const leftGain = Math.max(0, Math.min(1, 0.7 - panValue));
+      const rightGain = Math.max(0, Math.min(1, 0.7 + panValue));
       
       let writeIndex = 0;
       let prevOutput = 0;
-      let prevLPF = 0; // For two-stage LPF
       
-      // ====================================
-      // SAMPLE GENERATION LOOP
-      // ====================================
+      // Generate samples
       for (let i = startSample; i < durationSamples; i++) {
-        const t = (i - startSample) / sampleRate; // Time since pluck
+        const t = (i - startSample) / sampleRate;
         
-        // ====================================
-        // ADSR ENVELOPE
-        // ====================================
-        let envelope = 1.0;
-        if (t < attackTime) {
-          // Attack phase (exponential)
-          envelope = Math.pow(t / attackTime, 2);
-        } else if (t < attackTime + decayTime) {
-          // Decay phase
-          const decayProgress = (t - attackTime) / decayTime;
-          envelope = 1.0 - ((1.0 - sustainLevel) * decayProgress);
-        } else if (t < duration - releaseTime) {
-          // Sustain phase
-          envelope = sustainLevel;
-        } else {
-          // Release phase (exponential)
-          const releaseProgress = (t - (duration - releaseTime)) / releaseTime;
-          envelope = sustainLevel * Math.pow(1 - releaseProgress, 2.5);
-        }
+        // Simple exponential envelope
+        const envelope = Math.exp(-t * 1.5) * (t < 0.01 ? t / 0.01 : 1.0);
         
-        // ====================================
-        // PITCH DRIFT LFO
-        // ====================================
-        // Subtle pitch modulation (0.5-2 Hz, ±2 cents)
-        const lfoFreq = 0.8 + (stringIndex * 0.2); // Different LFO per string
-        const lfoAmount = 0.0003; // ±2 cents
-        const pitchMod = 1.0 + (Math.sin(2 * Math.PI * lfoFreq * t) * lfoAmount);
-        
-        // ====================================
-        // KARPLUS-STRONG FEEDBACK LOOP
-        // ====================================
-        let currentSample = delayLine[writeIndex];
+        // Karplus-Strong algorithm
+        const currentSample = delayLine[writeIndex];
         const nextIndex = (writeIndex + 1) % delayLength;
         
-        // Two-stage low-pass filter for smoother tone
-        const lpf1 = lpfCoeff * (currentSample + delayLine[nextIndex]);
-        const lpf2 = lpfCoeff * (lpf1 + prevLPF);
-        prevLPF = lpf1;
+        // Low-pass filter (averaging)
+        const filtered = 0.5 * (currentSample + delayLine[nextIndex]) * damping;
         
-        // Apply damping and write back to delay line
-        const filteredSample = lpf2 * finalDamping * pitchMod;
-        delayLine[writeIndex] = filteredSample;
+        // Validate to prevent NaN/Infinity
+        if (isFinite(filtered)) {
+          delayLine[writeIndex] = filtered;
+        } else {
+          delayLine[writeIndex] = 0;
+          console.warn('⚠️ Invalid sample detected, resetting');
+        }
         
-        // ====================================
-        // OUTPUT SAMPLE
-        // ====================================
+        // Output with envelope
         let outputSample = currentSample * baseAmplitude * envelope;
         
-        // ====================================
-        // BODY RESONANCE (guitar body cavity modes)
-        // ====================================
-        // Simulate wooden body resonances at specific frequencies
-        const bodyResonance1 = 1.0 + (Math.sin(2 * Math.PI * 110 * t) * 0.018); // 110 Hz (low air resonance)
-        const bodyResonance2 = 1.0 + (Math.sin(2 * Math.PI * 220 * t) * 0.012); // 220 Hz (top plate)
-        outputSample *= (bodyResonance1 + bodyResonance2) * 0.5;
-        
-        // ====================================
-        // HIGH-PASS FILTER (DC offset removal)
-        // ====================================
+        // High-pass filter (DC removal)
         const highPassFiltered = outputSample - (0.98 * prevOutput);
         prevOutput = outputSample;
         outputSample = highPassFiltered;
         
-        // ====================================
-        // STRING COUPLING (add sympathetic resonance from other strings)
-        // ====================================
-        // Sample from nearby strings for coupling effect
-        if (arrayIndex > 0 && i > 0) {
-          outputSample += leftChannel[i - 1] * couplingStrength;
+        // Validate output
+        if (!isFinite(outputSample)) {
+          outputSample = 0;
         }
         
-        // Move to next position in delay line
-        writeIndex = nextIndex;
-        
-        // ====================================
-        // STEREO OUTPUT
-        // ====================================
+        // Add to stereo channels
         leftChannel[i] += outputSample * leftGain;
         rightChannel[i] += outputSample * rightGain;
+        
+        writeIndex = nextIndex;
       }
     });
     
-    console.log('✅ Advanced synthesis complete with ADSR, pitch drift, detuning, string coupling');
+    console.log('✅ Synthesis complete');
     
-    // ============================================
-    // POST-PROCESSING CHAIN
-    // ============================================
-    console.log('🎛️ Applying professional DSP post-processing chain...');
-    
-    // 1. Multi-band EQ for guitar body acoustics
-    this.applyGuitarBodyEQ(leftChannel, rightChannel, sampleRate);
-    
-    // 2. Stereo widening (Haas effect + decorrelation)
-    this.applyStereoWidening(leftChannel, rightChannel, sampleRate, 0.35);
-    
-    // 3. Schroeder reverb (realistic room ambience)
-    this.applySchroederReverb(leftChannel, rightChannel, sampleRate, 0.28, 0.55, 0.18);
-    
-    // Dynamic compression + DC offset removal
-    let maxPeak = 0;
-    let leftDCOffset = 0;
-    let rightDCOffset = 0;
-    
-    // Calculate DC offset
+    // Validate audio data (catch any NaN/Infinity before processing)
+    let hasInvalidData = false;
     for (let i = 0; i < durationSamples; i++) {
-      leftDCOffset += leftChannel[i];
-      rightDCOffset += rightChannel[i];
+      if (!isFinite(leftChannel[i]) || !isFinite(rightChannel[i])) {
+        leftChannel[i] = 0;
+        rightChannel[i] = 0;
+        hasInvalidData = true;
+      }
+    }
+    if (hasInvalidData) {
+      console.warn('⚠️ Invalid audio data detected and cleaned');
+    }
+    
+    // Find peak level
+    let maxPeak = 0;
+    for (let i = 0; i < durationSamples; i++) {
       maxPeak = Math.max(maxPeak, Math.abs(leftChannel[i]), Math.abs(rightChannel[i]));
     }
-    leftDCOffset /= durationSamples;
-    rightDCOffset /= durationSamples;
     
-    // Remove DC offset and normalize with soft limiter
-    const targetPeak = 0.85; // Leave headroom to prevent clipping
-    const normalizeRatio = maxPeak > 0.01 ? targetPeak / maxPeak : 1.0;
+    // Normalize to safe level
+    const targetPeak = 0.7;
+    const normalizeRatio = maxPeak > 0.001 ? targetPeak / maxPeak : 1.0;
+    
+    console.log(`🎚️ Normalizing: peak=${maxPeak.toFixed(3)}, ratio=${normalizeRatio.toFixed(2)}`);
     
     for (let i = 0; i < durationSamples; i++) {
-      // Remove DC offset and apply normalization
-      let leftSample = (leftChannel[i] - leftDCOffset) * normalizeRatio * 1.5; // Reduced from 2.4 to 1.5
-      let rightSample = (rightChannel[i] - rightDCOffset) * normalizeRatio * 1.5;
-      
-      // Soft limiter (prevents harsh clipping)
-      const softClipThreshold = 0.9;
-      if (Math.abs(leftSample) > softClipThreshold) {
-        leftSample = Math.sign(leftSample) * (softClipThreshold + (Math.abs(leftSample) - softClipThreshold) * 0.3);
-      }
-      if (Math.abs(rightSample) > softClipThreshold) {
-        rightSample = Math.sign(rightSample) * (softClipThreshold + (Math.abs(rightSample) - softClipThreshold) * 0.3);
-      }
-      
-      // Hard limiter (safety net)
-      leftChannel[i] = Math.max(-0.98, Math.min(0.98, leftSample));
-      rightChannel[i] = Math.max(-0.98, Math.min(0.98, rightSample));
+      leftChannel[i] = Math.max(-0.95, Math.min(0.95, leftChannel[i] * normalizeRatio));
+      rightChannel[i] = Math.max(-0.95, Math.min(0.95, rightChannel[i] * normalizeRatio));
     }
     
-    // Natural fade-out (last 100ms)
-    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.1);
+    // Smooth fade-out (last 150ms)
+    const fadeOutStart = durationSamples - Math.floor(sampleRate * 0.15);
     for (let i = fadeOutStart; i < durationSamples; i++) {
       const fadeProgress = (i - fadeOutStart) / (durationSamples - fadeOutStart);
       const fadeFactor = Math.pow(1 - fadeProgress, 2);
