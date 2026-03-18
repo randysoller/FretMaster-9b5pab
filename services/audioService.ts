@@ -20,17 +20,17 @@ class AudioService {
     // ====================================
     
     // LOW SHELF BOOST (80-120 Hz) - Fundamental warmth
-    const lowShelfGain = 1.45; // +3.2 dB boost
+    const lowShelfGain = 1.25; // +2.0 dB boost (reduced to prevent clipping)
     const lowShelfFreq = 100;
     const lowShelfQ = 0.7;
     
     // LOW-MID PEAK (200-400 Hz) - Guitar body resonance
-    const lowMidGain = 1.52; // +3.6 dB boost
+    const lowMidGain = 1.30; // +2.3 dB boost (reduced to prevent clipping)
     const lowMidFreq = 280;
     const lowMidQ = 1.2; // Resonant peak
     
     // MID BOOST (500-800 Hz) - Presence and fullness
-    const midGain = 1.38; // +2.8 dB boost
+    const midGain = 1.22; // +1.7 dB boost (reduced to prevent clipping)
     const midFreq = 650;
     const midQ = 1.0;
     
@@ -52,7 +52,7 @@ class AudioService {
       'peaking', midFreq, midQ, midGain
     );
     
-    console.log('✅ Guitar body EQ applied: Low shelf +3.2dB @ 100Hz, Low-mid peak +3.6dB @ 280Hz, Mid boost +2.8dB @ 650Hz');
+    console.log('✅ Guitar body EQ applied: Low shelf +2.0dB @ 100Hz, Low-mid peak +2.3dB @ 280Hz, Mid boost +1.7dB @ 650Hz');
   }
 
   /**
@@ -278,11 +278,27 @@ class AudioService {
     leftDCOffset /= durationSamples;
     rightDCOffset /= durationSamples;
     
-    // Remove DC offset and normalize
-    const normalizeRatio = maxPeak > 0.75 ? 0.75 / maxPeak : 1.0;
+    // Remove DC offset and normalize with soft limiter
+    const targetPeak = 0.85; // Leave headroom to prevent clipping
+    const normalizeRatio = maxPeak > 0.01 ? targetPeak / maxPeak : 1.0;
+    
     for (let i = 0; i < durationSamples; i++) {
-      leftChannel[i] = (leftChannel[i] - leftDCOffset) * normalizeRatio * 2.4;
-      rightChannel[i] = (rightChannel[i] - rightDCOffset) * normalizeRatio * 2.4;
+      // Remove DC offset and apply normalization
+      let leftSample = (leftChannel[i] - leftDCOffset) * normalizeRatio * 1.5; // Reduced from 2.4 to 1.5
+      let rightSample = (rightChannel[i] - rightDCOffset) * normalizeRatio * 1.5;
+      
+      // Soft limiter (prevents harsh clipping)
+      const softClipThreshold = 0.9;
+      if (Math.abs(leftSample) > softClipThreshold) {
+        leftSample = Math.sign(leftSample) * (softClipThreshold + (Math.abs(leftSample) - softClipThreshold) * 0.3);
+      }
+      if (Math.abs(rightSample) > softClipThreshold) {
+        rightSample = Math.sign(rightSample) * (softClipThreshold + (Math.abs(rightSample) - softClipThreshold) * 0.3);
+      }
+      
+      // Hard limiter (safety net)
+      leftChannel[i] = Math.max(-0.98, Math.min(0.98, leftSample));
+      rightChannel[i] = Math.max(-0.98, Math.min(0.98, rightSample));
     }
     
     // Natural fade-out (last 100ms)
