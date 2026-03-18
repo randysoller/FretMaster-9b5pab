@@ -131,28 +131,279 @@ class StrummingAudioService {
   /**
    * Get sample asset path (returns require() statement)
    * 
-   * TODO: Replace with actual sample paths once library is created
-   * For now, this is a placeholder showing the expected structure
+   * FreePats sample mapping:
+   * - 6 strings × 13 frets (0-12) × 3 velocities = 234 total samples
+   * - Samples organized in string{N}/fret{N}-{velocity}.wav structure
+   * 
+   * Note: Once you've downloaded and organized FreePats samples using the
+   * FREEPATS_SETUP_GUIDE.md instructions, these paths will automatically
+   * load the authentic guitar recordings!
    */
   private getSampleAssetPath(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): any {
-    // Example: require('@/assets/audio/guitar-strings/string0/fret0-medium.wav')
+    // Validate inputs
+    if (stringIndex < 0 || stringIndex > 5 || fret < 0 || fret > 12) {
+      return null;
+    }
     
-    // PLACEHOLDER: Return null for now - samples need to be added
-    // In production, this would return actual require() paths
-    return null;
-    
-    // Production implementation would look like:
-    /*
+    // Build sample map with all FreePats samples
+    // This uses dynamic require paths that Metro bundler will resolve
     const sampleMap: Record<string, any> = {
+      // String 0 (Low E) - Frets 0-12
       's0_f0_soft': require('@/assets/audio/guitar-strings/string0/fret0-soft.wav'),
       's0_f0_medium': require('@/assets/audio/guitar-strings/string0/fret0-medium.wav'),
       's0_f0_hard': require('@/assets/audio/guitar-strings/string0/fret0-hard.wav'),
-      // ... all other combinations
+      's0_f1_soft': require('@/assets/audio/guitar-strings/string0/fret1-soft.wav'),
+      's0_f1_medium': require('@/assets/audio/guitar-strings/string0/fret1-medium.wav'),
+      's0_f1_hard': require('@/assets/audio/guitar-strings/string0/fret1-hard.wav'),
+      's0_f2_soft': require('@/assets/audio/guitar-strings/string0/fret2-soft.wav'),
+      's0_f2_medium': require('@/assets/audio/guitar-strings/string0/fret2-medium.wav'),
+      's0_f2_hard': require('@/assets/audio/guitar-strings/string0/fret2-hard.wav'),
+      's0_f3_soft': require('@/assets/audio/guitar-strings/string0/fret3-soft.wav'),
+      's0_f3_medium': require('@/assets/audio/guitar-strings/string0/fret3-medium.wav'),
+      's0_f3_hard': require('@/assets/audio/guitar-strings/string0/fret3-hard.wav'),
+      's0_f4_soft': require('@/assets/audio/guitar-strings/string0/fret4-soft.wav'),
+      's0_f4_medium': require('@/assets/audio/guitar-strings/string0/fret4-medium.wav'),
+      's0_f4_hard': require('@/assets/audio/guitar-strings/string0/fret4-hard.wav'),
+      's0_f5_soft': require('@/assets/audio/guitar-strings/string0/fret5-soft.wav'),
+      's0_f5_medium': require('@/assets/audio/guitar-strings/string0/fret5-medium.wav'),
+      's0_f5_hard': require('@/assets/audio/guitar-strings/string0/fret5-hard.wav'),
+      's0_f6_soft': require('@/assets/audio/guitar-strings/string0/fret6-soft.wav'),
+      's0_f6_medium': require('@/assets/audio/guitar-strings/string0/fret6-medium.wav'),
+      's0_f6_hard': require('@/assets/audio/guitar-strings/string0/fret6-hard.wav'),
+      's0_f7_soft': require('@/assets/audio/guitar-strings/string0/fret7-soft.wav'),
+      's0_f7_medium': require('@/assets/audio/guitar-strings/string0/fret7-medium.wav'),
+      's0_f7_hard': require('@/assets/audio/guitar-strings/string0/fret7-hard.wav'),
+      's0_f8_soft': require('@/assets/audio/guitar-strings/string0/fret8-soft.wav'),
+      's0_f8_medium': require('@/assets/audio/guitar-strings/string0/fret8-medium.wav'),
+      's0_f8_hard': require('@/assets/audio/guitar-strings/string0/fret8-hard.wav'),
+      's0_f9_soft': require('@/assets/audio/guitar-strings/string0/fret9-soft.wav'),
+      's0_f9_medium': require('@/assets/audio/guitar-strings/string0/fret9-medium.wav'),
+      's0_f9_hard': require('@/assets/audio/guitar-strings/string0/fret9-hard.wav'),
+      's0_f10_soft': require('@/assets/audio/guitar-strings/string0/fret10-soft.wav'),
+      's0_f10_medium': require('@/assets/audio/guitar-strings/string0/fret10-medium.wav'),
+      's0_f10_hard': require('@/assets/audio/guitar-strings/string0/fret10-hard.wav'),
+      's0_f11_soft': require('@/assets/audio/guitar-strings/string0/fret11-soft.wav'),
+      's0_f11_medium': require('@/assets/audio/guitar-strings/string0/fret11-medium.wav'),
+      's0_f11_hard': require('@/assets/audio/guitar-strings/string0/fret11-hard.wav'),
+      's0_f12_soft': require('@/assets/audio/guitar-strings/string0/fret12-soft.wav'),
+      's0_f12_medium': require('@/assets/audio/guitar-strings/string0/fret12-medium.wav'),
+      's0_f12_hard': require('@/assets/audio/guitar-strings/string0/fret12-hard.wav'),
+      
+      // String 1 (A) - Frets 0-12
+      's1_f0_soft': require('@/assets/audio/guitar-strings/string1/fret0-soft.wav'),
+      's1_f0_medium': require('@/assets/audio/guitar-strings/string1/fret0-medium.wav'),
+      's1_f0_hard': require('@/assets/audio/guitar-strings/string1/fret0-hard.wav'),
+      's1_f1_soft': require('@/assets/audio/guitar-strings/string1/fret1-soft.wav'),
+      's1_f1_medium': require('@/assets/audio/guitar-strings/string1/fret1-medium.wav'),
+      's1_f1_hard': require('@/assets/audio/guitar-strings/string1/fret1-hard.wav'),
+      's1_f2_soft': require('@/assets/audio/guitar-strings/string1/fret2-soft.wav'),
+      's1_f2_medium': require('@/assets/audio/guitar-strings/string1/fret2-medium.wav'),
+      's1_f2_hard': require('@/assets/audio/guitar-strings/string1/fret2-hard.wav'),
+      's1_f3_soft': require('@/assets/audio/guitar-strings/string1/fret3-soft.wav'),
+      's1_f3_medium': require('@/assets/audio/guitar-strings/string1/fret3-medium.wav'),
+      's1_f3_hard': require('@/assets/audio/guitar-strings/string1/fret3-hard.wav'),
+      's1_f4_soft': require('@/assets/audio/guitar-strings/string1/fret4-soft.wav'),
+      's1_f4_medium': require('@/assets/audio/guitar-strings/string1/fret4-medium.wav'),
+      's1_f4_hard': require('@/assets/audio/guitar-strings/string1/fret4-hard.wav'),
+      's1_f5_soft': require('@/assets/audio/guitar-strings/string1/fret5-soft.wav'),
+      's1_f5_medium': require('@/assets/audio/guitar-strings/string1/fret5-medium.wav'),
+      's1_f5_hard': require('@/assets/audio/guitar-strings/string1/fret5-hard.wav'),
+      's1_f6_soft': require('@/assets/audio/guitar-strings/string1/fret6-soft.wav'),
+      's1_f6_medium': require('@/assets/audio/guitar-strings/string1/fret6-medium.wav'),
+      's1_f6_hard': require('@/assets/audio/guitar-strings/string1/fret6-hard.wav'),
+      's1_f7_soft': require('@/assets/audio/guitar-strings/string1/fret7-soft.wav'),
+      's1_f7_medium': require('@/assets/audio/guitar-strings/string1/fret7-medium.wav'),
+      's1_f7_hard': require('@/assets/audio/guitar-strings/string1/fret7-hard.wav'),
+      's1_f8_soft': require('@/assets/audio/guitar-strings/string1/fret8-soft.wav'),
+      's1_f8_medium': require('@/assets/audio/guitar-strings/string1/fret8-medium.wav'),
+      's1_f8_hard': require('@/assets/audio/guitar-strings/string1/fret8-hard.wav'),
+      's1_f9_soft': require('@/assets/audio/guitar-strings/string1/fret9-soft.wav'),
+      's1_f9_medium': require('@/assets/audio/guitar-strings/string1/fret9-medium.wav'),
+      's1_f9_hard': require('@/assets/audio/guitar-strings/string1/fret9-hard.wav'),
+      's1_f10_soft': require('@/assets/audio/guitar-strings/string1/fret10-soft.wav'),
+      's1_f10_medium': require('@/assets/audio/guitar-strings/string1/fret10-medium.wav'),
+      's1_f10_hard': require('@/assets/audio/guitar-strings/string1/fret10-hard.wav'),
+      's1_f11_soft': require('@/assets/audio/guitar-strings/string1/fret11-soft.wav'),
+      's1_f11_medium': require('@/assets/audio/guitar-strings/string1/fret11-medium.wav'),
+      's1_f11_hard': require('@/assets/audio/guitar-strings/string1/fret11-hard.wav'),
+      's1_f12_soft': require('@/assets/audio/guitar-strings/string1/fret12-soft.wav'),
+      's1_f12_medium': require('@/assets/audio/guitar-strings/string1/fret12-medium.wav'),
+      's1_f12_hard': require('@/assets/audio/guitar-strings/string1/fret12-hard.wav'),
+      
+      // String 2 (D) - Frets 0-12
+      's2_f0_soft': require('@/assets/audio/guitar-strings/string2/fret0-soft.wav'),
+      's2_f0_medium': require('@/assets/audio/guitar-strings/string2/fret0-medium.wav'),
+      's2_f0_hard': require('@/assets/audio/guitar-strings/string2/fret0-hard.wav'),
+      's2_f1_soft': require('@/assets/audio/guitar-strings/string2/fret1-soft.wav'),
+      's2_f1_medium': require('@/assets/audio/guitar-strings/string2/fret1-medium.wav'),
+      's2_f1_hard': require('@/assets/audio/guitar-strings/string2/fret1-hard.wav'),
+      's2_f2_soft': require('@/assets/audio/guitar-strings/string2/fret2-soft.wav'),
+      's2_f2_medium': require('@/assets/audio/guitar-strings/string2/fret2-medium.wav'),
+      's2_f2_hard': require('@/assets/audio/guitar-strings/string2/fret2-hard.wav'),
+      's2_f3_soft': require('@/assets/audio/guitar-strings/string2/fret3-soft.wav'),
+      's2_f3_medium': require('@/assets/audio/guitar-strings/string2/fret3-medium.wav'),
+      's2_f3_hard': require('@/assets/audio/guitar-strings/string2/fret3-hard.wav'),
+      's2_f4_soft': require('@/assets/audio/guitar-strings/string2/fret4-soft.wav'),
+      's2_f4_medium': require('@/assets/audio/guitar-strings/string2/fret4-medium.wav'),
+      's2_f4_hard': require('@/assets/audio/guitar-strings/string2/fret4-hard.wav'),
+      's2_f5_soft': require('@/assets/audio/guitar-strings/string2/fret5-soft.wav'),
+      's2_f5_medium': require('@/assets/audio/guitar-strings/string2/fret5-medium.wav'),
+      's2_f5_hard': require('@/assets/audio/guitar-strings/string2/fret5-hard.wav'),
+      's2_f6_soft': require('@/assets/audio/guitar-strings/string2/fret6-soft.wav'),
+      's2_f6_medium': require('@/assets/audio/guitar-strings/string2/fret6-medium.wav'),
+      's2_f6_hard': require('@/assets/audio/guitar-strings/string2/fret6-hard.wav'),
+      's2_f7_soft': require('@/assets/audio/guitar-strings/string2/fret7-soft.wav'),
+      's2_f7_medium': require('@/assets/audio/guitar-strings/string2/fret7-medium.wav'),
+      's2_f7_hard': require('@/assets/audio/guitar-strings/string2/fret7-hard.wav'),
+      's2_f8_soft': require('@/assets/audio/guitar-strings/string2/fret8-soft.wav'),
+      's2_f8_medium': require('@/assets/audio/guitar-strings/string2/fret8-medium.wav'),
+      's2_f8_hard': require('@/assets/audio/guitar-strings/string2/fret8-hard.wav'),
+      's2_f9_soft': require('@/assets/audio/guitar-strings/string2/fret9-soft.wav'),
+      's2_f9_medium': require('@/assets/audio/guitar-strings/string2/fret9-medium.wav'),
+      's2_f9_hard': require('@/assets/audio/guitar-strings/string2/fret9-hard.wav'),
+      's2_f10_soft': require('@/assets/audio/guitar-strings/string2/fret10-soft.wav'),
+      's2_f10_medium': require('@/assets/audio/guitar-strings/string2/fret10-medium.wav'),
+      's2_f10_hard': require('@/assets/audio/guitar-strings/string2/fret10-hard.wav'),
+      's2_f11_soft': require('@/assets/audio/guitar-strings/string2/fret11-soft.wav'),
+      's2_f11_medium': require('@/assets/audio/guitar-strings/string2/fret11-medium.wav'),
+      's2_f11_hard': require('@/assets/audio/guitar-strings/string2/fret11-hard.wav'),
+      's2_f12_soft': require('@/assets/audio/guitar-strings/string2/fret12-soft.wav'),
+      's2_f12_medium': require('@/assets/audio/guitar-strings/string2/fret12-medium.wav'),
+      's2_f12_hard': require('@/assets/audio/guitar-strings/string2/fret12-hard.wav'),
+      
+      // String 3 (G) - Frets 0-12
+      's3_f0_soft': require('@/assets/audio/guitar-strings/string3/fret0-soft.wav'),
+      's3_f0_medium': require('@/assets/audio/guitar-strings/string3/fret0-medium.wav'),
+      's3_f0_hard': require('@/assets/audio/guitar-strings/string3/fret0-hard.wav'),
+      's3_f1_soft': require('@/assets/audio/guitar-strings/string3/fret1-soft.wav'),
+      's3_f1_medium': require('@/assets/audio/guitar-strings/string3/fret1-medium.wav'),
+      's3_f1_hard': require('@/assets/audio/guitar-strings/string3/fret1-hard.wav'),
+      's3_f2_soft': require('@/assets/audio/guitar-strings/string3/fret2-soft.wav'),
+      's3_f2_medium': require('@/assets/audio/guitar-strings/string3/fret2-medium.wav'),
+      's3_f2_hard': require('@/assets/audio/guitar-strings/string3/fret2-hard.wav'),
+      's3_f3_soft': require('@/assets/audio/guitar-strings/string3/fret3-soft.wav'),
+      's3_f3_medium': require('@/assets/audio/guitar-strings/string3/fret3-medium.wav'),
+      's3_f3_hard': require('@/assets/audio/guitar-strings/string3/fret3-hard.wav'),
+      's3_f4_soft': require('@/assets/audio/guitar-strings/string3/fret4-soft.wav'),
+      's3_f4_medium': require('@/assets/audio/guitar-strings/string3/fret4-medium.wav'),
+      's3_f4_hard': require('@/assets/audio/guitar-strings/string3/fret4-hard.wav'),
+      's3_f5_soft': require('@/assets/audio/guitar-strings/string3/fret5-soft.wav'),
+      's3_f5_medium': require('@/assets/audio/guitar-strings/string3/fret5-medium.wav'),
+      's3_f5_hard': require('@/assets/audio/guitar-strings/string3/fret5-hard.wav'),
+      's3_f6_soft': require('@/assets/audio/guitar-strings/string3/fret6-soft.wav'),
+      's3_f6_medium': require('@/assets/audio/guitar-strings/string3/fret6-medium.wav'),
+      's3_f6_hard': require('@/assets/audio/guitar-strings/string3/fret6-hard.wav'),
+      's3_f7_soft': require('@/assets/audio/guitar-strings/string3/fret7-soft.wav'),
+      's3_f7_medium': require('@/assets/audio/guitar-strings/string3/fret7-medium.wav'),
+      's3_f7_hard': require('@/assets/audio/guitar-strings/string3/fret7-hard.wav'),
+      's3_f8_soft': require('@/assets/audio/guitar-strings/string3/fret8-soft.wav'),
+      's3_f8_medium': require('@/assets/audio/guitar-strings/string3/fret8-medium.wav'),
+      's3_f8_hard': require('@/assets/audio/guitar-strings/string3/fret8-hard.wav'),
+      's3_f9_soft': require('@/assets/audio/guitar-strings/string3/fret9-soft.wav'),
+      's3_f9_medium': require('@/assets/audio/guitar-strings/string3/fret9-medium.wav'),
+      's3_f9_hard': require('@/assets/audio/guitar-strings/string3/fret9-hard.wav'),
+      's3_f10_soft': require('@/assets/audio/guitar-strings/string3/fret10-soft.wav'),
+      's3_f10_medium': require('@/assets/audio/guitar-strings/string3/fret10-medium.wav'),
+      's3_f10_hard': require('@/assets/audio/guitar-strings/string3/fret10-hard.wav'),
+      's3_f11_soft': require('@/assets/audio/guitar-strings/string3/fret11-soft.wav'),
+      's3_f11_medium': require('@/assets/audio/guitar-strings/string3/fret11-medium.wav'),
+      's3_f11_hard': require('@/assets/audio/guitar-strings/string3/fret11-hard.wav'),
+      's3_f12_soft': require('@/assets/audio/guitar-strings/string3/fret12-soft.wav'),
+      's3_f12_medium': require('@/assets/audio/guitar-strings/string3/fret12-medium.wav'),
+      's3_f12_hard': require('@/assets/audio/guitar-strings/string3/fret12-hard.wav'),
+      
+      // String 4 (B) - Frets 0-12
+      's4_f0_soft': require('@/assets/audio/guitar-strings/string4/fret0-soft.wav'),
+      's4_f0_medium': require('@/assets/audio/guitar-strings/string4/fret0-medium.wav'),
+      's4_f0_hard': require('@/assets/audio/guitar-strings/string4/fret0-hard.wav'),
+      's4_f1_soft': require('@/assets/audio/guitar-strings/string4/fret1-soft.wav'),
+      's4_f1_medium': require('@/assets/audio/guitar-strings/string4/fret1-medium.wav'),
+      's4_f1_hard': require('@/assets/audio/guitar-strings/string4/fret1-hard.wav'),
+      's4_f2_soft': require('@/assets/audio/guitar-strings/string4/fret2-soft.wav'),
+      's4_f2_medium': require('@/assets/audio/guitar-strings/string4/fret2-medium.wav'),
+      's4_f2_hard': require('@/assets/audio/guitar-strings/string4/fret2-hard.wav'),
+      's4_f3_soft': require('@/assets/audio/guitar-strings/string4/fret3-soft.wav'),
+      's4_f3_medium': require('@/assets/audio/guitar-strings/string4/fret3-medium.wav'),
+      's4_f3_hard': require('@/assets/audio/guitar-strings/string4/fret3-hard.wav'),
+      's4_f4_soft': require('@/assets/audio/guitar-strings/string4/fret4-soft.wav'),
+      's4_f4_medium': require('@/assets/audio/guitar-strings/string4/fret4-medium.wav'),
+      's4_f4_hard': require('@/assets/audio/guitar-strings/string4/fret4-hard.wav'),
+      's4_f5_soft': require('@/assets/audio/guitar-strings/string4/fret5-soft.wav'),
+      's4_f5_medium': require('@/assets/audio/guitar-strings/string4/fret5-medium.wav'),
+      's4_f5_hard': require('@/assets/audio/guitar-strings/string4/fret5-hard.wav'),
+      's4_f6_soft': require('@/assets/audio/guitar-strings/string4/fret6-soft.wav'),
+      's4_f6_medium': require('@/assets/audio/guitar-strings/string4/fret6-medium.wav'),
+      's4_f6_hard': require('@/assets/audio/guitar-strings/string4/fret6-hard.wav'),
+      's4_f7_soft': require('@/assets/audio/guitar-strings/string4/fret7-soft.wav'),
+      's4_f7_medium': require('@/assets/audio/guitar-strings/string4/fret7-medium.wav'),
+      's4_f7_hard': require('@/assets/audio/guitar-strings/string4/fret7-hard.wav'),
+      's4_f8_soft': require('@/assets/audio/guitar-strings/string4/fret8-soft.wav'),
+      's4_f8_medium': require('@/assets/audio/guitar-strings/string4/fret8-medium.wav'),
+      's4_f8_hard': require('@/assets/audio/guitar-strings/string4/fret8-hard.wav'),
+      's4_f9_soft': require('@/assets/audio/guitar-strings/string4/fret9-soft.wav'),
+      's4_f9_medium': require('@/assets/audio/guitar-strings/string4/fret9-medium.wav'),
+      's4_f9_hard': require('@/assets/audio/guitar-strings/string4/fret9-hard.wav'),
+      's4_f10_soft': require('@/assets/audio/guitar-strings/string4/fret10-soft.wav'),
+      's4_f10_medium': require('@/assets/audio/guitar-strings/string4/fret10-medium.wav'),
+      's4_f10_hard': require('@/assets/audio/guitar-strings/string4/fret10-hard.wav'),
+      's4_f11_soft': require('@/assets/audio/guitar-strings/string4/fret11-soft.wav'),
+      's4_f11_medium': require('@/assets/audio/guitar-strings/string4/fret11-medium.wav'),
+      's4_f11_hard': require('@/assets/audio/guitar-strings/string4/fret11-hard.wav'),
+      's4_f12_soft': require('@/assets/audio/guitar-strings/string4/fret12-soft.wav'),
+      's4_f12_medium': require('@/assets/audio/guitar-strings/string4/fret12-medium.wav'),
+      's4_f12_hard': require('@/assets/audio/guitar-strings/string4/fret12-hard.wav'),
+      
+      // String 5 (High e) - Frets 0-12
+      's5_f0_soft': require('@/assets/audio/guitar-strings/string5/fret0-soft.wav'),
+      's5_f0_medium': require('@/assets/audio/guitar-strings/string5/fret0-medium.wav'),
+      's5_f0_hard': require('@/assets/audio/guitar-strings/string5/fret0-hard.wav'),
+      's5_f1_soft': require('@/assets/audio/guitar-strings/string5/fret1-soft.wav'),
+      's5_f1_medium': require('@/assets/audio/guitar-strings/string5/fret1-medium.wav'),
+      's5_f1_hard': require('@/assets/audio/guitar-strings/string5/fret1-hard.wav'),
+      's5_f2_soft': require('@/assets/audio/guitar-strings/string5/fret2-soft.wav'),
+      's5_f2_medium': require('@/assets/audio/guitar-strings/string5/fret2-medium.wav'),
+      's5_f2_hard': require('@/assets/audio/guitar-strings/string5/fret2-hard.wav'),
+      's5_f3_soft': require('@/assets/audio/guitar-strings/string5/fret3-soft.wav'),
+      's5_f3_medium': require('@/assets/audio/guitar-strings/string5/fret3-medium.wav'),
+      's5_f3_hard': require('@/assets/audio/guitar-strings/string5/fret3-hard.wav'),
+      's5_f4_soft': require('@/assets/audio/guitar-strings/string5/fret4-soft.wav'),
+      's5_f4_medium': require('@/assets/audio/guitar-strings/string5/fret4-medium.wav'),
+      's5_f4_hard': require('@/assets/audio/guitar-strings/string5/fret4-hard.wav'),
+      's5_f5_soft': require('@/assets/audio/guitar-strings/string5/fret5-soft.wav'),
+      's5_f5_medium': require('@/assets/audio/guitar-strings/string5/fret5-medium.wav'),
+      's5_f5_hard': require('@/assets/audio/guitar-strings/string5/fret5-hard.wav'),
+      's5_f6_soft': require('@/assets/audio/guitar-strings/string5/fret6-soft.wav'),
+      's5_f6_medium': require('@/assets/audio/guitar-strings/string5/fret6-medium.wav'),
+      's5_f6_hard': require('@/assets/audio/guitar-strings/string5/fret6-hard.wav'),
+      's5_f7_soft': require('@/assets/audio/guitar-strings/string5/fret7-soft.wav'),
+      's5_f7_medium': require('@/assets/audio/guitar-strings/string5/fret7-medium.wav'),
+      's5_f7_hard': require('@/assets/audio/guitar-strings/string5/fret7-hard.wav'),
+      's5_f8_soft': require('@/assets/audio/guitar-strings/string5/fret8-soft.wav'),
+      's5_f8_medium': require('@/assets/audio/guitar-strings/string5/fret8-medium.wav'),
+      's5_f8_hard': require('@/assets/audio/guitar-strings/string5/fret8-hard.wav'),
+      's5_f9_soft': require('@/assets/audio/guitar-strings/string5/fret9-soft.wav'),
+      's5_f9_medium': require('@/assets/audio/guitar-strings/string5/fret9-medium.wav'),
+      's5_f9_hard': require('@/assets/audio/guitar-strings/string5/fret9-hard.wav'),
+      's5_f10_soft': require('@/assets/audio/guitar-strings/string5/fret10-soft.wav'),
+      's5_f10_medium': require('@/assets/audio/guitar-strings/string5/fret10-medium.wav'),
+      's5_f10_hard': require('@/assets/audio/guitar-strings/string5/fret10-hard.wav'),
+      's5_f11_soft': require('@/assets/audio/guitar-strings/string5/fret11-soft.wav'),
+      's5_f11_medium': require('@/assets/audio/guitar-strings/string5/fret11-medium.wav'),
+      's5_f11_hard': require('@/assets/audio/guitar-strings/string5/fret11-hard.wav'),
+      's5_f12_soft': require('@/assets/audio/guitar-strings/string5/fret12-soft.wav'),
+      's5_f12_medium': require('@/assets/audio/guitar-strings/string5/fret12-medium.wav'),
+      's5_f12_hard': require('@/assets/audio/guitar-strings/string5/fret12-hard.wav'),
     };
     
     const key = this.getSampleKey(stringIndex, fret, velocity);
-    return sampleMap[key] || null;
-    */
+    const assetPath = sampleMap[key];
+    
+    if (!assetPath) {
+      console.warn(`⚠️ No sample mapped for ${key} - will use synthesis fallback`);
+      return null;
+    }
+    
+    return assetPath;
   }
   
   /**
@@ -176,8 +427,8 @@ class StrummingAudioService {
   /**
    * Load sample into cache
    * 
-   * NOTE: This is a simplified version. In production with actual samples,
-   * this would use Expo Asset to load and cache the audio files.
+   * Once samples are organized per FREEPATS_SETUP_GUIDE.md, this will
+   * automatically load and cache them for instant playback.
    */
   private async loadSample(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): Promise<string | null> {
     const key = this.getSampleKey(stringIndex, fret, velocity);
@@ -190,18 +441,19 @@ class StrummingAudioService {
     // Get asset path
     const assetPath = this.getSampleAssetPath(stringIndex, fret, velocity);
     if (!assetPath) {
-      console.warn(`⚠️ No sample for ${key} - sample library not yet implemented`);
-      return null;
+      return null; // No sample available, will use synthesis fallback
     }
     
     try {
-      // Load asset using Expo Asset (production implementation)
-      // const asset = Asset.fromModule(assetPath);
-      // await asset.downloadAsync();
-      // const uri = asset.localUri;
+      // The assetPath is already a require() result, which is a module number
+      // Expo converts this to a local URI automatically
+      const uri = assetPath;
       
-      // PLACEHOLDER: Return null until samples are added
-      return null;
+      // Cache the URI
+      this.sampleCache.set(key, uri);
+      
+      console.log(`✅ Loaded sample ${key}`);
+      return uri;
       
     } catch (error) {
       console.error(`❌ Failed to load sample ${key}:`, error);
