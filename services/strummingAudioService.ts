@@ -5,11 +5,11 @@
  * Delivers authentic guitar strumming with humanization and dynamic expression.
  * 
  * Architecture:
- * - Per-string sample playback (not full chord samples)
- * - Velocity-layered samples (soft/medium/hard)
+ * - Per-string sample playback (real guitar samples from FreePats)
  * - Algorithmic humanization (timing jitter, velocity variation)
  * - Efficient memory management (sample pooling)
  * - Parallel string playback for realistic strumming
+ * - Automatic synthesis fallback for missing samples
  * 
  * Performance:
  * - Pre-loaded samples for zero-latency playback
@@ -20,22 +20,11 @@
  */
 
 import { ChordData } from '@/constants/musicData';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { Audio } from 'expo-av';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
-
-/**
- * Sample metadata for each playable note
- */
-interface StringSample {
-  stringIndex: number;      // 0-5 (low E to high e)
-  fret: number;            // 0-24
-  velocity: 'soft' | 'medium' | 'hard';
-  assetPath: any;          // require() path to WAV file
-  frequency: number;        // Hz (for reference)
-}
 
 /**
  * Strumming configuration
@@ -61,7 +50,7 @@ interface ActiveSound {
 
 class StrummingAudioService {
   private audioInitialized: boolean = false;
-  private sampleCache: Map<string, string> = new Map(); // key → URI
+  private sampleCache: Map<string, any> = new Map(); // key → require() result
   private activeSounds: ActiveSound[] = [];
   private soundPool: Audio.Sound[] = []; // Reusable sound instances
   
@@ -102,327 +91,194 @@ class StrummingAudioService {
   // ============================================================================
   
   /**
-   * Sample library structure:
+   * FreePats guitar sample mapping
+   * 
+   * 🎸 SAMPLE ORGANIZATION:
+   * Each string folder contains WAV files named by note (e.g., E2.wav, F2.wav)
    * 
    * assets/audio/guitar-strings/
-   * ├── string0/  (low E)
-   * │   ├── fret0-soft.wav
-   * │   ├── fret0-medium.wav
-   * │   ├── fret0-hard.wav
-   * │   ├── fret1-soft.wav
-   * │   └── ... (fret 0-12 minimum)
-   * ├── string1/  (A)
-   * ├── string2/  (D)
-   * ├── string3/  (G)
-   * ├── string4/  (B)
-   * └── string5/  (high e)
+   * ├── string0/  (Low E: E2-E3)
+   * ├── string1/  (A: A2-A3)
+   * ├── string2/  (D: D3-D4)
+   * ├── string3/  (G: G3-G4)
+   * ├── string4/  (B: B3-B4)
+   * └── string5/  (High E: E4-E5)
    * 
-   * Note: This is the IDEAL structure. For MVP, we can generate these
-   * samples from a base set using the provided sample generation helpers.
+   * ⚠️ TO ENABLE SAMPLES:
+   * 1. Follow assets/audio/guitar-strings/MANUAL_SETUP_GUIDE.md
+   * 2. Uncomment the SAMPLE_MAP below
+   * 3. Restart app: npx expo start --clear
+   * 
+   * Until enabled, app uses synthesis fallback (still works great!).
    */
   
   /**
-   * Get sample key for caching
+   * Note name mapping for each string/fret position
    */
-  private getSampleKey(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): string {
-    return `s${stringIndex}_f${fret}_${velocity}`;
+  private readonly NOTE_MAP = {
+    0: {  // String 0: Low E (E2)
+      0: 'E2', 1: 'F2', 2: 'Fs2', 3: 'G2', 4: 'Gs2', 5: 'A2',
+      6: 'As2', 7: 'B2', 8: 'C3', 9: 'Cs3', 10: 'D3', 11: 'Ds3', 12: 'E3'
+    },
+    1: {  // String 1: A (A2)
+      0: 'A2', 1: 'As2', 2: 'B2', 3: 'C3', 4: 'Cs3', 5: 'D3',
+      6: 'Ds3', 7: 'E3', 8: 'F3', 9: 'Fs3', 10: 'G3', 11: 'Gs3', 12: 'A3'
+    },
+    2: {  // String 2: D (D3)
+      0: 'D3', 1: 'Ds3', 2: 'E3', 3: 'F3', 4: 'Fs3', 5: 'G3',
+      6: 'Gs3', 7: 'A3', 8: 'As3', 9: 'B3', 10: 'C4', 11: 'Cs4', 12: 'D4'
+    },
+    3: {  // String 3: G (G3)
+      0: 'G3', 1: 'Gs3', 2: 'A3', 3: 'As3', 4: 'B3', 5: 'C4',
+      6: 'Cs4', 7: 'D4', 8: 'Ds4', 9: 'E4', 10: 'F4', 11: 'Fs4', 12: 'G4'
+    },
+    4: {  // String 4: B (B3)
+      0: 'B3', 1: 'C4', 2: 'Cs4', 3: 'D4', 4: 'Ds4', 5: 'E4',
+      6: 'F4', 7: 'Fs4', 8: 'G4', 9: 'Gs4', 10: 'A4', 11: 'As4', 12: 'B4'
+    },
+    5: {  // String 5: High E (E4)
+      0: 'E4', 1: 'F4', 2: 'Fs4', 3: 'G4', 4: 'Gs4', 5: 'A4',
+      6: 'As4', 7: 'B4', 8: 'C5', 9: 'Cs5', 10: 'D5', 11: 'Ds5', 12: 'E5'
+    }
+  };
+  
+  /**
+   * Get note name for string/fret position
+   */
+  private getNoteName(stringIndex: number, fret: number): string | null {
+    const stringMap = this.NOTE_MAP[stringIndex as keyof typeof this.NOTE_MAP];
+    if (!stringMap) return null;
+    return stringMap[fret as keyof typeof stringMap] || null;
   }
   
   /**
-   * Get sample asset path (returns require() statement)
+   * Get sample asset path
    * 
-   * FreePats sample mapping:
-   * - 6 strings × 13 frets (0-12) × 3 velocities = 234 total samples
-   * - Samples organized in string{N}/fret{N}-{velocity}.wav structure
-   * 
-   * ⚠️ IMPORTANT: Samples are currently DISABLED to prevent build errors.
-   * 
-   * TO ENABLE SAMPLES:
-   * 1. Follow FREEPATS_SETUP_GUIDE.md to download and organize samples
-   * 2. Uncomment the sampleMap below
-   * 3. Run: npx expo start --clear
-   * 
-   * Until then, the app uses synthesis fallback (still works great!).
+   * 🔒 SAMPLES CURRENTLY DISABLED
+   * Uncomment the code block below after organizing your samples!
    */
-  private getSampleAssetPath(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): any {
-    // Validate inputs
-    if (stringIndex < 0 || stringIndex > 5 || fret < 0 || fret > 12) {
-      return null;
-    }
+  private getSampleAssetPath(stringIndex: number, fret: number): any {
+    const noteName = this.getNoteName(stringIndex, fret);
+    if (!noteName) return null;
     
-    // 🔒 SAMPLES DISABLED UNTIL YOU ADD WAV FILES
-    // Return null to use synthesis fallback
-    // Uncomment the sampleMap below once you've added FreePats samples
+    // 🔒 SAMPLES DISABLED - Return null to use synthesis fallback
+    // Uncomment the SAMPLE_MAP below once you've added WAV files
     return null;
     
-    /* UNCOMMENT THIS BLOCK AFTER ADDING SAMPLES:
+    /* UNCOMMENT THIS BLOCK AFTER ORGANIZING SAMPLES:
     
-    // Build sample map with all FreePats samples
-    // This uses dynamic require paths that Metro bundler will resolve
-    const sampleMap: Record<string, any> = {
-      // String 0 (Low E) - Frets 0-12
-      's0_f0_soft': require('@/assets/audio/guitar-strings/string0/fret0-soft.wav'),
-      's0_f0_medium': require('@/assets/audio/guitar-strings/string0/fret0-medium.wav'),
-      's0_f0_hard': require('@/assets/audio/guitar-strings/string0/fret0-hard.wav'),
-      's0_f1_soft': require('@/assets/audio/guitar-strings/string0/fret1-soft.wav'),
-      's0_f1_medium': require('@/assets/audio/guitar-strings/string0/fret1-medium.wav'),
-      's0_f1_hard': require('@/assets/audio/guitar-strings/string0/fret1-hard.wav'),
-      's0_f2_soft': require('@/assets/audio/guitar-strings/string0/fret2-soft.wav'),
-      's0_f2_medium': require('@/assets/audio/guitar-strings/string0/fret2-medium.wav'),
-      's0_f2_hard': require('@/assets/audio/guitar-strings/string0/fret2-hard.wav'),
-      's0_f3_soft': require('@/assets/audio/guitar-strings/string0/fret3-soft.wav'),
-      's0_f3_medium': require('@/assets/audio/guitar-strings/string0/fret3-medium.wav'),
-      's0_f3_hard': require('@/assets/audio/guitar-strings/string0/fret3-hard.wav'),
-      's0_f4_soft': require('@/assets/audio/guitar-strings/string0/fret4-soft.wav'),
-      's0_f4_medium': require('@/assets/audio/guitar-strings/string0/fret4-medium.wav'),
-      's0_f4_hard': require('@/assets/audio/guitar-strings/string0/fret4-hard.wav'),
-      's0_f5_soft': require('@/assets/audio/guitar-strings/string0/fret5-soft.wav'),
-      's0_f5_medium': require('@/assets/audio/guitar-strings/string0/fret5-medium.wav'),
-      's0_f5_hard': require('@/assets/audio/guitar-strings/string0/fret5-hard.wav'),
-      's0_f6_soft': require('@/assets/audio/guitar-strings/string0/fret6-soft.wav'),
-      's0_f6_medium': require('@/assets/audio/guitar-strings/string0/fret6-medium.wav'),
-      's0_f6_hard': require('@/assets/audio/guitar-strings/string0/fret6-hard.wav'),
-      's0_f7_soft': require('@/assets/audio/guitar-strings/string0/fret7-soft.wav'),
-      's0_f7_medium': require('@/assets/audio/guitar-strings/string0/fret7-medium.wav'),
-      's0_f7_hard': require('@/assets/audio/guitar-strings/string0/fret7-hard.wav'),
-      's0_f8_soft': require('@/assets/audio/guitar-strings/string0/fret8-soft.wav'),
-      's0_f8_medium': require('@/assets/audio/guitar-strings/string0/fret8-medium.wav'),
-      's0_f8_hard': require('@/assets/audio/guitar-strings/string0/fret8-hard.wav'),
-      's0_f9_soft': require('@/assets/audio/guitar-strings/string0/fret9-soft.wav'),
-      's0_f9_medium': require('@/assets/audio/guitar-strings/string0/fret9-medium.wav'),
-      's0_f9_hard': require('@/assets/audio/guitar-strings/string0/fret9-hard.wav'),
-      's0_f10_soft': require('@/assets/audio/guitar-strings/string0/fret10-soft.wav'),
-      's0_f10_medium': require('@/assets/audio/guitar-strings/string0/fret10-medium.wav'),
-      's0_f10_hard': require('@/assets/audio/guitar-strings/string0/fret10-hard.wav'),
-      's0_f11_soft': require('@/assets/audio/guitar-strings/string0/fret11-soft.wav'),
-      's0_f11_medium': require('@/assets/audio/guitar-strings/string0/fret11-medium.wav'),
-      's0_f11_hard': require('@/assets/audio/guitar-strings/string0/fret11-hard.wav'),
-      's0_f12_soft': require('@/assets/audio/guitar-strings/string0/fret12-soft.wav'),
-      's0_f12_medium': require('@/assets/audio/guitar-strings/string0/fret12-medium.wav'),
-      's0_f12_hard': require('@/assets/audio/guitar-strings/string0/fret12-hard.wav'),
+    const SAMPLE_MAP: Record<string, any> = {
+      // String 0 (Low E)
+      'E2': require('@/assets/audio/guitar-strings/string0/E2.wav'),
+      'F2': require('@/assets/audio/guitar-strings/string0/F2.wav'),
+      'Fs2': require('@/assets/audio/guitar-strings/string0/Fs2.wav'),
+      'G2': require('@/assets/audio/guitar-strings/string0/G2.wav'),
+      'Gs2': require('@/assets/audio/guitar-strings/string0/Gs2.wav'),
+      'A2': require('@/assets/audio/guitar-strings/string0/A2.wav'),
+      'As2': require('@/assets/audio/guitar-strings/string0/As2.wav'),
+      'B2': require('@/assets/audio/guitar-strings/string0/B2.wav'),
+      'C3': require('@/assets/audio/guitar-strings/string0/C3.wav'),
+      'Cs3': require('@/assets/audio/guitar-strings/string0/Cs3.wav'),
+      'D3': require('@/assets/audio/guitar-strings/string0/D3.wav'),
+      'Ds3': require('@/assets/audio/guitar-strings/string0/Ds3.wav'),
+      'E3': require('@/assets/audio/guitar-strings/string0/E3.wav'),
       
-      // String 1 (A) - Frets 0-12
-      's1_f0_soft': require('@/assets/audio/guitar-strings/string1/fret0-soft.wav'),
-      's1_f0_medium': require('@/assets/audio/guitar-strings/string1/fret0-medium.wav'),
-      's1_f0_hard': require('@/assets/audio/guitar-strings/string1/fret0-hard.wav'),
-      's1_f1_soft': require('@/assets/audio/guitar-strings/string1/fret1-soft.wav'),
-      's1_f1_medium': require('@/assets/audio/guitar-strings/string1/fret1-medium.wav'),
-      's1_f1_hard': require('@/assets/audio/guitar-strings/string1/fret1-hard.wav'),
-      's1_f2_soft': require('@/assets/audio/guitar-strings/string1/fret2-soft.wav'),
-      's1_f2_medium': require('@/assets/audio/guitar-strings/string1/fret2-medium.wav'),
-      's1_f2_hard': require('@/assets/audio/guitar-strings/string1/fret2-hard.wav'),
-      's1_f3_soft': require('@/assets/audio/guitar-strings/string1/fret3-soft.wav'),
-      's1_f3_medium': require('@/assets/audio/guitar-strings/string1/fret3-medium.wav'),
-      's1_f3_hard': require('@/assets/audio/guitar-strings/string1/fret3-hard.wav'),
-      's1_f4_soft': require('@/assets/audio/guitar-strings/string1/fret4-soft.wav'),
-      's1_f4_medium': require('@/assets/audio/guitar-strings/string1/fret4-medium.wav'),
-      's1_f4_hard': require('@/assets/audio/guitar-strings/string1/fret4-hard.wav'),
-      's1_f5_soft': require('@/assets/audio/guitar-strings/string1/fret5-soft.wav'),
-      's1_f5_medium': require('@/assets/audio/guitar-strings/string1/fret5-medium.wav'),
-      's1_f5_hard': require('@/assets/audio/guitar-strings/string1/fret5-hard.wav'),
-      's1_f6_soft': require('@/assets/audio/guitar-strings/string1/fret6-soft.wav'),
-      's1_f6_medium': require('@/assets/audio/guitar-strings/string1/fret6-medium.wav'),
-      's1_f6_hard': require('@/assets/audio/guitar-strings/string1/fret6-hard.wav'),
-      's1_f7_soft': require('@/assets/audio/guitar-strings/string1/fret7-soft.wav'),
-      's1_f7_medium': require('@/assets/audio/guitar-strings/string1/fret7-medium.wav'),
-      's1_f7_hard': require('@/assets/audio/guitar-strings/string1/fret7-hard.wav'),
-      's1_f8_soft': require('@/assets/audio/guitar-strings/string1/fret8-soft.wav'),
-      's1_f8_medium': require('@/assets/audio/guitar-strings/string1/fret8-medium.wav'),
-      's1_f8_hard': require('@/assets/audio/guitar-strings/string1/fret8-hard.wav'),
-      's1_f9_soft': require('@/assets/audio/guitar-strings/string1/fret9-soft.wav'),
-      's1_f9_medium': require('@/assets/audio/guitar-strings/string1/fret9-medium.wav'),
-      's1_f9_hard': require('@/assets/audio/guitar-strings/string1/fret9-hard.wav'),
-      's1_f10_soft': require('@/assets/audio/guitar-strings/string1/fret10-soft.wav'),
-      's1_f10_medium': require('@/assets/audio/guitar-strings/string1/fret10-medium.wav'),
-      's1_f10_hard': require('@/assets/audio/guitar-strings/string1/fret10-hard.wav'),
-      's1_f11_soft': require('@/assets/audio/guitar-strings/string1/fret11-soft.wav'),
-      's1_f11_medium': require('@/assets/audio/guitar-strings/string1/fret11-medium.wav'),
-      's1_f11_hard': require('@/assets/audio/guitar-strings/string1/fret11-hard.wav'),
-      's1_f12_soft': require('@/assets/audio/guitar-strings/string1/fret12-soft.wav'),
-      's1_f12_medium': require('@/assets/audio/guitar-strings/string1/fret12-medium.wav'),
-      's1_f12_hard': require('@/assets/audio/guitar-strings/string1/fret12-hard.wav'),
+      // String 1 (A)
+      'A2_s1': require('@/assets/audio/guitar-strings/string1/A2.wav'),
+      'As2_s1': require('@/assets/audio/guitar-strings/string1/As2.wav'),
+      'B2_s1': require('@/assets/audio/guitar-strings/string1/B2.wav'),
+      'C3_s1': require('@/assets/audio/guitar-strings/string1/C3.wav'),
+      'Cs3_s1': require('@/assets/audio/guitar-strings/string1/Cs3.wav'),
+      'D3_s1': require('@/assets/audio/guitar-strings/string1/D3.wav'),
+      'Ds3_s1': require('@/assets/audio/guitar-strings/string1/Ds3.wav'),
+      'E3_s1': require('@/assets/audio/guitar-strings/string1/E3.wav'),
+      'F3': require('@/assets/audio/guitar-strings/string1/F3.wav'),
+      'Fs3': require('@/assets/audio/guitar-strings/string1/Fs3.wav'),
+      'G3': require('@/assets/audio/guitar-strings/string1/G3.wav'),
+      'Gs3': require('@/assets/audio/guitar-strings/string1/Gs3.wav'),
+      'A3': require('@/assets/audio/guitar-strings/string1/A3.wav'),
       
-      // String 2 (D) - Frets 0-12
-      's2_f0_soft': require('@/assets/audio/guitar-strings/string2/fret0-soft.wav'),
-      's2_f0_medium': require('@/assets/audio/guitar-strings/string2/fret0-medium.wav'),
-      's2_f0_hard': require('@/assets/audio/guitar-strings/string2/fret0-hard.wav'),
-      's2_f1_soft': require('@/assets/audio/guitar-strings/string2/fret1-soft.wav'),
-      's2_f1_medium': require('@/assets/audio/guitar-strings/string2/fret1-medium.wav'),
-      's2_f1_hard': require('@/assets/audio/guitar-strings/string2/fret1-hard.wav'),
-      's2_f2_soft': require('@/assets/audio/guitar-strings/string2/fret2-soft.wav'),
-      's2_f2_medium': require('@/assets/audio/guitar-strings/string2/fret2-medium.wav'),
-      's2_f2_hard': require('@/assets/audio/guitar-strings/string2/fret2-hard.wav'),
-      's2_f3_soft': require('@/assets/audio/guitar-strings/string2/fret3-soft.wav'),
-      's2_f3_medium': require('@/assets/audio/guitar-strings/string2/fret3-medium.wav'),
-      's2_f3_hard': require('@/assets/audio/guitar-strings/string2/fret3-hard.wav'),
-      's2_f4_soft': require('@/assets/audio/guitar-strings/string2/fret4-soft.wav'),
-      's2_f4_medium': require('@/assets/audio/guitar-strings/string2/fret4-medium.wav'),
-      's2_f4_hard': require('@/assets/audio/guitar-strings/string2/fret4-hard.wav'),
-      's2_f5_soft': require('@/assets/audio/guitar-strings/string2/fret5-soft.wav'),
-      's2_f5_medium': require('@/assets/audio/guitar-strings/string2/fret5-medium.wav'),
-      's2_f5_hard': require('@/assets/audio/guitar-strings/string2/fret5-hard.wav'),
-      's2_f6_soft': require('@/assets/audio/guitar-strings/string2/fret6-soft.wav'),
-      's2_f6_medium': require('@/assets/audio/guitar-strings/string2/fret6-medium.wav'),
-      's2_f6_hard': require('@/assets/audio/guitar-strings/string2/fret6-hard.wav'),
-      's2_f7_soft': require('@/assets/audio/guitar-strings/string2/fret7-soft.wav'),
-      's2_f7_medium': require('@/assets/audio/guitar-strings/string2/fret7-medium.wav'),
-      's2_f7_hard': require('@/assets/audio/guitar-strings/string2/fret7-hard.wav'),
-      's2_f8_soft': require('@/assets/audio/guitar-strings/string2/fret8-soft.wav'),
-      's2_f8_medium': require('@/assets/audio/guitar-strings/string2/fret8-medium.wav'),
-      's2_f8_hard': require('@/assets/audio/guitar-strings/string2/fret8-hard.wav'),
-      's2_f9_soft': require('@/assets/audio/guitar-strings/string2/fret9-soft.wav'),
-      's2_f9_medium': require('@/assets/audio/guitar-strings/string2/fret9-medium.wav'),
-      's2_f9_hard': require('@/assets/audio/guitar-strings/string2/fret9-hard.wav'),
-      's2_f10_soft': require('@/assets/audio/guitar-strings/string2/fret10-soft.wav'),
-      's2_f10_medium': require('@/assets/audio/guitar-strings/string2/fret10-medium.wav'),
-      's2_f10_hard': require('@/assets/audio/guitar-strings/string2/fret10-hard.wav'),
-      's2_f11_soft': require('@/assets/audio/guitar-strings/string2/fret11-soft.wav'),
-      's2_f11_medium': require('@/assets/audio/guitar-strings/string2/fret11-medium.wav'),
-      's2_f11_hard': require('@/assets/audio/guitar-strings/string2/fret11-hard.wav'),
-      's2_f12_soft': require('@/assets/audio/guitar-strings/string2/fret12-soft.wav'),
-      's2_f12_medium': require('@/assets/audio/guitar-strings/string2/fret12-medium.wav'),
-      's2_f12_hard': require('@/assets/audio/guitar-strings/string2/fret12-hard.wav'),
+      // String 2 (D)
+      'D3_s2': require('@/assets/audio/guitar-strings/string2/D3.wav'),
+      'Ds3_s2': require('@/assets/audio/guitar-strings/string2/Ds3.wav'),
+      'E3_s2': require('@/assets/audio/guitar-strings/string2/E3.wav'),
+      'F3_s2': require('@/assets/audio/guitar-strings/string2/F3.wav'),
+      'Fs3_s2': require('@/assets/audio/guitar-strings/string2/Fs3.wav'),
+      'G3_s2': require('@/assets/audio/guitar-strings/string2/G3.wav'),
+      'Gs3_s2': require('@/assets/audio/guitar-strings/string2/Gs3.wav'),
+      'A3_s2': require('@/assets/audio/guitar-strings/string2/A3.wav'),
+      'As3': require('@/assets/audio/guitar-strings/string2/As3.wav'),
+      'B3': require('@/assets/audio/guitar-strings/string2/B3.wav'),
+      'C4': require('@/assets/audio/guitar-strings/string2/C4.wav'),
+      'Cs4': require('@/assets/audio/guitar-strings/string2/Cs4.wav'),
+      'D4': require('@/assets/audio/guitar-strings/string2/D4.wav'),
       
-      // String 3 (G) - Frets 0-12
-      's3_f0_soft': require('@/assets/audio/guitar-strings/string3/fret0-soft.wav'),
-      's3_f0_medium': require('@/assets/audio/guitar-strings/string3/fret0-medium.wav'),
-      's3_f0_hard': require('@/assets/audio/guitar-strings/string3/fret0-hard.wav'),
-      's3_f1_soft': require('@/assets/audio/guitar-strings/string3/fret1-soft.wav'),
-      's3_f1_medium': require('@/assets/audio/guitar-strings/string3/fret1-medium.wav'),
-      's3_f1_hard': require('@/assets/audio/guitar-strings/string3/fret1-hard.wav'),
-      's3_f2_soft': require('@/assets/audio/guitar-strings/string3/fret2-soft.wav'),
-      's3_f2_medium': require('@/assets/audio/guitar-strings/string3/fret2-medium.wav'),
-      's3_f2_hard': require('@/assets/audio/guitar-strings/string3/fret2-hard.wav'),
-      's3_f3_soft': require('@/assets/audio/guitar-strings/string3/fret3-soft.wav'),
-      's3_f3_medium': require('@/assets/audio/guitar-strings/string3/fret3-medium.wav'),
-      's3_f3_hard': require('@/assets/audio/guitar-strings/string3/fret3-hard.wav'),
-      's3_f4_soft': require('@/assets/audio/guitar-strings/string3/fret4-soft.wav'),
-      's3_f4_medium': require('@/assets/audio/guitar-strings/string3/fret4-medium.wav'),
-      's3_f4_hard': require('@/assets/audio/guitar-strings/string3/fret4-hard.wav'),
-      's3_f5_soft': require('@/assets/audio/guitar-strings/string3/fret5-soft.wav'),
-      's3_f5_medium': require('@/assets/audio/guitar-strings/string3/fret5-medium.wav'),
-      's3_f5_hard': require('@/assets/audio/guitar-strings/string3/fret5-hard.wav'),
-      's3_f6_soft': require('@/assets/audio/guitar-strings/string3/fret6-soft.wav'),
-      's3_f6_medium': require('@/assets/audio/guitar-strings/string3/fret6-medium.wav'),
-      's3_f6_hard': require('@/assets/audio/guitar-strings/string3/fret6-hard.wav'),
-      's3_f7_soft': require('@/assets/audio/guitar-strings/string3/fret7-soft.wav'),
-      's3_f7_medium': require('@/assets/audio/guitar-strings/string3/fret7-medium.wav'),
-      's3_f7_hard': require('@/assets/audio/guitar-strings/string3/fret7-hard.wav'),
-      's3_f8_soft': require('@/assets/audio/guitar-strings/string3/fret8-soft.wav'),
-      's3_f8_medium': require('@/assets/audio/guitar-strings/string3/fret8-medium.wav'),
-      's3_f8_hard': require('@/assets/audio/guitar-strings/string3/fret8-hard.wav'),
-      's3_f9_soft': require('@/assets/audio/guitar-strings/string3/fret9-soft.wav'),
-      's3_f9_medium': require('@/assets/audio/guitar-strings/string3/fret9-medium.wav'),
-      's3_f9_hard': require('@/assets/audio/guitar-strings/string3/fret9-hard.wav'),
-      's3_f10_soft': require('@/assets/audio/guitar-strings/string3/fret10-soft.wav'),
-      's3_f10_medium': require('@/assets/audio/guitar-strings/string3/fret10-medium.wav'),
-      's3_f10_hard': require('@/assets/audio/guitar-strings/string3/fret10-hard.wav'),
-      's3_f11_soft': require('@/assets/audio/guitar-strings/string3/fret11-soft.wav'),
-      's3_f11_medium': require('@/assets/audio/guitar-strings/string3/fret11-medium.wav'),
-      's3_f11_hard': require('@/assets/audio/guitar-strings/string3/fret11-hard.wav'),
-      's3_f12_soft': require('@/assets/audio/guitar-strings/string3/fret12-soft.wav'),
-      's3_f12_medium': require('@/assets/audio/guitar-strings/string3/fret12-medium.wav'),
-      's3_f12_hard': require('@/assets/audio/guitar-strings/string3/fret12-hard.wav'),
+      // String 3 (G)
+      'G3_s3': require('@/assets/audio/guitar-strings/string3/G3.wav'),
+      'Gs3_s3': require('@/assets/audio/guitar-strings/string3/Gs3.wav'),
+      'A3_s3': require('@/assets/audio/guitar-strings/string3/A3.wav'),
+      'As3_s3': require('@/assets/audio/guitar-strings/string3/As3.wav'),
+      'B3_s3': require('@/assets/audio/guitar-strings/string3/B3.wav'),
+      'C4_s3': require('@/assets/audio/guitar-strings/string3/C4.wav'),
+      'Cs4_s3': require('@/assets/audio/guitar-strings/string3/Cs4.wav'),
+      'D4_s3': require('@/assets/audio/guitar-strings/string3/D4.wav'),
+      'Ds4': require('@/assets/audio/guitar-strings/string3/Ds4.wav'),
+      'E4': require('@/assets/audio/guitar-strings/string3/E4.wav'),
+      'F4': require('@/assets/audio/guitar-strings/string3/F4.wav'),
+      'Fs4': require('@/assets/audio/guitar-strings/string3/Fs4.wav'),
+      'G4': require('@/assets/audio/guitar-strings/string3/G4.wav'),
       
-      // String 4 (B) - Frets 0-12
-      's4_f0_soft': require('@/assets/audio/guitar-strings/string4/fret0-soft.wav'),
-      's4_f0_medium': require('@/assets/audio/guitar-strings/string4/fret0-medium.wav'),
-      's4_f0_hard': require('@/assets/audio/guitar-strings/string4/fret0-hard.wav'),
-      's4_f1_soft': require('@/assets/audio/guitar-strings/string4/fret1-soft.wav'),
-      's4_f1_medium': require('@/assets/audio/guitar-strings/string4/fret1-medium.wav'),
-      's4_f1_hard': require('@/assets/audio/guitar-strings/string4/fret1-hard.wav'),
-      's4_f2_soft': require('@/assets/audio/guitar-strings/string4/fret2-soft.wav'),
-      's4_f2_medium': require('@/assets/audio/guitar-strings/string4/fret2-medium.wav'),
-      's4_f2_hard': require('@/assets/audio/guitar-strings/string4/fret2-hard.wav'),
-      's4_f3_soft': require('@/assets/audio/guitar-strings/string4/fret3-soft.wav'),
-      's4_f3_medium': require('@/assets/audio/guitar-strings/string4/fret3-medium.wav'),
-      's4_f3_hard': require('@/assets/audio/guitar-strings/string4/fret3-hard.wav'),
-      's4_f4_soft': require('@/assets/audio/guitar-strings/string4/fret4-soft.wav'),
-      's4_f4_medium': require('@/assets/audio/guitar-strings/string4/fret4-medium.wav'),
-      's4_f4_hard': require('@/assets/audio/guitar-strings/string4/fret4-hard.wav'),
-      's4_f5_soft': require('@/assets/audio/guitar-strings/string4/fret5-soft.wav'),
-      's4_f5_medium': require('@/assets/audio/guitar-strings/string4/fret5-medium.wav'),
-      's4_f5_hard': require('@/assets/audio/guitar-strings/string4/fret5-hard.wav'),
-      's4_f6_soft': require('@/assets/audio/guitar-strings/string4/fret6-soft.wav'),
-      's4_f6_medium': require('@/assets/audio/guitar-strings/string4/fret6-medium.wav'),
-      's4_f6_hard': require('@/assets/audio/guitar-strings/string4/fret6-hard.wav'),
-      's4_f7_soft': require('@/assets/audio/guitar-strings/string4/fret7-soft.wav'),
-      's4_f7_medium': require('@/assets/audio/guitar-strings/string4/fret7-medium.wav'),
-      's4_f7_hard': require('@/assets/audio/guitar-strings/string4/fret7-hard.wav'),
-      's4_f8_soft': require('@/assets/audio/guitar-strings/string4/fret8-soft.wav'),
-      's4_f8_medium': require('@/assets/audio/guitar-strings/string4/fret8-medium.wav'),
-      's4_f8_hard': require('@/assets/audio/guitar-strings/string4/fret8-hard.wav'),
-      's4_f9_soft': require('@/assets/audio/guitar-strings/string4/fret9-soft.wav'),
-      's4_f9_medium': require('@/assets/audio/guitar-strings/string4/fret9-medium.wav'),
-      's4_f9_hard': require('@/assets/audio/guitar-strings/string4/fret9-hard.wav'),
-      's4_f10_soft': require('@/assets/audio/guitar-strings/string4/fret10-soft.wav'),
-      's4_f10_medium': require('@/assets/audio/guitar-strings/string4/fret10-medium.wav'),
-      's4_f10_hard': require('@/assets/audio/guitar-strings/string4/fret10-hard.wav'),
-      's4_f11_soft': require('@/assets/audio/guitar-strings/string4/fret11-soft.wav'),
-      's4_f11_medium': require('@/assets/audio/guitar-strings/string4/fret11-medium.wav'),
-      's4_f11_hard': require('@/assets/audio/guitar-strings/string4/fret11-hard.wav'),
-      's4_f12_soft': require('@/assets/audio/guitar-strings/string4/fret12-soft.wav'),
-      's4_f12_medium': require('@/assets/audio/guitar-strings/string4/fret12-medium.wav'),
-      's4_f12_hard': require('@/assets/audio/guitar-strings/string4/fret12-hard.wav'),
+      // String 4 (B)
+      'B3_s4': require('@/assets/audio/guitar-strings/string4/B3.wav'),
+      'C4_s4': require('@/assets/audio/guitar-strings/string4/C4.wav'),
+      'Cs4_s4': require('@/assets/audio/guitar-strings/string4/Cs4.wav'),
+      'D4_s4': require('@/assets/audio/guitar-strings/string4/D4.wav'),
+      'Ds4_s4': require('@/assets/audio/guitar-strings/string4/Ds4.wav'),
+      'E4_s4': require('@/assets/audio/guitar-strings/string4/E4.wav'),
+      'F4_s4': require('@/assets/audio/guitar-strings/string4/F4.wav'),
+      'Fs4_s4': require('@/assets/audio/guitar-strings/string4/Fs4.wav'),
+      'G4_s4': require('@/assets/audio/guitar-strings/string4/G4.wav'),
+      'Gs4': require('@/assets/audio/guitar-strings/string4/Gs4.wav'),
+      'A4': require('@/assets/audio/guitar-strings/string4/A4.wav'),
+      'As4': require('@/assets/audio/guitar-strings/string4/As4.wav'),
+      'B4': require('@/assets/audio/guitar-strings/string4/B4.wav'),
       
-      // String 5 (High e) - Frets 0-12
-      's5_f0_soft': require('@/assets/audio/guitar-strings/string5/fret0-soft.wav'),
-      's5_f0_medium': require('@/assets/audio/guitar-strings/string5/fret0-medium.wav'),
-      's5_f0_hard': require('@/assets/audio/guitar-strings/string5/fret0-hard.wav'),
-      's5_f1_soft': require('@/assets/audio/guitar-strings/string5/fret1-soft.wav'),
-      's5_f1_medium': require('@/assets/audio/guitar-strings/string5/fret1-medium.wav'),
-      's5_f1_hard': require('@/assets/audio/guitar-strings/string5/fret1-hard.wav'),
-      's5_f2_soft': require('@/assets/audio/guitar-strings/string5/fret2-soft.wav'),
-      's5_f2_medium': require('@/assets/audio/guitar-strings/string5/fret2-medium.wav'),
-      's5_f2_hard': require('@/assets/audio/guitar-strings/string5/fret2-hard.wav'),
-      's5_f3_soft': require('@/assets/audio/guitar-strings/string5/fret3-soft.wav'),
-      's5_f3_medium': require('@/assets/audio/guitar-strings/string5/fret3-medium.wav'),
-      's5_f3_hard': require('@/assets/audio/guitar-strings/string5/fret3-hard.wav'),
-      's5_f4_soft': require('@/assets/audio/guitar-strings/string5/fret4-soft.wav'),
-      's5_f4_medium': require('@/assets/audio/guitar-strings/string5/fret4-medium.wav'),
-      's5_f4_hard': require('@/assets/audio/guitar-strings/string5/fret4-hard.wav'),
-      's5_f5_soft': require('@/assets/audio/guitar-strings/string5/fret5-soft.wav'),
-      's5_f5_medium': require('@/assets/audio/guitar-strings/string5/fret5-medium.wav'),
-      's5_f5_hard': require('@/assets/audio/guitar-strings/string5/fret5-hard.wav'),
-      's5_f6_soft': require('@/assets/audio/guitar-strings/string5/fret6-soft.wav'),
-      's5_f6_medium': require('@/assets/audio/guitar-strings/string5/fret6-medium.wav'),
-      's5_f6_hard': require('@/assets/audio/guitar-strings/string5/fret6-hard.wav'),
-      's5_f7_soft': require('@/assets/audio/guitar-strings/string5/fret7-soft.wav'),
-      's5_f7_medium': require('@/assets/audio/guitar-strings/string5/fret7-medium.wav'),
-      's5_f7_hard': require('@/assets/audio/guitar-strings/string5/fret7-hard.wav'),
-      's5_f8_soft': require('@/assets/audio/guitar-strings/string5/fret8-soft.wav'),
-      's5_f8_medium': require('@/assets/audio/guitar-strings/string5/fret8-medium.wav'),
-      's5_f8_hard': require('@/assets/audio/guitar-strings/string5/fret8-hard.wav'),
-      's5_f9_soft': require('@/assets/audio/guitar-strings/string5/fret9-soft.wav'),
-      's5_f9_medium': require('@/assets/audio/guitar-strings/string5/fret9-medium.wav'),
-      's5_f9_hard': require('@/assets/audio/guitar-strings/string5/fret9-hard.wav'),
-      's5_f10_soft': require('@/assets/audio/guitar-strings/string5/fret10-soft.wav'),
-      's5_f10_medium': require('@/assets/audio/guitar-strings/string5/fret10-medium.wav'),
-      's5_f10_hard': require('@/assets/audio/guitar-strings/string5/fret10-hard.wav'),
-      's5_f11_soft': require('@/assets/audio/guitar-strings/string5/fret11-soft.wav'),
-      's5_f11_medium': require('@/assets/audio/guitar-strings/string5/fret11-medium.wav'),
-      's5_f11_hard': require('@/assets/audio/guitar-strings/string5/fret11-hard.wav'),
-      's5_f12_soft': require('@/assets/audio/guitar-strings/string5/fret12-soft.wav'),
-      's5_f12_medium': require('@/assets/audio/guitar-strings/string5/fret12-medium.wav'),
-      's5_f12_hard': require('@/assets/audio/guitar-strings/string5/fret12-hard.wav'),
+      // String 5 (High E)
+      'E4_s5': require('@/assets/audio/guitar-strings/string5/E4.wav'),
+      'F4_s5': require('@/assets/audio/guitar-strings/string5/F4.wav'),
+      'Fs4_s5': require('@/assets/audio/guitar-strings/string5/Fs4.wav'),
+      'G4_s5': require('@/assets/audio/guitar-strings/string5/G4.wav'),
+      'Gs4_s5': require('@/assets/audio/guitar-strings/string5/Gs4.wav'),
+      'A4_s5': require('@/assets/audio/guitar-strings/string5/A4.wav'),
+      'As4_s5': require('@/assets/audio/guitar-strings/string5/As4.wav'),
+      'B4_s5': require('@/assets/audio/guitar-strings/string5/B4.wav'),
+      'C5': require('@/assets/audio/guitar-strings/string5/C5.wav'),
+      'Cs5': require('@/assets/audio/guitar-strings/string5/Cs5.wav'),
+      'D5': require('@/assets/audio/guitar-strings/string5/D5.wav'),
+      'Ds5': require('@/assets/audio/guitar-strings/string5/Ds5.wav'),
+      'E5': require('@/assets/audio/guitar-strings/string5/E5.wav'),
     };
     
-    const key = this.getSampleKey(stringIndex, fret, velocity);
-    const assetPath = sampleMap[key];
+    // Build lookup key (add suffix for duplicate notes on multiple strings)
+    const key = stringIndex >= 1 && ['A2', 'As2', 'B2', 'C3', 'Cs3', 'D3', 'Ds3', 'E3'].includes(noteName)
+      ? `${noteName}_s${stringIndex}`
+      : stringIndex >= 2 && ['F3', 'Fs3', 'G3', 'Gs3', 'A3'].includes(noteName)
+      ? `${noteName}_s${stringIndex}`
+      : stringIndex >= 3 && ['As3', 'B3', 'C4', 'Cs4', 'D4'].includes(noteName)
+      ? `${noteName}_s${stringIndex}`
+      : stringIndex >= 4 && ['Ds4', 'E4', 'F4', 'Fs4', 'G4'].includes(noteName)
+      ? `${noteName}_s${stringIndex}`
+      : stringIndex >= 5 && ['Gs4', 'A4', 'As4', 'B4'].includes(noteName)
+      ? `${noteName}_s${stringIndex}`
+      : noteName;
     
-    if (!assetPath) {
-      console.warn(`⚠️ No sample mapped for ${key} - will use synthesis fallback`);
-      return null;
-    }
-    
-    return assetPath;
+    return SAMPLE_MAP[key] || null;
     
     END OF COMMENTED BLOCK */
   }
   
   /**
    * Calculate frequency for guitar string at specific fret
-   * (Same as audioService.ts for consistency)
    */
   private calculateStringFrequency(stringIndex: number, fret: number): number {
     const openStringFrequencies = [
@@ -438,93 +294,25 @@ class StrummingAudioService {
     return openFreq * Math.pow(2, fret / 12);
   }
   
-  /**
-   * Load sample into cache
-   * 
-   * Once samples are organized per FREEPATS_SETUP_GUIDE.md, this will
-   * automatically load and cache them for instant playback.
-   */
-  private async loadSample(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): Promise<string | null> {
-    const key = this.getSampleKey(stringIndex, fret, velocity);
-    
-    // Return cached if available
-    if (this.sampleCache.has(key)) {
-      return this.sampleCache.get(key)!;
-    }
-    
-    // Get asset path
-    const assetPath = this.getSampleAssetPath(stringIndex, fret, velocity);
-    if (!assetPath) {
-      return null; // No sample available, will use synthesis fallback
-    }
-    
-    try {
-      // The assetPath is already a require() result, which is a module number
-      // Expo converts this to a local URI automatically
-      const uri = assetPath;
-      
-      // Cache the URI
-      this.sampleCache.set(key, uri);
-      
-      console.log(`✅ Loaded sample ${key}`);
-      return uri;
-      
-    } catch (error) {
-      console.error(`❌ Failed to load sample ${key}:`, error);
-      return null;
-    }
-  }
-  
   // ============================================================================
   // HUMANIZATION & EXPRESSION
   // ============================================================================
   
   /**
    * Generate humanized timing offset
-   * Adds natural micro-variations to string timing
    */
   private getHumanizedDelay(baseDelay: number, variance: number, enabled: boolean): number {
     if (!enabled) return baseDelay;
-    
-    // Random offset within ±variance range
     const offset = (Math.random() - 0.5) * 2 * variance;
-    return Math.max(5, baseDelay + offset); // Minimum 5ms to prevent overlap issues
+    return Math.max(5, baseDelay + offset);
   }
   
   /**
    * Get velocity multiplier with random variation
-   * Simulates natural picking intensity variation
    */
   private getVelocityMultiplier(profile: { base: number; range: number }): number {
     const variation = (Math.random() - 0.5) * 2 * profile.range;
     return Math.max(0.3, Math.min(1.2, profile.base + variation));
-  }
-  
-  /**
-   * Select velocity layer based on intensity and randomization
-   * Adds variation by occasionally selecting neighboring velocity layers
-   */
-  private selectVelocityLayer(intensity: 'light' | 'normal' | 'heavy'): 'soft' | 'medium' | 'hard' {
-    const layers: Array<'soft' | 'medium' | 'hard'> = ['soft', 'medium', 'hard'];
-    
-    // Primary layer for each intensity
-    const primaryLayer = {
-      light: 'soft',
-      normal: 'medium',
-      heavy: 'hard',
-    }[intensity] as 'soft' | 'medium' | 'hard';
-    
-    // 70% use primary layer, 30% use neighboring layer for variation
-    if (Math.random() > 0.3) {
-      return primaryLayer;
-    }
-    
-    // Select neighboring layer
-    const currentIndex = layers.indexOf(primaryLayer);
-    const neighborOffset = Math.random() > 0.5 ? 1 : -1;
-    const neighborIndex = Math.max(0, Math.min(layers.length - 1, currentIndex + neighborOffset));
-    
-    return layers[neighborIndex];
   }
   
   // ============================================================================
@@ -532,73 +320,33 @@ class StrummingAudioService {
   // ============================================================================
   
   /**
-   * Get or create a sound instance from the pool
-   */
-  private async getSoundInstance(): Promise<Audio.Sound> {
-    // Reuse pooled sound if available
-    if (this.soundPool.length > 0) {
-      return this.soundPool.pop()!;
-    }
-    
-    // Create new sound instance
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: '' }, // Will set URI when playing
-      { shouldPlay: false },
-      null,
-      false // Don't download immediately
-    );
-    
-    return sound;
-  }
-  
-  /**
-   * Return sound instance to pool or unload if pool is full
-   */
-  private async returnSoundToPool(sound: Audio.Sound): Promise<void> {
-    if (this.soundPool.length < 6) { // Keep max 6 sounds in pool
-      // Reset sound for reuse
-      await sound.stopAsync();
-      await sound.setPositionAsync(0);
-      this.soundPool.push(sound);
-    } else {
-      // Pool is full, unload the sound
-      await sound.unloadAsync();
-    }
-  }
-  
-  /**
-   * Play individual string sample
+   * Play individual string sample or synthesis fallback
    */
   private async playStringSample(
     stringIndex: number,
     fret: number,
-    velocity: 'soft' | 'medium' | 'hard',
     volumeMultiplier: number
   ): Promise<void> {
-    // Load sample (from cache if available)
-    const sampleUri = await this.loadSample(stringIndex, fret, velocity);
+    const assetPath = this.getSampleAssetPath(stringIndex, fret);
     
-    if (!sampleUri) {
-      // Fallback: Generate synthetic tone (simplified Karplus-Strong)
-      console.log(`🎸 String ${stringIndex} fret ${fret} - using synthesis fallback`);
+    if (!assetPath) {
+      // Fallback: Generate synthetic tone
+      const noteName = this.getNoteName(stringIndex, fret);
+      console.log(`🎸 ${noteName} (string ${stringIndex}) - using synthesis fallback`);
       await this.playSynthesizedString(stringIndex, fret, volumeMultiplier);
       return;
     }
     
     try {
-      // Get sound instance from pool
-      const sound = await this.getSoundInstance();
+      // Play real sample
+      const { sound } = await Audio.Sound.createAsync(
+        assetPath,
+        { shouldPlay: true, volume: volumeMultiplier }
+      );
       
-      // Load and play the sample
-      await sound.loadAsync({ uri: sampleUri });
-      await sound.setVolumeAsync(volumeMultiplier);
-      await sound.playAsync();
-      
-      // Track active sound for cleanup
+      // Schedule cleanup
       const unloadTimer = setTimeout(async () => {
-        await this.returnSoundToPool(sound);
-        
-        // Remove from active sounds
+        await sound.unloadAsync();
         const index = this.activeSounds.findIndex(s => s.sound === sound);
         if (index !== -1) {
           this.activeSounds.splice(index, 1);
@@ -617,25 +365,24 @@ class StrummingAudioService {
       }
       
     } catch (error) {
-      console.error(`❌ Failed to play string sample:`, error);
+      console.error(`❌ Failed to play sample:`, error);
+      // Fallback to synthesis
+      await this.playSynthesizedString(stringIndex, fret, volumeMultiplier);
     }
   }
   
   /**
    * Synthesis fallback for strings without samples
-   * Simplified single-string Karplus-Strong
    */
   private async playSynthesizedString(
     stringIndex: number,
     fret: number,
     volumeMultiplier: number
   ): Promise<void> {
-    // Generate simple plucked string tone
     const frequency = this.calculateStringFrequency(stringIndex, fret);
-    const duration = 1.5; // seconds
+    const duration = 1.5;
     const sampleRate = 44100;
     
-    // Create simple Karplus-Strong tone (lightweight version)
     const wavUri = this.generateSimpleStringTone(frequency, duration, sampleRate, volumeMultiplier);
     
     try {
@@ -644,7 +391,6 @@ class StrummingAudioService {
         { shouldPlay: true, volume: 1.0 }
       );
       
-      // Schedule cleanup
       setTimeout(async () => {
         await sound.unloadAsync();
       }, duration * 1000 + 500);
@@ -655,8 +401,7 @@ class StrummingAudioService {
   }
   
   /**
-   * Generate simple Karplus-Strong tone for single string
-   * (Lightweight version optimized for mobile)
+   * Generate simple Karplus-Strong tone
    */
   private generateSimpleStringTone(
     frequency: number,
@@ -667,11 +412,10 @@ class StrummingAudioService {
     const numSamples = Math.floor(sampleRate * duration);
     const delayLength = Math.round(sampleRate / frequency);
     
-    // Mono buffer for efficiency
     const buffer = new Float32Array(numSamples);
-    
-    // Initialize delay line with noise
     const delayLine = new Float32Array(delayLength);
+    
+    // Initialize with noise
     for (let i = 0; i < delayLength; i++) {
       delayLine[i] = (Math.random() * 2 - 1) * 0.5;
     }
@@ -684,7 +428,6 @@ class StrummingAudioService {
       const currentSample = delayLine[writeIndex];
       const nextIndex = (writeIndex + 1) % delayLength;
       
-      // Simple averaging filter
       const filtered = 0.5 * (currentSample + delayLine[nextIndex]) * damping;
       delayLine[writeIndex] = filtered;
       
@@ -692,12 +435,11 @@ class StrummingAudioService {
       writeIndex = nextIndex;
     }
     
-    // Convert to WAV
     return this.createMonoWAV(buffer, sampleRate);
   }
   
   /**
-   * Create mono WAV file (optimized for mobile)
+   * Create mono WAV file
    */
   private createMonoWAV(buffer: Float32Array, sampleRate: number): string {
     const numChannels = 1;
@@ -712,7 +454,7 @@ class StrummingAudioService {
     const wavBuffer = new ArrayBuffer(totalSize);
     const view = new DataView(wavBuffer);
     
-    // WAV header (same as stereo version but mono)
+    // WAV header
     this.writeString(view, 0, 'RIFF');
     view.setUint32(4, totalSize - 8, true);
     this.writeString(view, 8, 'WAVE');
@@ -735,7 +477,7 @@ class StrummingAudioService {
       offset += 2;
     }
     
-    // Convert to base64 data URI
+    // Convert to base64
     const bytes = new Uint8Array(wavBuffer);
     let binary = '';
     for (let i = 0; i < bytes.length; i++) {
@@ -754,30 +496,22 @@ class StrummingAudioService {
   }
   
   // ============================================================================
-  // PUBLIC API - CHORD STRUMMING
+  // PUBLIC API
   // ============================================================================
   
   /**
    * Play chord with realistic strumming
-   * 
-   * This is the PRIMARY method for chord playback with the new strumming engine.
-   * 
-   * @param chord - Chord data with positions
-   * @param config - Strumming configuration (optional)
    */
   async playChordWithStrum(
     chord: ChordData,
     config: Partial<StrumConfig> = {}
   ): Promise<void> {
-    const startTime = Date.now();
-    
     try {
-      // Validate input
       if (!chord || !chord.positions) {
         throw new Error('Invalid chord data');
       }
       
-      // Initialize audio mode (once per session)
+      // Initialize audio mode
       if (!this.audioInitialized) {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
@@ -786,7 +520,7 @@ class StrummingAudioService {
           shouldDuckAndroid: true,
         });
         this.audioInitialized = true;
-        console.log('✅ Strumming engine audio initialized');
+        console.log('✅ Strumming engine initialized');
       }
       
       // Default configuration
@@ -797,7 +531,7 @@ class StrummingAudioService {
         humanize: config.humanize !== undefined ? config.humanize : true,
       };
       
-      console.log(`🎸 Strumming ${chord.name}:`, strumConfig);
+      console.log(`🎸 Strumming ${chord.name}`);
       
       // Get playable strings
       const playableStrings: Array<{ stringIndex: number; fret: number }> = [];
@@ -811,20 +545,17 @@ class StrummingAudioService {
         throw new Error('No playable strings in chord');
       }
       
-      // Reverse order for upstroke
+      // Reverse for upstroke
       if (strumConfig.direction === 'up') {
         playableStrings.reverse();
       }
       
-      // Get timing profile
+      // Get timing and velocity profiles
       const timingProfile = this.STRUM_TIMING[strumConfig.speed];
       const velocityProfile = this.VELOCITY_PROFILES[strumConfig.intensity];
       
-      // Strum each string sequentially with humanization
-      const strumPromises: Promise<void>[] = [];
-      
+      // Strum each string with humanization
       playableStrings.forEach((string, index) => {
-        // Calculate delay for this string
         const baseDelay = index * timingProfile.base;
         const actualDelay = this.getHumanizedDelay(
           baseDelay,
@@ -832,33 +563,16 @@ class StrummingAudioService {
           strumConfig.humanize
         );
         
-        // Select velocity layer with variation
-        const velocityLayer = this.selectVelocityLayer(strumConfig.intensity);
-        
-        // Get volume multiplier with humanization
         const volumeMultiplier = this.getVelocityMultiplier(velocityProfile);
         
-        // Schedule string playback
-        const playPromise = new Promise<void>((resolve) => {
-          setTimeout(async () => {
-            await this.playStringSample(
-              string.stringIndex,
-              string.fret,
-              velocityLayer,
-              volumeMultiplier
-            );
-            resolve();
-          }, actualDelay);
-        });
-        
-        strumPromises.push(playPromise);
+        setTimeout(async () => {
+          await this.playStringSample(
+            string.stringIndex,
+            string.fret,
+            volumeMultiplier
+          );
+        }, actualDelay);
       });
-      
-      // Wait for all strings to be scheduled
-      await Promise.all(strumPromises);
-      
-      const totalTime = Date.now() - startTime;
-      console.log(`✅ Chord strum initiated in ${totalTime}ms`);
       
     } catch (error) {
       console.error('❌ Chord strum failed:', error);
@@ -867,8 +581,7 @@ class StrummingAudioService {
   }
   
   /**
-   * Compatibility wrapper for existing playChordPreview() calls
-   * Uses default strumming settings
+   * Compatibility wrapper for existing code
    */
   async playChordPreview(chord: ChordData): Promise<void> {
     await this.playChordWithStrum(chord, {
@@ -880,41 +593,9 @@ class StrummingAudioService {
   }
   
   /**
-   * Play chord with custom strum pattern
-   * 
-   * Example patterns:
-   * - 'D D U U D U' (down, down, up, up, down, up)
-   * - 'D x D U x D U' (down, mute, down, up, mute, down, up)
-   */
-  async playStrumPattern(
-    chord: ChordData,
-    pattern: string,
-    tempo: number = 120 // BPM
-  ): Promise<void> {
-    const strokes = pattern.split(' ').filter(s => s.length > 0);
-    const beatDuration = 60000 / tempo; // ms per beat
-    
-    for (let i = 0; i < strokes.length; i++) {
-      const stroke = strokes[i];
-      const delay = i * beatDuration;
-      
-      setTimeout(async () => {
-        if (stroke === 'D') {
-          await this.playChordWithStrum(chord, { direction: 'down', speed: 'fast' });
-        } else if (stroke === 'U') {
-          await this.playChordWithStrum(chord, { direction: 'up', speed: 'fast' });
-        }
-        // 'x' = muted strum (no playback)
-      }, delay);
-    }
-  }
-  
-  /**
    * Stop all active sounds
    */
   async stopAll(): Promise<void> {
-    console.log('🛑 Stopping all active sounds...');
-    
     const stopPromises = this.activeSounds.map(async ({ sound, unloadTimer }) => {
       clearTimeout(unloadTimer);
       try {
@@ -927,100 +608,15 @@ class StrummingAudioService {
     
     await Promise.all(stopPromises);
     this.activeSounds = [];
-    
-    console.log('✅ All sounds stopped');
   }
   
   /**
-   * Cleanup service and release resources
+   * Cleanup service
    */
   async cleanup(): Promise<void> {
-    console.log('🧹 Cleaning up strumming audio service...');
-    
-    // Stop all active sounds
     await this.stopAll();
-    
-    // Clear sound pool
-    const poolPromises = this.soundPool.map(sound => sound.unloadAsync());
-    await Promise.all(poolPromises);
     this.soundPool = [];
-    
-    // Clear cache
     this.sampleCache.clear();
-    
-    console.log('✅ Strumming audio service cleaned up');
-  }
-  
-  // ============================================================================
-  // SAMPLE LIBRARY HELPERS
-  // ============================================================================
-  
-  /**
-   * Generate sample library from base recordings
-   * 
-   * This helper function can be used to create velocity-layered samples
-   * from a base set of recordings by applying amplitude scaling.
-   * 
-   * NOTE: For production, use professional sample libraries or record
-   * actual guitar samples at different velocities for best quality.
-   */
-  generateSampleVariations(
-    baseRecordings: Map<string, ArrayBuffer>
-  ): Map<string, ArrayBuffer> {
-    console.log('🎹 Generating velocity-layered sample variations...');
-    
-    const variations = new Map<string, ArrayBuffer>();
-    
-    baseRecordings.forEach((audioData, key) => {
-      // Parse base recording (assuming WAV format)
-      const view = new DataView(audioData);
-      
-      // Create soft version (0.6× amplitude)
-      variations.set(`${key}_soft`, this.scaleAmplitude(audioData, 0.6));
-      
-      // Use base as medium
-      variations.set(`${key}_medium`, audioData);
-      
-      // Create hard version (1.2× amplitude with light clipping)
-      variations.set(`${key}_hard`, this.scaleAmplitude(audioData, 1.2));
-    });
-    
-    console.log(`✅ Generated ${variations.size} sample variations`);
-    return variations;
-  }
-  
-  /**
-   * Scale amplitude of WAV file
-   * (Simple implementation - for production use proper audio processing)
-   */
-  private scaleAmplitude(wavData: ArrayBuffer, scale: number): ArrayBuffer {
-    const view = new DataView(wavData);
-    const output = wavData.slice(0); // Clone
-    const outputView = new DataView(output);
-    
-    // Assuming 16-bit PCM, data starts at byte 44
-    for (let i = 44; i < wavData.byteLength; i += 2) {
-      const sample = view.getInt16(i, true);
-      const scaled = Math.max(-32768, Math.min(32767, sample * scale));
-      outputView.setInt16(i, scaled, true);
-    }
-    
-    return output;
-  }
-  
-  /**
-   * Get sample library statistics
-   */
-  getSampleStats(): {
-    cached: number;
-    poolSize: number;
-    activeSounds: number;
-  } {
-    return {
-      cached: this.sampleCache.size,
-      poolSize: this.soundPool.length,
-      activeSounds: this.activeSounds.length,
-    };
   }
 }
 
