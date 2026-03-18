@@ -8,138 +8,7 @@ import { Audio } from 'expo-av';
 class AudioService {
   private audioInitialized: boolean = false;
 
-  /**
-   * Apply multi-band EQ to simulate guitar body acoustics
-   * Adds warmth, body, and fullness like a real acoustic guitar
-   */
-  private applyGuitarBodyEQ(leftChannel: Float32Array, rightChannel: Float32Array, sampleRate: number): void {
-    const numSamples = leftChannel.length;
-    
-    // ====================================
-    // RESONANT BIQUAD FILTERS FOR BODY EQ
-    // ====================================
-    
-    // LOW SHELF BOOST (80-120 Hz) - Fundamental warmth
-    const lowShelfGain = 1.25; // +2.0 dB boost (reduced to prevent clipping)
-    const lowShelfFreq = 100;
-    const lowShelfQ = 0.7;
-    
-    // LOW-MID PEAK (200-400 Hz) - Guitar body resonance
-    const lowMidGain = 1.30; // +2.3 dB boost (reduced to prevent clipping)
-    const lowMidFreq = 280;
-    const lowMidQ = 1.2; // Resonant peak
-    
-    // MID BOOST (500-800 Hz) - Presence and fullness
-    const midGain = 1.22; // +1.7 dB boost (reduced to prevent clipping)
-    const midFreq = 650;
-    const midQ = 1.0;
-    
-    // Apply low shelf filter (boost bass fundamentals)
-    this.applyBiquadFilter(
-      leftChannel, rightChannel, sampleRate,
-      'lowshelf', lowShelfFreq, lowShelfQ, lowShelfGain
-    );
-    
-    // Apply low-mid resonant peak (guitar body "thump")
-    this.applyBiquadFilter(
-      leftChannel, rightChannel, sampleRate,
-      'peaking', lowMidFreq, lowMidQ, lowMidGain
-    );
-    
-    // Apply mid-range boost (fullness and presence)
-    this.applyBiquadFilter(
-      leftChannel, rightChannel, sampleRate,
-      'peaking', midFreq, midQ, midGain
-    );
-    
-    console.log('✅ Guitar body EQ applied: Low shelf +2.0dB @ 100Hz, Low-mid peak +2.3dB @ 280Hz, Mid boost +1.7dB @ 650Hz');
-  }
 
-  /**
-   * Apply biquad filter (2nd-order IIR filter)
-   * Supports: lowshelf, highshelf, peaking, lowpass, highpass
-   */
-  private applyBiquadFilter(
-    leftChannel: Float32Array,
-    rightChannel: Float32Array,
-    sampleRate: number,
-    type: 'lowshelf' | 'highshelf' | 'peaking' | 'lowpass' | 'highpass',
-    freq: number,
-    Q: number,
-    gain: number = 1.0
-  ): void {
-    const w0 = 2 * Math.PI * freq / sampleRate;
-    const cosw0 = Math.cos(w0);
-    const sinw0 = Math.sin(w0);
-    const alpha = sinw0 / (2 * Q);
-    const A = Math.sqrt(gain);
-    
-    let b0: number, b1: number, b2: number, a0: number, a1: number, a2: number;
-    
-    // Calculate filter coefficients based on type
-    if (type === 'lowshelf') {
-      const S = 1; // Shelf slope
-      b0 = A * ((A + 1) - (A - 1) * cosw0 + 2 * Math.sqrt(A) * alpha);
-      b1 = 2 * A * ((A - 1) - (A + 1) * cosw0);
-      b2 = A * ((A + 1) - (A - 1) * cosw0 - 2 * Math.sqrt(A) * alpha);
-      a0 = (A + 1) + (A - 1) * cosw0 + 2 * Math.sqrt(A) * alpha;
-      a1 = -2 * ((A - 1) + (A + 1) * cosw0);
-      a2 = (A + 1) + (A - 1) * cosw0 - 2 * Math.sqrt(A) * alpha;
-    } else if (type === 'peaking') {
-      b0 = 1 + alpha * A;
-      b1 = -2 * cosw0;
-      b2 = 1 - alpha * A;
-      a0 = 1 + alpha / A;
-      a1 = -2 * cosw0;
-      a2 = 1 - alpha / A;
-    } else {
-      // Default to peaking if unknown type
-      b0 = 1 + alpha * A;
-      b1 = -2 * cosw0;
-      b2 = 1 - alpha * A;
-      a0 = 1 + alpha / A;
-      a1 = -2 * cosw0;
-      a2 = 1 - alpha / A;
-    }
-    
-    // Normalize coefficients
-    b0 /= a0;
-    b1 /= a0;
-    b2 /= a0;
-    a1 /= a0;
-    a2 /= a0;
-    
-    // Apply filter to both channels
-    this.applyBiquadFilterChannel(leftChannel, b0, b1, b2, a1, a2);
-    this.applyBiquadFilterChannel(rightChannel, b0, b1, b2, a1, a2);
-  }
-
-  /**
-   * Apply biquad filter to a single channel
-   */
-  private applyBiquadFilterChannel(
-    channel: Float32Array,
-    b0: number, b1: number, b2: number,
-    a1: number, a2: number
-  ): void {
-    let x1 = 0, x2 = 0; // Input history
-    let y1 = 0, y2 = 0; // Output history
-    
-    for (let i = 0; i < channel.length; i++) {
-      const x0 = channel[i];
-      
-      // Biquad difference equation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
-      const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-      
-      // Update history
-      x2 = x1;
-      x1 = x0;
-      y2 = y1;
-      y1 = y0;
-      
-      channel[i] = y0;
-    }
-  }
 
   /**
    * Calculate frequency for guitar string at specific fret
@@ -161,141 +30,16 @@ class AudioService {
     return openFreq * Math.pow(2, fret / 12);
   }
 
-  /**
-   * Apply Schroeder reverb (algorithmic reverb)
-   * Pre-bakes realistic room ambience into the audio
-   */
-  private applySchroederReverb(
-    leftChannel: Float32Array,
-    rightChannel: Float32Array,
-    sampleRate: number,
-    roomSize: number = 0.25,
-    damping: number = 0.5,
-    wetMix: number = 0.20
-  ): void {
-    // Schroeder reverb: parallel comb filters + series allpass filters
-    
-    // Comb filter delays (prime numbers scaled by room size)
-    const combDelays = [1557, 1617, 1491, 1422, 1277, 1356, 1188, 1116].map(d => Math.floor(d * roomSize));
-    const combBuffers = combDelays.map(d => new Float32Array(d));
-    const combIndices = new Array(combDelays.length).fill(0);
-    const combGain = 0.84;
-    
-    // Allpass filter delays
-    const allpassDelays = [225, 556, 441, 341].map(d => Math.floor(d * roomSize));
-    const allpassBuffers = allpassDelays.map(d => new Float32Array(d));
-    const allpassIndices = new Array(allpassDelays.length).fill(0);
-    const allpassGain = 0.5;
-    
-    // Process each channel
-    for (const channel of [leftChannel, rightChannel]) {
-      const drySignal = new Float32Array(channel);
-      const wetSignal = new Float32Array(channel.length);
-      
-      for (let i = 0; i < channel.length; i++) {
-        const input = channel[i];
-        let combSum = 0;
-        
-        // Parallel comb filters
-        for (let c = 0; c < combBuffers.length; c++) {
-          const delayedSample = combBuffers[c][combIndices[c]];
-          combSum += delayedSample;
-          
-          // Feedback with damping
-          combBuffers[c][combIndices[c]] = input + (delayedSample * combGain * damping);
-          combIndices[c] = (combIndices[c] + 1) % combDelays[c];
-        }
-        
-        wetSignal[i] = combSum / combBuffers.length;
-      }
-      
-      // Series allpass filters (smooth the reverb tail)
-      let signal = wetSignal;
-      for (let a = 0; a < allpassBuffers.length; a++) {
-        const processedSignal = new Float32Array(signal.length);
-        
-        for (let i = 0; i < signal.length; i++) {
-          const input = signal[i];
-          const delayed = allpassBuffers[a][allpassIndices[a]];
-          
-          processedSignal[i] = -input + delayed;
-          allpassBuffers[a][allpassIndices[a]] = input + (delayed * allpassGain);
-          allpassIndices[a] = (allpassIndices[a] + 1) % allpassDelays[a];
-        }
-        
-        signal = processedSignal;
-      }
-      
-      // Mix dry and wet signals
-      for (let i = 0; i < channel.length; i++) {
-        channel[i] = drySignal[i] * (1 - wetMix) + signal[i] * wetMix;
-      }
-    }
-    
-    console.log('✅ Schroeder reverb applied: room=' + roomSize + ', damping=' + damping + ', wet=' + wetMix);
-  }
 
-  /**
-   * Apply stereo widening via Haas effect + decorrelation
-   * Creates spatial depth and width
-   */
-  private applyStereoWidening(
-    leftChannel: Float32Array,
-    rightChannel: Float32Array,
-    sampleRate: number,
-    width: number = 0.35
-  ): void {
-    const delayMs = 15; // Haas effect delay (15ms)
-    const delaySamples = Math.floor(sampleRate * delayMs / 1000);
-    
-    // Create mid/side from left/right
-    const mid = new Float32Array(leftChannel.length);
-    const side = new Float32Array(leftChannel.length);
-    
-    for (let i = 0; i < leftChannel.length; i++) {
-      mid[i] = (leftChannel[i] + rightChannel[i]) * 0.5;
-      side[i] = (leftChannel[i] - rightChannel[i]) * 0.5;
-    }
-    
-    // Apply slight delay to side signal (Haas effect)
-    const delayedSide = new Float32Array(side.length);
-    for (let i = delaySamples; i < side.length; i++) {
-      delayedSide[i] = side[i - delaySamples];
-    }
-    
-    // Decorrelate side signal with allpass filter
-    const allpassDelay = 89; // Prime number
-    const allpassBuffer = new Float32Array(allpassDelay);
-    let allpassIndex = 0;
-    
-    for (let i = 0; i < delayedSide.length; i++) {
-      const delayed = allpassBuffer[allpassIndex];
-      const output = -delayedSide[i] + delayed;
-      allpassBuffer[allpassIndex] = delayedSide[i] + (delayed * 0.6);
-      allpassIndex = (allpassIndex + 1) % allpassDelay;
-      delayedSide[i] = output;
-    }
-    
-    // Boost side signal for width, then convert back to L/R
-    const sideGain = 1.0 + width;
-    for (let i = 0; i < leftChannel.length; i++) {
-      leftChannel[i] = mid[i] + (delayedSide[i] * sideGain);
-      rightChannel[i] = mid[i] - (delayedSide[i] * sideGain);
-    }
-    
-    console.log('✅ Stereo widening applied: width=' + width + ', Haas delay=' + delayMs + 'ms');
-  }
 
   /**
    * Generate guitar chord audio using Karplus-Strong synthesis
-   * Robust implementation with proper error handling and validation
+   * Based on André Michelle's acclaimed implementation
    */
   private generateGuitarWAV(chord: ChordData, duration: number = 2.5): string {
-    const sampleRate = 44100; // CD quality
-    const numChannels = 2; // Stereo
+    const sampleRate = 44100;
     const durationSamples = Math.floor(sampleRate * duration);
     
-    // Create stereo buffer
     const leftChannel = new Float32Array(durationSamples);
     const rightChannel = new Float32Array(durationSamples);
     
@@ -310,81 +54,102 @@ class AudioService {
     
     console.log(`🎸 Synthesizing ${stringsToPlay.length} strings:`, stringsToPlay.map(s => `${s.frequency.toFixed(1)}Hz`).join(', '));
     
-    // Synthesize each string independently
+    // André Michelle parameters (the secret sauce!)
+    const characterVariation = 0.25;  // Variation between strings
+    const stringDamping = 0.5;        // Base string decay rate
+    const stringDampingVariation = 0.25; // Damping randomness
+    const pluckDamping = 0.5;         // Initial pluck brightness
+    const pluckDampingVariation = 0.25;  // Pluck randomness
+    const stereoSpread = 0.2;         // Stereo width
+    
+    // Synthesize each string
     stringsToPlay.forEach(({ stringIndex, frequency }, arrayIndex) => {
-      // Strum timing (15ms between strings)
-      const strumDelay = arrayIndex * 0.015;
+      const strumDelay = arrayIndex * 0.015; // 15ms strum spacing
       const startSample = Math.floor(strumDelay * sampleRate);
       
-      // Karplus-Strong delay line length
       const delayLength = Math.round(sampleRate / frequency);
-      if (delayLength < 10 || delayLength > 5000) {
-        console.warn(`⚠️ Invalid delay length ${delayLength} for freq ${frequency}Hz, skipping string`);
-        return; // Skip this string if parameters are invalid
-      }
+      if (delayLength < 10 || delayLength > 5000) return;
       
-      // Initialize delay line with noise burst (pluck excitation)
       const delayLine = new Float32Array(delayLength);
+      
+      // Character variation - each string sounds slightly different
+      const characterRandom = (Math.random() - 0.5) * characterVariation;
+      
+      // "Magic" damping calculation (André Michelle's formula)
+      // This is the key to realistic tone!
+      const targetDamping = 1.0 - (1.0 / delayLength);
+      const dampingVariation = (Math.random() - 0.5) * stringDampingVariation;
+      const stringDamp = targetDamping * (1.0 - stringDamping) + dampingVariation;
+      const finalDamping = Math.max(0.1, Math.min(0.9999, stringDamp));
+      
+      // Pluck damping (controls initial brightness)
+      const pluckDampVariation = (Math.random() - 0.5) * pluckDampingVariation;
+      const pluckDamp = pluckDamping + pluckDampVariation;
+      
+      // Initialize with noise, but apply pluck damping
+      let prevNoise = 0;
       for (let j = 0; j < delayLength; j++) {
-        delayLine[j] = (Math.random() * 2 - 1) * 0.5;
+        const noise = (Math.random() * 2 - 1) * 0.5;
+        // Apply low-pass to initial pluck for warmth
+        const dampedNoise = noise * (1.0 - pluckDamp) + prevNoise * pluckDamp;
+        delayLine[j] = dampedNoise + characterRandom;
+        prevNoise = dampedNoise;
       }
       
-      // String parameters
-      const baseAmplitude = (stringIndex > 3 ? 0.35 : 0.32) / stringsToPlay.length;
-      const damping = 0.9975; // Constant damping for stability
+      // Base amplitude (stronger for bass strings)
+      const baseAmplitude = (stringIndex < 3 ? 0.35 : 0.30) / Math.max(1, stringsToPlay.length * 0.8);
       
-      // Stereo panning (low strings left, high strings right)
-      const panValue = (stringIndex - 2.5) * 0.15; // -0.375 to +0.375
-      const leftGain = Math.max(0, Math.min(1, 0.7 - panValue));
-      const rightGain = Math.max(0, Math.min(1, 0.7 + panValue));
+      // Stereo positioning with spread
+      const panPosition = (stringIndex - 2.5) / 5.0; // -0.5 to +0.5
+      const spreadOffset = (Math.random() - 0.5) * stereoSpread;
+      const finalPan = Math.max(-1, Math.min(1, panPosition + spreadOffset));
+      
+      // Convert pan to gains (equal power panning)
+      const panAngle = (finalPan + 1.0) * 0.25 * Math.PI; // 0 to π/2
+      const leftGain = Math.cos(panAngle);
+      const rightGain = Math.sin(panAngle);
       
       let writeIndex = 0;
-      let prevOutput = 0;
+      let prevSample1 = 0;
+      let prevSample2 = 0;
       
-      // Generate samples
+      // Generate samples with Karplus-Strong feedback loop
       for (let i = startSample; i < durationSamples; i++) {
         const t = (i - startSample) / sampleRate;
         
-        // Simple exponential envelope
-        const envelope = Math.exp(-t * 1.5) * (t < 0.01 ? t / 0.01 : 1.0);
+        // Natural exponential decay
+        const envelope = Math.exp(-t * 0.5) * (t < 0.005 ? t / 0.005 : 1.0);
         
-        // Karplus-Strong algorithm
         const currentSample = delayLine[writeIndex];
         const nextIndex = (writeIndex + 1) % delayLength;
+        const nextSample = delayLine[nextIndex];
         
-        // Low-pass filter (averaging)
-        const filtered = 0.5 * (currentSample + delayLine[nextIndex]) * damping;
+        // Improved averaging filter with damping
+        const averaged = 0.5 * (currentSample + nextSample);
+        const damped = averaged * finalDamping;
         
-        // Validate to prevent NaN/Infinity
-        if (isFinite(filtered)) {
-          delayLine[writeIndex] = filtered;
-        } else {
-          delayLine[writeIndex] = 0;
-          console.warn('⚠️ Invalid sample detected, resetting');
-        }
+        delayLine[writeIndex] = isFinite(damped) ? damped : 0;
         
         // Output with envelope
-        let outputSample = currentSample * baseAmplitude * envelope;
+        let output = currentSample * baseAmplitude * envelope;
         
-        // High-pass filter (DC removal)
-        const highPassFiltered = outputSample - (0.98 * prevOutput);
-        prevOutput = outputSample;
-        outputSample = highPassFiltered;
+        // Two-pole high-pass filter (better DC removal)
+        const highPassed = output - (1.96 * prevSample1) + (0.96 * prevSample2);
+        prevSample2 = prevSample1;
+        prevSample1 = output;
+        output = highPassed * 0.5; // Scale down high-pass output
         
-        // Validate output
-        if (!isFinite(outputSample)) {
-          outputSample = 0;
-        }
+        if (!isFinite(output)) output = 0;
         
         // Add to stereo channels
-        leftChannel[i] += outputSample * leftGain;
-        rightChannel[i] += outputSample * rightGain;
+        leftChannel[i] += output * leftGain;
+        rightChannel[i] += output * rightGain;
         
         writeIndex = nextIndex;
       }
     });
     
-    console.log('✅ Synthesis complete');
+    console.log('✅ André Michelle Karplus-Strong synthesis complete');
     
     // Validate audio data (catch any NaN/Infinity before processing)
     let hasInvalidData = false;
