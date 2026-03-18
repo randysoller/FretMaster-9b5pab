@@ -1,5 +1,6 @@
 // UI Components
 export { Button } from './ui/Button';
+export { StrumControls } from './ui/StrumControls';
 
 // Layout Components
 export { Screen } from './layout/Screen';

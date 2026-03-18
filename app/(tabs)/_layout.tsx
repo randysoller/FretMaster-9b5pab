@@ -250,6 +250,13 @@ export default function TabLayout() {
             title: 'Testing',
           }}
         />
+        <Tabs.Screen
+          name="strum-demo"
+          options={{
+            href: null,
+            title: 'Strumming Demo',
+          }}
+        />
       </Tabs>
     </View>
   );
