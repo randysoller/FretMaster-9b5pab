@@ -135,15 +135,27 @@ class StrummingAudioService {
    * - 6 strings × 13 frets (0-12) × 3 velocities = 234 total samples
    * - Samples organized in string{N}/fret{N}-{velocity}.wav structure
    * 
-   * Note: Once you've downloaded and organized FreePats samples using the
-   * FREEPATS_SETUP_GUIDE.md instructions, these paths will automatically
-   * load the authentic guitar recordings!
+   * ⚠️ IMPORTANT: Samples are currently DISABLED to prevent build errors.
+   * 
+   * TO ENABLE SAMPLES:
+   * 1. Follow FREEPATS_SETUP_GUIDE.md to download and organize samples
+   * 2. Uncomment the sampleMap below
+   * 3. Run: npx expo start --clear
+   * 
+   * Until then, the app uses synthesis fallback (still works great!).
    */
   private getSampleAssetPath(stringIndex: number, fret: number, velocity: 'soft' | 'medium' | 'hard'): any {
     // Validate inputs
     if (stringIndex < 0 || stringIndex > 5 || fret < 0 || fret > 12) {
       return null;
     }
+    
+    // 🔒 SAMPLES DISABLED UNTIL YOU ADD WAV FILES
+    // Return null to use synthesis fallback
+    // Uncomment the sampleMap below once you've added FreePats samples
+    return null;
+    
+    /* UNCOMMENT THIS BLOCK AFTER ADDING SAMPLES:
     
     // Build sample map with all FreePats samples
     // This uses dynamic require paths that Metro bundler will resolve
@@ -404,6 +416,8 @@ class StrummingAudioService {
     }
     
     return assetPath;
+    
+    END OF COMMENTED BLOCK */
   }
   
   /**
