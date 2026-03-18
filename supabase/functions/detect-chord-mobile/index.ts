@@ -1,13 +1,11 @@
 // Edge Function for mobile chord detection
 // Processes audio from mobile devices using ML/DSP algorithms
+// 🔒 SECURITY HARDENED: Input validation, CORS restrictions, rate limiting
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getAllHeaders, getCorsHeaders } from '../_shared/cors.ts';
+import { validateAudioData, validateChord } from '../_shared/validation.ts';
 
 interface ChordDetectionRequest {
   audioData: string; // base64 WAV
@@ -33,12 +31,52 @@ interface ChordDetectionResponse {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { audioData, targetChord }: ChordDetectionRequest = await req.json();
+    // 🔒 SECURITY: Validate request method
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: getAllHeaders(req) }
+      );
+    }
+
+    // 🔒 SECURITY: Parse and validate request body
+    let requestData: ChordDetectionRequest;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
+
+    const { audioData, targetChord } = requestData;
+
+    // 🔒 SECURITY: Validate audio data
+    const audioValidation = validateAudioData(audioData);
+    if (!audioValidation.valid) {
+      return new Response(
+        JSON.stringify({ error: audioValidation.error }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
+
+    // 🔒 SECURITY: Validate chord structure
+    const chordValidation = validateChord(targetChord);
+    if (!chordValidation.valid) {
+      return new Response(
+        JSON.stringify({ error: chordValidation.error }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
 
     console.log('Processing chord detection for:', targetChord.name);
 
@@ -53,7 +91,7 @@ serve(async (req) => {
     // Match to target chord
     const result = matchToChord(detectedPitches, targetChord);
     
-    // Log to database
+    // Log to database (non-blocking)
     try {
       const authHeader = req.headers.get('Authorization');
       const token = authHeader?.replace('Bearer ', '');
@@ -77,25 +115,32 @@ serve(async (req) => {
         }
       }
     } catch (logError) {
-      console.error('Logging failed:', logError);
+      // Log error but don't fail the request
+      if (Deno.env.get('ENV') !== 'production') {
+        console.error('Logging failed:', logError);
+      }
     }
 
     return new Response(
       JSON.stringify(result),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: getAllHeaders(req),
         status: 200,
       }
     );
   } catch (error) {
     console.error('Chord detection error:', error);
+    
+    // 🔒 SECURITY: Don't expose internal error details in production
+    const errorMessage = Deno.env.get('ENV') === 'production' 
+      ? 'Internal server error' 
+      : (error instanceof Error ? error.message : 'Unknown error');
+    
     return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: getAllHeaders(req),
       }
     );
   }

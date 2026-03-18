@@ -6,6 +6,15 @@ import { Platform } from 'react-native';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
+// 🔒 SECURITY: Enforce HTTPS
+if (!supabaseUrl.startsWith('https://')) {
+  throw new Error('🚨 SECURITY ERROR: Supabase URL must use HTTPS!');
+}
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('🚨 SECURITY ERROR: Missing Supabase credentials!');
+}
+
 // Create storage adapter that works on both web and mobile
 const createStorageAdapter = () => {
   if (Platform.OS === 'web') {

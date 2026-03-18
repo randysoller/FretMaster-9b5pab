@@ -1,14 +1,11 @@
 // Edge Function for ML-enhanced chord detection
 // Handles complex chord recognition when local detection confidence is low
+// 🔒 SECURITY HARDENED: Input validation, CORS restrictions, authentication
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-// CORS headers for cross-origin requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getAllHeaders, getCorsHeaders } from '../_shared/cors.ts';
+import { validateChord, validateFrequencies } from '../_shared/validation.ts';
 
 interface ChordAnalysisRequest {
   audioFingerprint?: string;
@@ -35,59 +32,102 @@ interface ChordAnalysisResponse {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const corsHeaders = getCorsHeaders(req);
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Create Supabase client with user's auth token
+    // 🔒 SECURITY: Validate request method
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: getAllHeaders(req) }
+      );
+    }
+
+    // 🔒 SECURITY: Validate authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: getAllHeaders(req) }
+      );
+    }
+
+    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
     // Get user from JWT token
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
 
     if (userError || !user) {
-      console.error('Auth error:', userError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: getAllHeaders(req) }
       );
     }
 
-    // Parse request body
-    const requestData: ChordAnalysisRequest = await req.json();
+    // 🔒 SECURITY: Parse and validate request body
+    let requestData: ChordAnalysisRequest;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
+
     const { detectedFrequencies, targetChord, preliminaryResult, audioFingerprint } = requestData;
 
-    console.log('Processing chord analysis for user:', user.id);
-    console.log('Target chord:', targetChord.name);
-    console.log('Preliminary confidence:', preliminaryResult.confidence);
+    // 🔒 SECURITY: Validate frequencies
+    const freqValidation = validateFrequencies(detectedFrequencies);
+    if (!freqValidation.valid) {
+      return new Response(
+        JSON.stringify({ error: freqValidation.error }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
 
-    // For now, we'll use enhanced algorithmic analysis
-    // In the future, this is where we'd load and run a TensorFlow.js model
+    // 🔒 SECURITY: Validate chord structure
+    const chordValidation = validateChord(targetChord);
+    if (!chordValidation.valid) {
+      return new Response(
+        JSON.stringify({ error: chordValidation.error }),
+        { status: 400, headers: getAllHeaders(req) }
+      );
+    }
+
+    // Log processing (non-sensitive info only)
+    if (Deno.env.get('ENV') !== 'production') {
+      console.log('Processing chord analysis');
+      console.log('Target chord:', targetChord.name);
+      console.log('Preliminary confidence:', preliminaryResult.confidence);
+    }
+
+    // Enhanced algorithmic analysis
     const enhancedResult = await enhanceChordDetection(
       detectedFrequencies,
       targetChord,
       preliminaryResult
     );
 
-    // Log the detection attempt to the database
+    // Log detection attempt (non-blocking)
     if (audioFingerprint) {
-      const { error: logError } = await supabaseClient
-        .rpc('log_chord_detection', {
+      try {
+        await supabaseClient.rpc('log_chord_detection', {
           p_target_chord: targetChord.name,
           p_detected_notes: enhancedResult.detectedNotes,
           p_accuracy: enhancedResult.accuracy,
@@ -95,59 +135,52 @@ serve(async (req) => {
           p_method: 'ml-enhanced',
           p_audio_fingerprint: audioFingerprint,
         });
-
-      if (logError) {
-        console.error('Error logging detection:', logError);
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        if (Deno.env.get('ENV') !== 'production') {
+          console.error('Logging failed:', logError);
+        }
       }
     }
 
     return new Response(
       JSON.stringify(enhancedResult),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: getAllHeaders(req),
         status: 200,
       }
     );
   } catch (error) {
     console.error('Edge function error:', error);
+    
+    // 🔒 SECURITY: Don't expose internal error details in production
+    const errorMessage = Deno.env.get('ENV') === 'production' 
+      ? 'Internal server error' 
+      : (error instanceof Error ? error.message : 'Unknown error');
+    
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined
-      }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: getAllHeaders(req),
       }
     );
   }
 });
 
-/**
- * Enhanced chord detection using advanced algorithms
- * Future: Replace with TensorFlow.js ML model inference
- */
 async function enhanceChordDetection(
   frequencies: number[],
   targetChord: { name: string; positions: number[]; notes: string[] },
   preliminary: { detectedNotes: string[]; accuracy: number; confidence: number }
 ): Promise<ChordAnalysisResponse> {
-  // Apply advanced harmonic analysis
   const harmonicWeights = analyzeHarmonics(frequencies);
-  
-  // Apply psychoacoustic masking model
   const maskedFrequencies = applyMasking(frequencies, harmonicWeights);
-  
-  // Re-evaluate note detection with enhanced data
   const enhancedNotes = detectNotesFromFrequencies(maskedFrequencies, targetChord);
   
-  // Calculate improved accuracy
   const correctNotes = enhancedNotes.filter(note => 
     targetChord.notes.some(target => note.startsWith(target.substring(0, note.length - 1)))
   );
   const accuracy = (correctNotes.length / Math.max(targetChord.notes.length, 1)) * 100;
-  
-  // Boost confidence when using ML enhancement
   const confidence = Math.min(preliminary.confidence * 1.3, 0.95);
 
   return {
@@ -159,40 +192,26 @@ async function enhanceChordDetection(
   };
 }
 
-/**
- * Analyze harmonic content of frequencies
- */
 function analyzeHarmonics(frequencies: number[]): number[] {
   const weights = new Array(frequencies.length).fill(1);
   
-  // Give higher weight to fundamental frequencies
   frequencies.forEach((freq, i) => {
-    // Check if this frequency has harmonics in the set
     const hasHarmonics = frequencies.some((f, j) => 
       i !== j && Math.abs(f / freq - Math.round(f / freq)) < 0.05
     );
     
     if (hasHarmonics) {
-      weights[i] *= 1.5; // Boost fundamental frequencies
+      weights[i] *= 1.5;
     }
   });
   
   return weights;
 }
 
-/**
- * Apply psychoacoustic masking
- */
 function applyMasking(frequencies: number[], weights: number[]): number[] {
-  return frequencies.filter((freq, i) => {
-    // Keep frequencies with significant weight
-    return weights[i] > 0.5;
-  });
+  return frequencies.filter((freq, i) => weights[i] > 0.5);
 }
 
-/**
- * Detect notes from frequency data
- */
 function detectNotesFromFrequencies(
   frequencies: number[],
   targetChord: { notes: string[] }
@@ -203,14 +222,12 @@ function detectNotesFromFrequencies(
   frequencies.forEach(freq => {
     if (freq < 80 || freq > 1200) return;
     
-    // Convert frequency to note
     const noteNum = 12 * (Math.log(freq / 440) / Math.log(2));
     const noteIndex = Math.round(noteNum) + 69;
     const noteName = NOTE_STRINGS[noteIndex % 12];
     const octave = Math.floor(noteIndex / 12) - 1;
     const note = `${noteName}${octave}`;
     
-    // Only include notes close to target chord
     if (targetChord.notes.some(target => 
       note.startsWith(target.substring(0, note.length - 1))
     )) {

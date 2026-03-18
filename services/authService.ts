@@ -144,8 +144,20 @@ class AuthService {
       return { valid: false, error: 'Password is required' };
     }
     
-    if (password.length < 6) {
-      return { valid: false, error: 'Password must be at least 6 characters long' };
+    if (password.length < 12) {
+      return { valid: false, error: 'Password must be at least 12 characters long' };
+    }
+    
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    if (!(hasUpper && hasLower && hasNumber && hasSpecial)) {
+      return { 
+        valid: false, 
+        error: 'Password must contain uppercase, lowercase, number, and special character' 
+      };
     }
     
     return { valid: true };
