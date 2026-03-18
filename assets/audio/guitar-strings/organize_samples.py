@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Guitar Sample Organizer
-Automatically organizes downloaded FreePats samples into string/fret structure
+Guitar Sample Organizer with FLAC Auto-Conversion
+Automatically converts FLAC to WAV and organizes samples into string/fret structure
+
+Requires: ffmpeg (install with: brew install ffmpeg)
 """
 
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 # Complete mapping of string -> fret -> note name
@@ -36,6 +39,35 @@ SAMPLE_MAP = {
     }
 }
 
+def convert_flac_to_wav(flac_file: Path, wav_file: Path) -> bool:
+    """
+    Convert FLAC to WAV using ffmpeg
+    
+    Args:
+        flac_file: Path to FLAC source file
+        wav_file: Path to WAV destination file
+    
+    Returns:
+        True if conversion successful, False otherwise
+    """
+    try:
+        subprocess.run([
+            'ffmpeg',
+            '-i', str(flac_file),
+            '-ar', '44100',  # 44.1kHz sample rate
+            '-sample_fmt', 's16',  # 16-bit
+            '-y',  # Overwrite if exists
+            str(wav_file)
+        ], check=True, capture_output=True, text=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"    ⚠️  FFmpeg conversion failed: {e.stderr[:100]}")
+        return False
+    except FileNotFoundError:
+        print("    ❌ FFmpeg not found! Install with: brew install ffmpeg")
+        return False
+
+
 def organize_samples(source_dir: str, dest_dir: str = '.'):
     """
     Organize downloaded guitar samples into string folders
@@ -64,15 +96,20 @@ def organize_samples(source_dir: str, dest_dir: str = '.'):
     
     print()
     
-    # Find all WAV files in source directory
+    # Find all audio files in source directory (WAV and FLAC)
     wav_files = list(source_path.glob('*.wav')) + list(source_path.glob('*.WAV'))
+    flac_files = list(source_path.glob('*.flac')) + list(source_path.glob('*.FLAC'))
     
-    if not wav_files:
-        print("⚠️  No WAV files found in source directory!")
-        print("   Make sure you've extracted the FreePats samples first.")
+    total_files = len(wav_files) + len(flac_files)
+    
+    if total_files == 0:
+        print("⚠️  No audio files found in source directory!")
+        print("   Make sure you've extracted the sample pack first.")
         return
     
-    print(f"Found {len(wav_files)} WAV files")
+    print(f"Found {len(wav_files)} WAV files + {len(flac_files)} FLAC files")
+    if flac_files:
+        print("🔄 FLAC files will be auto-converted to WAV")
     print()
     
     # Organize samples
@@ -83,13 +120,17 @@ def organize_samples(source_dir: str, dest_dir: str = '.'):
         print(f"Processing String {string_num}...")
         
         for fret, note_name in fret_map.items():
-            # Try to find matching WAV file
+            # Try to find matching audio file (WAV or FLAC)
             # FreePats might use different naming: F# vs Fs, etc.
             possible_names = [
                 f"{note_name}.wav",
                 f"{note_name}.WAV",
+                f"{note_name}.flac",
+                f"{note_name}.FLAC",
                 note_name.replace('s', '#') + '.wav',  # Fs -> F#
                 note_name.replace('s', '#') + '.WAV',
+                note_name.replace('s', '#') + '.flac',
+                note_name.replace('s', '#') + '.FLAC',
             ]
             
             source_file = None
@@ -100,11 +141,22 @@ def organize_samples(source_dir: str, dest_dir: str = '.'):
                     break
             
             if source_file:
-                # Copy to destination
                 dest_file = dest_path / f'string{string_num}' / f'{note_name}.wav'
-                shutil.copy2(source_file, dest_file)
-                print(f"  ✓ Fret {fret:2d}: {note_name:4s} → {dest_file.name}")
-                organized_count += 1
+                
+                # If source is FLAC, convert to WAV
+                if source_file.suffix.lower() == '.flac':
+                    print(f"  🔄 Fret {fret:2d}: {note_name:4s} - Converting FLAC → WAV...")
+                    if convert_flac_to_wav(source_file, dest_file):
+                        print(f"    ✅ Converted and saved to {dest_file.name}")
+                        organized_count += 1
+                    else:
+                        print(f"    ❌ Conversion failed")
+                        missing_samples.append(f"String {string_num}, Fret {fret}: {note_name} (FLAC conversion failed)")
+                else:
+                    # Direct WAV copy
+                    shutil.copy2(source_file, dest_file)
+                    print(f"  ✓ Fret {fret:2d}: {note_name:4s} → {dest_file.name}")
+                    organized_count += 1
             else:
                 print(f"  ✗ Fret {fret:2d}: {note_name:4s} - NOT FOUND")
                 missing_samples.append(f"String {string_num}, Fret {fret}: {note_name}")
@@ -134,13 +186,18 @@ def main():
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python organize_samples.py <source_directory>")
+        print("Guitar Sample Organizer with FLAC Auto-Conversion")
+        print("\nUsage: python3 organize_samples.py <source_directory>")
         print("\nExample:")
-        print("  python organize_samples.py ~/Downloads/freepats-guitar/samples")
+        print("  python3 organize_samples.py ~/Downloads/guitar-samples")
         print("\nThis script will:")
-        print("  1. Find all WAV files in the source directory")
-        print("  2. Organize them into string0/ through string5/ folders")
-        print("  3. Rename them according to the naming convention")
+        print("  1. Find all WAV and FLAC files in the source directory")
+        print("  2. Auto-convert FLAC files to WAV (requires ffmpeg)")
+        print("  3. Organize them into string0/ through string5/ folders")
+        print("  4. Rename them according to the naming convention")
+        print("\nRequirements:")
+        print("  - Python 3")
+        print("  - ffmpeg (install with: brew install ffmpeg)")
         return
     
     source_dir = sys.argv[1]
