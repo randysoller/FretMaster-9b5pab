@@ -161,11 +161,7 @@ class StrummingAudioService {
     const noteName = this.getNoteName(stringIndex, fret);
     if (!noteName) return null;
     
-    // 🔒 SAMPLES DISABLED - Return null to use synthesis fallback
-    // Uncomment the SAMPLE_MAP below once you've added WAV files
-    return null;
-    
-    /* UNCOMMENT THIS BLOCK AFTER ORGANIZING SAMPLES:
+    // ✅ SAMPLES ENABLED - Using real guitar samples!
     
     const SAMPLE_MAP: Record<string, any> = {
       // String 0 (Low E)
@@ -273,8 +269,6 @@ class StrummingAudioService {
       : noteName;
     
     return SAMPLE_MAP[key] || null;
-    
-    END OF COMMENTED BLOCK */
   }
   
   /**
