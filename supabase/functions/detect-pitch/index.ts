@@ -3,8 +3,10 @@
 // 🔒 SECURITY HARDENED: Input validation, CORS restrictions, rate limiting
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 import { getAllHeaders, getCorsHeaders } from '../_shared/cors.ts';
 import { validateAudioData } from '../_shared/validation.ts';
+import { checkRateLimit, addRateLimitHeaders } from '../_shared/rateLimit.ts';
 
 interface PitchDetectionRequest {
   audioData: string; // base64 encoded WAV
@@ -66,6 +68,17 @@ serve(async (req) => {
       );
     }
 
+    // 🔒 SECURITY: Check rate limit
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+    
+    const rateLimitResult = await checkRateLimit(supabaseClient, req, 'detect-pitch');
+    if (rateLimitResult instanceof Response) {
+      return rateLimitResult; // Rate limited - return 429
+    }
+
     console.log('Processing pitch detection, method:', method);
 
     let result: PitchDetectionResponse;
@@ -76,10 +89,14 @@ serve(async (req) => {
       result = await detectWithLocalAlgorithm(audioData);
     }
 
+    // Add rate limit headers to response
+    const responseHeaders = getAllHeaders(req);
+    addRateLimitHeaders(responseHeaders, rateLimitResult);
+    
     return new Response(
       JSON.stringify(result),
       {
-        headers: getAllHeaders(req),
+        headers: responseHeaders,
         status: 200,
       }
     );

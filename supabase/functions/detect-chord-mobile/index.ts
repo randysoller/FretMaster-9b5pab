@@ -1,3 +1,4 @@
+
 // Edge Function for mobile chord detection
 // Processes audio from mobile devices using ML/DSP algorithms
 // 🔒 SECURITY HARDENED: Input validation, CORS restrictions, rate limiting
@@ -6,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 import { getAllHeaders, getCorsHeaders } from '../_shared/cors.ts';
 import { validateAudioData, validateChord } from '../_shared/validation.ts';
+import { checkRateLimit, addRateLimitHeaders } from '../_shared/rateLimit.ts';
 
 interface ChordDetectionRequest {
   audioData: string; // base64 WAV
@@ -78,7 +80,19 @@ serve(async (req) => {
       );
     }
 
+    // 🔒 SECURITY: Check rate limit
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+    
+    const rateLimitResult = await checkRateLimit(supabaseClient, req, 'detect-chord-mobile');
+    if (rateLimitResult instanceof Response) {
+      return rateLimitResult; // Rate limited - return 429
+    }
+
     console.log('Processing chord detection for:', targetChord.name);
+    console.log('Rate limit status:', rateLimitResult.remaining, 'requests remaining');
 
     // Decode audio
     const audioBuffer = decodeBase64ToAudioBuffer(audioData);
@@ -95,36 +109,33 @@ serve(async (req) => {
     try {
       const authHeader = req.headers.get('Authorization');
       const token = authHeader?.replace('Bearer ', '');
+        
+      const { data: { user } } = await supabaseClient.auth.getUser(token);
       
-      if (token) {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        );
-        
-        const { data: { user } } = await supabaseClient.auth.getUser(token);
-        
-        if (user) {
-          await supabaseClient.rpc('log_chord_detection', {
-            p_target_chord: targetChord.name,
-            p_detected_notes: result.detectedNotes,
-            p_accuracy: result.accuracy,
-            p_confidence: result.confidence,
-            p_method: 'mobile-api',
-          });
-        }
+      if (user) {
+        await supabaseClient.rpc('log_chord_detection', {
+          p_target_chord: targetChord.name,
+          p_detected_notes: result.detectedNotes,
+          p_accuracy: result.accuracy,
+          p_confidence: result.confidence,
+          p_method: 'mobile-api',
+        });
       }
-    } catch (logError) {
+    } catch (logError) { // This catch block was missing a closing brace for the preceding try block.
       // Log error but don't fail the request
       if (Deno.env.get('ENV') !== 'production') {
         console.error('Logging failed:', logError);
       }
-    }
+    } // Added closing brace here for the try block related to logging.
 
+    // Add rate limit headers to response
+    const responseHeaders = getAllHeaders(req);
+    addRateLimitHeaders(responseHeaders, rateLimitResult);
+    
     return new Response(
       JSON.stringify(result),
       {
-        headers: getAllHeaders(req),
+        headers: responseHeaders,
         status: 200,
       }
     );

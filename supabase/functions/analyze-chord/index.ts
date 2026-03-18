@@ -6,6 +6,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 import { getAllHeaders, getCorsHeaders } from '../_shared/cors.ts';
 import { validateChord, validateFrequencies } from '../_shared/validation.ts';
+import { checkRateLimit, addRateLimitHeaders } from '../_shared/rateLimit.ts';
 
 interface ChordAnalysisRequest {
   audioFingerprint?: string;
@@ -79,6 +80,12 @@ serve(async (req) => {
       );
     }
 
+    // 🔒 SECURITY: Check rate limit
+    const rateLimitResult = await checkRateLimit(supabaseClient, req, 'analyze-chord');
+    if (rateLimitResult instanceof Response) {
+      return rateLimitResult; // Rate limited - return 429
+    }
+
     // 🔒 SECURITY: Parse and validate request body
     let requestData: ChordAnalysisRequest;
     try {
@@ -143,10 +150,14 @@ serve(async (req) => {
       }
     }
 
+    // Add rate limit headers to response
+    const responseHeaders = getAllHeaders(req);
+    addRateLimitHeaders(responseHeaders, rateLimitResult);
+    
     return new Response(
       JSON.stringify(enhancedResult),
       {
-        headers: getAllHeaders(req),
+        headers: responseHeaders,
         status: 200,
       }
     );
