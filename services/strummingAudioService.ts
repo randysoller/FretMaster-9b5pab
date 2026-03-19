@@ -157,7 +157,7 @@ class StrummingAudioService {
    * ✅ FILES ON GITHUB.COM - READY FOR LOCAL TESTING!
    * 
    * FOR LOCAL TESTING ON YOUR MAC:
-   * 1. Uncomment SAMPLE_MAP below (remove /* and */)
+   * 1. Uncomment SAMPLE_MAP below (remove the comment markers)
    * 2. Run: npx expo start --clear
    * 3. Scan QR code - real guitar samples will work!
    * 
