@@ -154,13 +154,19 @@ class StrummingAudioService {
   /**
    * Get sample asset path
    * 
-   * ✅ REAL GUITAR SAMPLES ENABLED
-   * All 6 strings × 13 frets = 78 authentic guitar samples!
+   * ⏳ SAMPLES READY - WAITING FOR SYNC
+   * Your WAV files are on GitHub, waiting for OnSpace to sync them.
+   * Once files appear in repository, uncomment SAMPLE_MAP below!
    */
   private getSampleAssetPath(stringIndex: number, fret: number): any {
     const noteName = this.getNoteName(stringIndex, fret);
     if (!noteName) return null;
     
+    // ⏳ Files pushed to GitHub - waiting for OnSpace sync
+    // Uncomment SAMPLE_MAP when files appear in repository search
+    return null;
+    
+    /* SAMPLE_MAP - Ready to use once sync completes!
     const SAMPLE_MAP: Record<string, any> = {
       // ============================================================================
       // STRING 0: Low E (E2-E3)
@@ -278,6 +284,7 @@ class StrummingAudioService {
     }
     
     return SAMPLE_MAP[key] || null;
+    */
   }
   
   /**
