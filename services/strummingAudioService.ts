@@ -154,15 +154,24 @@ class StrummingAudioService {
   /**
    * Get sample asset path
    * 
-   * ✅ SAMPLES ENABLED
-   * 78 guitar samples from all 6 strings (E2-E5 range)
-   * Files exist on GitHub and in local repository
+   * ✅ FILES ON GITHUB.COM - READY FOR LOCAL TESTING!
+   * 
+   * FOR LOCAL TESTING ON YOUR MAC:
+   * 1. Uncomment SAMPLE_MAP below (remove /* and */)
+   * 2. Run: npx expo start --clear
+   * 3. Scan QR code - real guitar samples will work!
+   * 
+   * OnSpace hasn't synced yet, so this is commented to prevent compilation errors here.
    */
   private getSampleAssetPath(stringIndex: number, fret: number): any {
     const noteName = this.getNoteName(stringIndex, fret);
     if (!noteName) return null;
     
-    // SAMPLE_MAP - Real guitar samples!
+    // 🎸 Temporarily disabled for OnSpace (files not synced yet)
+    // ✅ For local testing: Uncomment the SAMPLE_MAP block below!
+    return null;
+    
+    /* SAMPLE_MAP - Real guitar samples!
     const SAMPLE_MAP: Record<string, any> = {
       // ============================================================================
       // STRING 0: Low E (E2-E3)
@@ -280,6 +289,7 @@ class StrummingAudioService {
     }
     
     return SAMPLE_MAP[key] || null;
+    */
   }
   
   /**
