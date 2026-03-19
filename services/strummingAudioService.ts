@@ -161,8 +161,11 @@ class StrummingAudioService {
     const noteName = this.getNoteName(stringIndex, fret);
     if (!noteName) return null;
     
-    // ✅ SAMPLES ENABLED - Using real guitar samples!
+    // ⚠️ SAMPLES TEMPORARILY DISABLED - Waiting for new WAV files to be uploaded
+    // Uncomment SAMPLE_MAP below after uploading your new samples!
+    return null;
     
+    /* SAMPLE_MAP - Uncomment after uploading WAV files
     const SAMPLE_MAP: Record<string, any> = {
       // String 0 (Low E) - Using actual Freesound filenames
       'E2': require('@/assets/audio/guitar-strings/string0/467650__allan764__1-e2.wav'),
@@ -228,6 +231,7 @@ class StrummingAudioService {
       : noteName;
     
     return SAMPLE_MAP[key] || null;
+    */
   }
   
   /**
