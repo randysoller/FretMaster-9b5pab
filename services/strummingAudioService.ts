@@ -154,84 +154,130 @@ class StrummingAudioService {
   /**
    * Get sample asset path
    * 
-   * 🔒 SAMPLES CURRENTLY DISABLED
-   * Uncomment the code block below after organizing your samples!
+   * ✅ REAL GUITAR SAMPLES ENABLED
+   * All 6 strings × 13 frets = 78 authentic guitar samples!
    */
   private getSampleAssetPath(stringIndex: number, fret: number): any {
     const noteName = this.getNoteName(stringIndex, fret);
     if (!noteName) return null;
     
-    // ⚠️ SAMPLES TEMPORARILY DISABLED - Waiting for new WAV files to be uploaded
-    // Uncomment SAMPLE_MAP below after uploading your new samples!
-    return null;
-    
-    /* SAMPLE_MAP - Uncomment after uploading WAV files
     const SAMPLE_MAP: Record<string, any> = {
-      // String 0 (Low E) - Using actual Freesound filenames
-      'E2': require('@/assets/audio/guitar-strings/string0/467650__allan764__1-e2.wav'),
-      'F2': require('@/assets/audio/guitar-strings/string0/467674__allan764__2-f2.wav'),
-      // Fs2: No sample (synthesis fallback)
-      'G2': require('@/assets/audio/guitar-strings/string0/467686__allan764__4-g2.wav'),
-      // Gs2: No sample (synthesis fallback)
-      'A2': require('@/assets/audio/guitar-strings/string0/467659__allan764__6-a2.wav'),
-      // As2: No sample (synthesis fallback)
-      'B2': require('@/assets/audio/guitar-strings/string0/467671__allan764__8-b2.wav'),
-      'C3': require('@/assets/audio/guitar-strings/string0/467662__allan764__9-c3.wav'),
-      // Cs3: No sample (synthesis fallback)
-      'D3': require('@/assets/audio/guitar-strings/string0/467648__allan764__11-d3.wav'),
-      // Ds3: No sample (synthesis fallback)
-      'E3': require('@/assets/audio/guitar-strings/string0/467654__allan764__13-e3.wav'),
+      // ============================================================================
+      // STRING 0: Low E (E2-E3)
+      // ============================================================================
+      'E2': require('@/assets/audio/guitar-strings/string0/E2.wav'),
+      'F2': require('@/assets/audio/guitar-strings/string0/F2.wav'),
+      'Fs2': require('@/assets/audio/guitar-strings/string0/Fs2.wav'),
+      'G2': require('@/assets/audio/guitar-strings/string0/G2.wav'),
+      'Gs2': require('@/assets/audio/guitar-strings/string0/Gs2.wav'),
+      'A2': require('@/assets/audio/guitar-strings/string0/A2.wav'),
+      'As2': require('@/assets/audio/guitar-strings/string0/As2.wav'),
+      'B2': require('@/assets/audio/guitar-strings/string0/B2.wav'),
+      'C3': require('@/assets/audio/guitar-strings/string0/C3.wav'),
+      'Cs3': require('@/assets/audio/guitar-strings/string0/Cs3.wav'),
+      'D3': require('@/assets/audio/guitar-strings/string0/D3.wav'),
+      'Ds3': require('@/assets/audio/guitar-strings/string0/Ds3.wav'),
+      'E3': require('@/assets/audio/guitar-strings/string0/E3.wav'),
       
-      // String 1 (A) - No samples uploaded yet (all synthesis fallback)
+      // ============================================================================
+      // STRING 1: A (A2-A3)
+      // ============================================================================
+      'A2_s1': require('@/assets/audio/guitar-strings/string1/A2.wav'),
+      'As2_s1': require('@/assets/audio/guitar-strings/string1/As2.wav'),
+      'B2_s1': require('@/assets/audio/guitar-strings/string1/B2.wav'),
+      'C3_s1': require('@/assets/audio/guitar-strings/string1/C3.wav'),
+      'Cs3_s1': require('@/assets/audio/guitar-strings/string1/Cs3.wav'),
+      'D3_s1': require('@/assets/audio/guitar-strings/string1/D3.wav'),
+      'Ds3_s1': require('@/assets/audio/guitar-strings/string1/Ds3.wav'),
+      'E3_s1': require('@/assets/audio/guitar-strings/string1/E3.wav'),
+      'F3_s1': require('@/assets/audio/guitar-strings/string1/F3.wav'),
+      'Fs3_s1': require('@/assets/audio/guitar-strings/string1/Fs3.wav'),
+      'G3_s1': require('@/assets/audio/guitar-strings/string1/G3.wav'),
+      'Gs3_s1': require('@/assets/audio/guitar-strings/string1/Gs3.wav'),
+      'A3_s1': require('@/assets/audio/guitar-strings/string1/A3.wav'),
       
-      // String 2 (D) - No samples uploaded yet (all synthesis fallback)
+      // ============================================================================
+      // STRING 2: D (D3-D4)
+      // ============================================================================
+      'D3_s2': require('@/assets/audio/guitar-strings/string2/D3.wav'),
+      'Ds3_s2': require('@/assets/audio/guitar-strings/string2/Ds3.wav'),
+      'E3_s2': require('@/assets/audio/guitar-strings/string2/E3.wav'),
+      'F3_s2': require('@/assets/audio/guitar-strings/string2/F3.wav'),
+      'Fs3_s2': require('@/assets/audio/guitar-strings/string2/Fs3.wav'),
+      'G3_s2': require('@/assets/audio/guitar-strings/string2/G3.wav'),
+      'Gs3_s2': require('@/assets/audio/guitar-strings/string2/Gs3.wav'),
+      'A3_s2': require('@/assets/audio/guitar-strings/string2/A3.wav'),
+      'As3_s2': require('@/assets/audio/guitar-strings/string2/As3.wav'),
+      'B3_s2': require('@/assets/audio/guitar-strings/string2/B3.wav'),
+      'C4_s2': require('@/assets/audio/guitar-strings/string2/C4.wav'),
+      'Cs4_s2': require('@/assets/audio/guitar-strings/string2/Cs4.wav'),
+      'D4_s2': require('@/assets/audio/guitar-strings/string2/D4.wav'),
       
-      // String 3 (G) - Using actual Freesound filenames
-      // G3_s3: No unique file needed (matches string0 samples)
-      // Gs3_s3: No sample (synthesis fallback)
-      'A3_s3': require('@/assets/audio/guitar-strings/string3/467675__allan764__19-a3.wav'),
-      // As3_s3: No sample (synthesis fallback)
-      'B3_s3': require('@/assets/audio/guitar-strings/string3/467673__allan764__20-b3.wav'),
-      'C4_s3': require('@/assets/audio/guitar-strings/string3/467679__allan764__22-c4.wav'),
-      // Cs4_s3: No sample (synthesis fallback)
-      'D4_s3': require('@/assets/audio/guitar-strings/string3/467678__allan764__23-d4.wav'),
-      // Ds4: No sample (synthesis fallback)
-      'E4': require('@/assets/audio/guitar-strings/string3/467676__allan764__25-e4.wav'),
-      'F4': require('@/assets/audio/guitar-strings/string3/467681__allan764__26-f4.wav'),
-      // Fs4: No sample (synthesis fallback)
-      'G4': require('@/assets/audio/guitar-strings/string3/467665__allan764__28-g4.wav'),
+      // ============================================================================
+      // STRING 3: G (G3-G4)
+      // ============================================================================
+      'G3_s3': require('@/assets/audio/guitar-strings/string3/G3.wav'),
+      'Gs3_s3': require('@/assets/audio/guitar-strings/string3/Gs3.wav'),
+      'A3_s3': require('@/assets/audio/guitar-strings/string3/A3.wav'),
+      'As3_s3': require('@/assets/audio/guitar-strings/string3/As3.wav'),
+      'B3_s3': require('@/assets/audio/guitar-strings/string3/B3.wav'),
+      'C4_s3': require('@/assets/audio/guitar-strings/string3/C4.wav'),
+      'Cs4_s3': require('@/assets/audio/guitar-strings/string3/Cs4.wav'),
+      'D4_s3': require('@/assets/audio/guitar-strings/string3/D4.wav'),
+      'Ds4_s3': require('@/assets/audio/guitar-strings/string3/Ds4.wav'),
+      'E4_s3': require('@/assets/audio/guitar-strings/string3/E4.wav'),
+      'F4_s3': require('@/assets/audio/guitar-strings/string3/F4.wav'),
+      'Fs4_s3': require('@/assets/audio/guitar-strings/string3/Fs4.wav'),
+      'G4_s3': require('@/assets/audio/guitar-strings/string3/G4.wav'),
       
-      // String 4 (B) - Using actual Freesound filenames (limited samples)
-      // B3_s4: No unique file needed
-      // Most notes use synthesis fallback
-      'C4_s4': require('@/assets/audio/guitar-strings/string4/467649__allan764__10-c3.wav'),
-      // Cs4_s4: No sample (synthesis fallback)
-      'D4_s4': require('@/assets/audio/guitar-strings/string4/467648__allan764__11-d3.wav'),
-      // Ds4_s4: No sample (synthesis fallback)
-      'E4_s4': require('@/assets/audio/guitar-strings/string4/467654__allan764__13-e3.wav'),
-      'F4_s4': require('@/assets/audio/guitar-strings/string4/467653__allan764__14-f3.wav'),
-      // Fs4_s4: No sample (synthesis fallback)
-      'G4_s4': require('@/assets/audio/guitar-strings/string4/467651__allan764__16-g3.wav'),
-      // Gs4, A4, As4, B4: No samples (synthesis fallback)
+      // ============================================================================
+      // STRING 4: B (B3-B4)
+      // ============================================================================
+      'B3_s4': require('@/assets/audio/guitar-strings/string4/B3.wav'),
+      'C4_s4': require('@/assets/audio/guitar-strings/string4/C4.wav'),
+      'Cs4_s4': require('@/assets/audio/guitar-strings/string4/Cs4.wav'),
+      'D4_s4': require('@/assets/audio/guitar-strings/string4/D4.wav'),
+      'Ds4_s4': require('@/assets/audio/guitar-strings/string4/Ds4.wav'),
+      'E4_s4': require('@/assets/audio/guitar-strings/string4/E4.wav'),
+      'F4_s4': require('@/assets/audio/guitar-strings/string4/F4.wav'),
+      'Fs4_s4': require('@/assets/audio/guitar-strings/string4/Fs4.wav'),
+      'G4_s4': require('@/assets/audio/guitar-strings/string4/G4.wav'),
+      'Gs4_s4': require('@/assets/audio/guitar-strings/string4/Gs4.wav'),
+      'A4_s4': require('@/assets/audio/guitar-strings/string4/A4.wav'),
+      'As4_s4': require('@/assets/audio/guitar-strings/string4/As4.wav'),
+      'B4_s4': require('@/assets/audio/guitar-strings/string4/B4.wav'),
       
-      // String 5 (High E) - No samples uploaded yet (all synthesis fallback)
+      // ============================================================================
+      // STRING 5: High E (E4-E5)
+      // ============================================================================
+      'E4_s5': require('@/assets/audio/guitar-strings/string5/E4.wav'),
+      'F4_s5': require('@/assets/audio/guitar-strings/string5/F4.wav'),
+      'Fs4_s5': require('@/assets/audio/guitar-strings/string5/Fs4.wav'),
+      'G4_s5': require('@/assets/audio/guitar-strings/string5/G4.wav'),
+      'Gs4_s5': require('@/assets/audio/guitar-strings/string5/Gs4.wav'),
+      'A4_s5': require('@/assets/audio/guitar-strings/string5/A4.wav'),
+      'As4_s5': require('@/assets/audio/guitar-strings/string5/As4.wav'),
+      'B4_s5': require('@/assets/audio/guitar-strings/string5/B4.wav'),
+      'C5_s5': require('@/assets/audio/guitar-strings/string5/C5.wav'),
+      'Cs5_s5': require('@/assets/audio/guitar-strings/string5/Cs5.wav'),
+      'D5_s5': require('@/assets/audio/guitar-strings/string5/D5.wav'),
+      'Ds5_s5': require('@/assets/audio/guitar-strings/string5/Ds5.wav'),
+      'E5_s5': require('@/assets/audio/guitar-strings/string5/E5.wav'),
     };
     
-    // Build lookup key (add suffix for duplicate notes on multiple strings)
-    const key = stringIndex >= 1 && ['A2', 'As2', 'B2', 'C3', 'Cs3', 'D3', 'Ds3', 'E3'].includes(noteName)
-      ? `${noteName}_s${stringIndex}`
-      : stringIndex >= 2 && ['F3', 'Fs3', 'G3', 'Gs3', 'A3'].includes(noteName)
-      ? `${noteName}_s${stringIndex}`
-      : stringIndex >= 3 && ['As3', 'B3', 'C4', 'Cs4', 'D4'].includes(noteName)
-      ? `${noteName}_s${stringIndex}`
-      : stringIndex >= 4 && ['Ds4', 'E4', 'F4', 'Fs4', 'G4'].includes(noteName)
-      ? `${noteName}_s${stringIndex}`
-      : stringIndex >= 5 && ['Gs4', 'A4', 'As4', 'B4'].includes(noteName)
-      ? `${noteName}_s${stringIndex}`
-      : noteName;
+    // Build lookup key (add string suffix for notes that appear on multiple strings)
+    let key: string;
+    
+    // String 0: No suffix needed (unique notes)
+    if (stringIndex === 0) {
+      key = noteName;
+    }
+    // String 1+: Add suffix for all notes to avoid conflicts
+    else {
+      key = `${noteName}_s${stringIndex}`;
+    }
     
     return SAMPLE_MAP[key] || null;
-    */
   }
   
   /**
